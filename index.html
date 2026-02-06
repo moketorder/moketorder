@@ -997,19 +997,19 @@
     <div id="history-modal" class="modal-overlay">
         <div class="modal-content">
             <div
-                style="background:var(--moket-green); padding: 45px 20px 25px 20px; border-radius: 12px 12px 0 0; margin: -20px -20px 18px -20px; text-align: center;">
+                style="background:var(--moket-green); padding: 45px 20px 25px 20px; border-radius: 12px 12px 0 0; margin: -20px -20px 8px -20px; text-align: center;">
                 <h3 id="history-modal-title"
                     style="margin: 0; font-weight: 900; color: var(--white); font-size: 1.35rem;">주문내역</h3>
             </div>
             <div style="padding: 0 20px 0 20px; flex-shrink: 0;">
                 <div
-                    style="display: flex; justify-content: center; gap: 8px; margin-bottom: 12px; border-bottom: 1.5px solid #eee; padding-bottom: 10px;">
+                    style="display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; border-bottom: 1.5px solid #eee; padding-bottom: 8px;">
                     <button class="date-btn" id="btn-sort-order" onclick="changeSortMode('timestamp')"
                         style="height:36px; font-size:1rem; flex:1;">주문일순</button>
                     <button class="date-btn active" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
                         style="height:36px; font-size:1rem; flex:1;">픽업일순</button>
                 </div>
-                <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 5px;">
+                <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 8px;">
                     <button class="date-btn" id="filter-all" onclick="filterHistory('all')"
                         style="height:32px; font-size:0.9rem; flex:1; padding:0;">전체</button>
                     <button class="date-btn active" id="filter-today" onclick="filterHistory('today')"
@@ -1019,7 +1019,18 @@
                     <button class="date-btn" id="filter-month" onclick="filterHistory('month')"
                         style="height:32px; font-size:0.9rem; flex:1; padding:0;">1개월</button>
                 </div>
-                <div style="display: flex; justify-content: flex-end; padding: 0;">
+                <div
+                    style="display: flex; justify-content: center; gap: 6px; margin-bottom: 0; border-top: 1.5px solid #eee; padding-top: 8px;">
+                    <button class="date-btn active" id="status-order" onclick="filterStatus('order')"
+                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">주문</button>
+                    <button class="date-btn" id="status-cancel" onclick="filterStatus('cancel')"
+                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">취소</button>
+                    <button class="date-btn" id="status-stocked" onclick="filterStatus('stocked')"
+                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">입고</button>
+                    <button class="date-btn" id="status-pickup" onclick="filterStatus('pickup')"
+                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">픽업</button>
+                </div>
+                <div style="display: flex; justify-content: flex-end; padding: 0; margin-top: 2px;">
                     <button id="btn-sort-dir" onclick="toggleSortDir()"
                         style="height: 24px; width: 32px; padding: 0; background: none; border: none; color: #999; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none; margin-right: -4px;">
                     </button>
@@ -1354,6 +1365,7 @@
         let currentSortBy = 'pickupDate'; // 'pickupDate' (픽업일) 기본값
         let currentSortDir = 'asc'; // 픽업일 기준은 오름차순(오늘->미래)이 기본
         let currentFilter = 'all'; // '전체' 기본값
+        let currentStatusFilter = 'order'; // '주문' 기본값 (하위분류)
 
         function toggleSortDir() {
             currentSortDir = (currentSortDir === 'desc') ? 'asc' : 'desc';
@@ -1372,6 +1384,7 @@
             // [추가] 모달을 열 때마다 기본값으로 초기화 (픽업일순, 오늘)
             currentSortBy = 'pickupDate';
             currentFilter = 'all';
+            currentStatusFilter = 'order';
             currentSortDir = 'asc'; // 오름차순으로 초기화 (오늘 항목이 위로)
 
             // 버튼 UI 초기화
@@ -1381,6 +1394,12 @@
             document.getElementById('filter-today').classList.remove('active');
             document.getElementById('filter-week').classList.remove('active');
             document.getElementById('filter-month').classList.remove('active');
+
+            // 하위 분류 버튼 초기화
+            document.getElementById('status-order').classList.add('active');
+            document.getElementById('status-cancel').classList.remove('active');
+            document.getElementById('status-stocked').classList.remove('active');
+            document.getElementById('status-pickup').classList.remove('active');
 
             const modal = document.getElementById('history-modal');
             const list = document.getElementById('history-list');
@@ -1461,6 +1480,17 @@
             renderHistory();
         }
 
+        function filterStatus(status) {
+            currentStatusFilter = status;
+            // 버튼 활성화 처리
+            const statuses = ['order', 'cancel', 'stocked', 'pickup'];
+            statuses.forEach(s => {
+                const btn = document.getElementById('status-' + s);
+                if (btn) btn.classList.toggle('active', s === status);
+            });
+            renderHistory();
+        }
+
         function renderHistory() {
             const list = document.getElementById('history-list');
             list.innerHTML = '';
@@ -1480,23 +1510,52 @@
 
             const now = new Date();
             const filtered = fullHistoryData.filter(item => {
+                const isCancelled = (item.item && item.item.includes('[취소]')) ||
+                    (item.received === "canceled" || item.received === "취소완료");
+                const isReceived = (item.received === true || item.received === "TRUE");
+
+                // [하위 분류 필터 적용]
+                if (currentStatusFilter === 'order') {
+                    if (isCancelled) return false;
+                    // 주문: 날짜 상관없이 모든 품목 (단, 기간 필터가 'all'이 아니면 기간 필터 적용)
+                } else if (currentStatusFilter === 'cancel') {
+                    if (!isCancelled) return false;
+                    // 취소: 날짜 상관없이 취소 품목만
+                } else if (currentStatusFilter === 'stocked') {
+                    if (isCancelled || isReceived) return false;
+
+                    if (currentSortBy === 'pickupDate' && currentFilter === 'today') {
+                        // 픽업일순 - 오늘 - 입고: 픽업일이 오늘인 것만
+                        const pDate = parseKRDate(item.pickupDate);
+                        const isSameDay = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+                        if (!isSameDay(now, pDate)) return false;
+                    } else {
+                        // 입고 기본: 오늘 24시 전 주문 품목 중 미픽업
+                        const orderDate = parseKRDate(item.timestamp);
+                        const todayEnd = new Date();
+                        todayEnd.setHours(23, 59, 59, 999);
+                        if (orderDate > todayEnd) return false;
+                    }
+                    // 입고 모드에서는 기간 필터 무시하고 위의 조건(픽업일 오늘 또는 24시전 주문) 적용
+                    return true;
+                } else if (currentStatusFilter === 'pickup') {
+                    if (!isReceived || isCancelled) return false;
+                    // 픽업: 픽업 완료 품목 (기간 필터가 'all'이 아니면 기간 필터 적용)
+                }
+
+                // [기간 필터 적용 (주문/취소/픽업일 때만 작동)]
                 if (currentFilter === 'all') return true;
-                const itemDate = parseKRDate(item[currentSortBy]);
+                const itemDateForFilter = parseKRDate(item[currentSortBy]);
 
                 if (currentSortBy === 'timestamp') {
-                    // 주문일순: 과거 내역 필터링 (최근 24시간/7일/30일 -> 날짜 기준 수정)
                     const isSameDay = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-
-                    if (currentFilter === 'today') return isSameDay(now, itemDate);
-                    if (currentFilter === 'week') return (now - itemDate) / (1000 * 60 * 60 * 24) < 7;
-                    if (currentFilter === 'month') return (now - itemDate) / (1000 * 60 * 60 * 24) < 30;
+                    if (currentFilter === 'today') return isSameDay(now, itemDateForFilter);
+                    if (currentFilter === 'week') return (now - itemDateForFilter) / (1000 * 60 * 60 * 24) < 7;
+                    if (currentFilter === 'month') return (now - itemDateForFilter) / (1000 * 60 * 60 * 24) < 30;
                 } else {
-                    // 픽업일순: 미래 일정 필터링 (오늘/7일 이내/30일 이내)
                     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const targetDate = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate());
-                    // 날짜 차이 계산 (미래는 양수)
+                    const targetDate = new Date(itemDateForFilter.getFullYear(), itemDateForFilter.getMonth(), itemDateForFilter.getDate());
                     const diffDays = Math.floor((targetDate - todayStart) / (1000 * 60 * 60 * 24));
-
                     if (currentFilter === 'today') return diffDays === 0;
                     if (currentFilter === 'week') return diffDays >= 0 && diffDays <= 7;
                     if (currentFilter === 'month') return diffDays >= 0 && diffDays <= 30;
