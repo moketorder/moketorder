@@ -1699,6 +1699,7 @@
                     .then(result => {
                         const updatedIdx = fullHistoryData.findIndex(d =>
                             String(d.timestamp).trim() === String(timestamp).trim() &&
+                            String(d.matchKey || "").trim() === String(matchKey || "").trim() && // matchKey 비교 추가
                             String(d.item).replace(/['"]/g, '').trim() === String(item).replace(/['"]/g, '').trim()
                         );
 
@@ -1718,8 +1719,8 @@
                                 localStorage.setItem(cacheKey, JSON.stringify(fullHistoryData));
 
                                 // 로컬 재고 복구 (서버는 이미 완료되었으므로 시각적 업데이트)
-                                const itemKey = (order.matchKey || "") + "|" + String(item).replace(/['"]/g, '').trim();
-                                const p = productsData.find(pd => pd.matchKey === String(order.matchKey || "") && pd.name === String(item).replace(/['"]/g, '').trim());
+                                const itemKey = (matchKey || "") + "|" + String(item).replace(/['"]/g, '').trim();
+                                const p = productsData.find(pd => pd.matchKey === String(matchKey || "") && pd.name === String(item).replace(/['"]/g, '').trim());
                                 if (p) {
                                     p.stock = parseInt(p.stock || 0) + (parseInt(fullHistoryData[updatedIdx].qty) || 1);
                                     // [상태 잠금] 15초 동안 이 수량을 보호 (loadData가 덮어쓰지 못하도록)
@@ -1729,18 +1730,19 @@
                                     };
                                 }
                             }
-                            showSystemModal("주문이 취소되었습니다.\n목록이 정렬되었습니다.", 'alert');
+                            showSystemModal("주문이 취소되었습니다.\\n목록이 정렬되었습니다.", 'alert');
                             renderHistory();
                             setTimeout(() => loadData(), 2000); // 실제 데이터 싱크
                         } else {
                             if (updatedIdx !== -1) fullHistoryData[updatedIdx].isProcessing = false;
                             renderHistory();
-                            showSystemModal("취소 처리에 실패했습니다.\n잠시 후 다시 시도해 주세요.", 'alert');
+                            showSystemModal("취소 처리에 실패했습니다.\\n잠시 후 다시 시도해 주세요.", 'alert');
                         }
                     })
                     .catch(e => {
                         const errIdx = fullHistoryData.findIndex(d =>
                             String(d.timestamp).trim() === String(timestamp).trim() &&
+                            String(d.matchKey || "").trim() === String(matchKey || "").trim() && // matchKey 비교 추가
                             String(d.item).replace(/['"]/g, '').trim() === String(item).replace(/['"]/g, '').trim()
                         );
                         if (errIdx !== -1) fullHistoryData[errIdx].isProcessing = false;
