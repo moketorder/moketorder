@@ -1234,9 +1234,16 @@
                         url: '/v2/user/me',
                         success: function (res) {
                             console.log('User info retrieved:', res);
-                            const kakaoName = res.kakao_account.profile.nickname;
+                            const kakaoName = res.kakao_account?.profile?.nickname;
+                            const kakaoPhone = res.kakao_account?.phone_number; // 권한 있을 경우만 들어옴
+
                             if (kakaoName) {
-                                localStorage.setItem('kakao_nickname', kakaoName);
+                                // [수정] 원본 정보는 별도 키에 영구 보관 (사용자 수정 시에도 유지됨)
+                                localStorage.setItem('kakao_original_name', kakaoName);
+                                if (kakaoPhone) localStorage.setItem('kakao_original_phone', kakaoPhone);
+
+                                // 화면 표시용 (사용자가 수정 가능)
+                                localStorage.setItem('moket_user_name', kakaoName);
                                 document.getElementById('input-name').value = kakaoName;
 
                                 const modal = document.getElementById('profile-modal');
@@ -2094,8 +2101,8 @@
 
                 // 2. 백그라운드 전송
                 // [수정] 원본 카카오 프로필 정보 항상 포함 (사용자 수동 변경과 관계없이 기록용)
-                const kakaoName = localStorage.getItem('kakao_user_name') || "";
-                const kakaoPhone = localStorage.getItem('kakao_user_phone') || "";
+                const kakaoName = localStorage.getItem('kakao_original_name') || "";
+                const kakaoPhone = localStorage.getItem('kakao_original_phone') || "";
 
                 // 2. 서버 전송 데이터 구성
                 const payload = {
@@ -2140,6 +2147,12 @@
 
         // window.onload 대신 DOMContentLoaded 사용 (훨씬 빠름)
         document.addEventListener('DOMContentLoaded', () => {
+            // [마이그레이션] 구버전 카카오 키 이동
+            const oldNick = localStorage.getItem('kakao_nickname');
+            if (oldNick && !localStorage.getItem('kakao_original_name')) {
+                localStorage.setItem('kakao_original_name', oldNick);
+            }
+
             // 주문내역은 배경에서 삭제 (UI 안막음)
             setTimeout(() => localStorage.removeItem('moket_order_history'), 100);
 
