@@ -878,20 +878,16 @@
                 <h3 id="profile-modal-title"
                     style="margin: 0; font-weight: 900; color: var(--white); font-size: 1.35rem;">주문자 정보</h3>
             </div>
-            <div class="login-msg" id="kakao-cert-info"
-                style="display:none; background:#f0f7ff; border:1px solid #d0e4ff; color:#0056b3; padding:10px; border-radius:10px; font-size:0.9rem; margin-bottom:15px; font-weight:700; text-align:center;">
-                ✅ 카카오 인증됨: <span id="cert-name-val"></span>
-            </div>
             <div class="login-msg" id="kakao-login-prompt">
                 모켓에 오신 고객님 반갑습니다!<br>서비스를 이용하시려면 <b>카카오 로그인</b>이 필요합니다.
             </div>
             <div class="input-group"><strong>주문자명</strong><input id="input-name" type="text" class="modal-input"
                     placeholder="주문자명 입력">
-                <div class="input-hint">오픈채팅방 닉네임으로 입력 해 주세요.</div>
+                <div class="input-hint">오픈채팅방 닉네임과 동일하게 설정 해 주세요.</div>
             </div>
             <div class="input-group"><strong>연락처</strong><input id="input-phone" type="tel" class="modal-input"
                     placeholder="010-0000-0000">
-                <div class="input-hint">주문내역을 받아보실 연락처를 입력 해 주세요.</div>
+                <div class="input-hint">주문확인안내와 픽업안내를 받아보실 연락처를 입력 해 주세요.</div>
             </div>
             <button id="btn-kakao-login" class="btn-common btn-kakao" onclick="loginWithKakao()">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style="margin-right:8px;">
@@ -1032,7 +1028,7 @@
             </div>
         </div>
     </div>
-    <script>const API_URL = 'https://script.google.com/macros/s/AKfycbxkDVATKgn9gJsQNZeM3RdPgBs7HFn4MVwejp4s1lrVH13G3Y9N5j5BMuSnZQHnlHcM/exec'
+    <script>const API_URL = 'https://script.google.com/macros/s/AKfycby9Oxeh4IFX6t0bOR2AnbD1KTEDcobfHTCplEj2HfgZuQ7dRRMzroBGc6MsmGH8jUdF/exec'
 
         // [카카오 초기화]
         try {
@@ -1206,20 +1202,15 @@
                 document.getElementById('input-phone').value = phone;
             }
 
-            // [추가] 카카오 인증 상태 표시
+            // [추가] 카카오 인증 상태에 따른 버튼 처리 (UI는 숨김)
             const certName = localStorage.getItem('kakao_original_name');
-            const certDiv = document.getElementById('kakao-cert-info');
             const promptDiv = document.getElementById('kakao-login-prompt');
-            const certVal = document.getElementById('cert-name-val');
             const kakaoBtn = document.getElementById('btn-kakao-login');
 
             if (certName) {
-                if (certDiv) certDiv.style.display = 'block';
                 if (promptDiv) promptDiv.style.display = 'none';
-                if (certVal) certVal.innerText = certName;
                 if (kakaoBtn) kakaoBtn.style.display = 'none';
             } else {
-                if (certDiv) certDiv.style.display = 'none';
                 if (promptDiv) promptDiv.style.display = 'block';
                 if (kakaoBtn) kakaoBtn.style.display = 'flex';
             }
