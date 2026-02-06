@@ -1003,15 +1003,17 @@
             </div>
             <div style="padding: 0 20px 0 20px; flex-shrink: 0;">
                 <div
-                    style="display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; border-bottom: 1.5px solid #eee; padding-bottom: 8px;">
-                    <button class="date-btn" id="btn-sort-order" onclick="changeSortMode('timestamp')"
-                        style="height:36px; font-size:1rem; flex:1;">주문일순</button>
-                    <button class="date-btn active" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
-                        style="height:36px; font-size:1rem; flex:1;">픽업일순</button>
+                    style="display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; border-bottom: 1.5px solid #eee; padding-bottom: 8px;">
+                    <button class="date-btn active" id="status-order" onclick="filterStatus('order')"
+                        style="height:42px; font-size:1.0rem; flex:1; padding:0; font-weight:900;">전체</button>
+                    <button class="date-btn" id="status-stocked" onclick="filterStatus('stocked')"
+                        style="height:42px; font-size:1.0rem; flex:1; padding:0; font-weight:900;">입고</button>
+                    <button class="date-btn" id="status-pickup" onclick="filterStatus('pickup')"
+                        style="height:42px; font-size:1.0rem; flex:1; padding:0; font-weight:900;">픽업</button>
+                    <button class="date-btn" id="status-cancel" onclick="filterStatus('cancel')"
+                        style="height:42px; font-size:1.0rem; flex:1; padding:0; font-weight:900;">취소</button>
                 </div>
                 <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 8px;">
-                    <button class="date-btn" id="filter-all" onclick="filterHistory('all')"
-                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">전체</button>
                     <button class="date-btn active" id="filter-today" onclick="filterHistory('today')"
                         style="height:32px; font-size:0.9rem; flex:1; padding:0;">오늘</button>
                     <button class="date-btn" id="filter-week" onclick="filterHistory('week')"
@@ -1020,15 +1022,11 @@
                         style="height:32px; font-size:0.9rem; flex:1; padding:0;">1개월</button>
                 </div>
                 <div
-                    style="display: flex; justify-content: center; gap: 6px; margin-bottom: 0; border-top: 1.5px solid #eee; padding-top: 8px;">
-                    <button class="date-btn active" id="status-order" onclick="filterStatus('order')"
-                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">주문</button>
-                    <button class="date-btn" id="status-cancel" onclick="filterStatus('cancel')"
-                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">취소</button>
-                    <button class="date-btn" id="status-stocked" onclick="filterStatus('stocked')"
-                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">입고</button>
-                    <button class="date-btn" id="status-pickup" onclick="filterStatus('pickup')"
-                        style="height:32px; font-size:0.9rem; flex:1; padding:0;">픽업</button>
+                    style="display: flex; justify-content: center; gap: 8px; margin-bottom: 0; border-top: 1.5px solid #eee; padding-top: 8px;">
+                    <button class="date-btn active" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
+                        style="height:30px; font-size:0.85rem; flex:1;">픽업순</button>
+                    <button class="date-btn" id="btn-sort-order" onclick="changeSortMode('timestamp')"
+                        style="height:30px; font-size:0.85rem; flex:1;">주문순</button>
                 </div>
                 <div style="display: flex; justify-content: flex-end; padding: 0; margin-top: 2px;">
                     <button id="btn-sort-dir" onclick="toggleSortDir()"
@@ -1372,13 +1370,15 @@
         let fullHistoryData = []; // 서버에서 가져온 전체 데이터 저장
         let currentSortBy = 'pickupDate'; // 'pickupDate' (픽업일) 기본값
         let currentSortDir = 'asc'; // 픽업일 기준은 오름차순(오늘->미래)이 기본
-        let currentFilter = 'all'; // '전체' 기본값
+        let currentFilter = 'today'; // '오늘' 기본값
         let currentStatusFilter = 'order'; // '주문' 기본값 (하위분류)
 
         function toggleSortDir() {
             currentSortDir = (currentSortDir === 'desc') ? 'asc' : 'desc';
             renderHistory();
         }
+
+        let currentHistoryLimit = 10;
 
         async function openHistoryModal() {
             const name = document.getElementById('input-name').value;
@@ -1391,15 +1391,15 @@
 
             // [추가] 모달을 열 때마다 기본값으로 초기화 (픽업일순, 오늘)
             currentSortBy = 'pickupDate';
-            currentFilter = 'all';
+            currentFilter = 'today';
             currentStatusFilter = 'order';
             currentSortDir = 'asc'; // 오름차순으로 초기화 (오늘 항목이 위로)
+            currentHistoryLimit = 10; // 초기화
 
             // 버튼 UI 초기화
             document.getElementById('btn-sort-order').classList.remove('active');
             document.getElementById('btn-sort-pickup').classList.add('active');
-            document.getElementById('filter-all').classList.add('active');
-            document.getElementById('filter-today').classList.remove('active');
+            document.getElementById('filter-today').classList.add('active');
             document.getElementById('filter-week').classList.remove('active');
             document.getElementById('filter-month').classList.remove('active');
 
@@ -1469,6 +1469,7 @@
 
         function changeSortMode(mode) {
             currentSortBy = mode;
+            currentHistoryLimit = 10; // 초기화
             // 모드 변경 시 적절한 기본 정렬 방향 설정
             currentSortDir = (mode === 'timestamp') ? 'desc' : 'asc';
 
@@ -1479,6 +1480,7 @@
 
         function filterHistory(type) {
             currentFilter = type;
+            currentHistoryLimit = 10; // 초기화
             // 버튼 활성화 처리
             const buttons = ['all', 'today', 'week', 'month'];
             buttons.forEach(b => {
@@ -1490,6 +1492,7 @@
 
         function filterStatus(status) {
             currentStatusFilter = status;
+            currentHistoryLimit = 10; // 초기화
             // 버튼 활성화 처리
             const statuses = ['order', 'cancel', 'stocked', 'pickup'];
             statuses.forEach(s => {
@@ -1524,51 +1527,45 @@
 
                 // [하위 분류 필터 적용]
                 if (currentStatusFilter === 'order') {
-                    if (isCancelled) return false;
-                    // 주문: 날짜 상관없이 모든 품목 (단, 기간 필터가 'all'이 아니면 기간 필터 적용)
+                    // '전체' 탭: 취소된 항목도 모두 포함 (기존 필터 로직 제거)
                 } else if (currentStatusFilter === 'cancel') {
                     if (!isCancelled) return false;
-                    // 취소: 날짜 상관없이 취소 품목만
                 } else if (currentStatusFilter === 'stocked') {
                     if (isCancelled || isReceived) return false;
-
-                    if (currentFilter === 'today') {
-                        // 오늘 - 입고: 정렬 방식 무관하게 픽업일이 오늘인 것만
-                        const pDate = parseKRDate(item.pickupDate);
-                        const isSameDay = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-                        if (!isSameDay(now, pDate)) return false;
-                    } else {
-                        // 입고 기본: 오늘 24시 전 주문 품목 중 미픽업
-                        const orderDate = parseKRDate(item.timestamp);
-                        const todayEnd = new Date();
-                        todayEnd.setHours(23, 59, 59, 999);
-                        if (orderDate > todayEnd) return false;
-                    }
-                    // 입고 모드에서는 기간 필터 무시하고 위의 조건(픽업일 오늘 또는 24시전 주문) 적용
-                    return true;
+                    // 입고 탭에서는 오늘 24시 이후 주문건은 제외 (기본 정책)
+                    const orderDate = parseKRDate(item.timestamp);
+                    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+                    if (orderDate > todayEnd) return false;
                 } else if (currentStatusFilter === 'pickup') {
                     if (!isReceived || isCancelled) return false;
-                    // 픽업: 픽업 완료 품목 (기간 필터가 'all'이 아니면 기간 필터 적용)
                 }
 
-                // [기간 필터 적용 (주문/취소/픽업일 때만 작동)]
-                if (currentFilter === 'all') return true;
-                const itemDateForFilter = parseKRDate(item[currentSortBy]);
+                // [기간 필터 적용]
+                const orderDate = parseKRDate(item.timestamp);
+                const pickupDate = parseKRDate(item.pickupDate);
+                const isSameDay = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
+                // 1. '오늘' 필터: 선택한 정렬 기준(주문일 또는 픽업일)이 오늘인 내역만 표시
+                if (currentFilter === 'today') {
+                    const itemDate = currentSortBy === 'timestamp' ? orderDate : pickupDate;
+                    return isSameDay(now, itemDate);
+                }
+
+                // 2. 1주일/1개월 필터
                 if (currentSortBy === 'timestamp') {
-                    const isSameDay = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-                    if (currentFilter === 'today') return isSameDay(now, itemDateForFilter);
-                    if (currentFilter === 'week') return (now - itemDateForFilter) / (1000 * 60 * 60 * 24) < 7;
-                    if (currentFilter === 'month') return (now - itemDateForFilter) / (1000 * 60 * 60 * 24) < 30;
-                } else {
-                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const targetDate = new Date(itemDateForFilter.getFullYear(), itemDateForFilter.getMonth(), itemDateForFilter.getDate());
-                    const diffDays = Math.floor((targetDate - todayStart) / (1000 * 60 * 60 * 24));
-                    if (currentFilter === 'today') return diffDays === 0;
+                    const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
                     if (currentFilter === 'week') return diffDays >= 0 && diffDays <= 7;
                     if (currentFilter === 'month') return diffDays >= 0 && diffDays <= 30;
+                } else {
+                    const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const d2 = new Date(pickupDate.getFullYear(), pickupDate.getMonth(), pickupDate.getDate());
+                    const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)); // 오늘=0
+
+                    // 1주일/1개월 필터 (오늘 포함 과거만 표시)
+                    if (currentFilter === 'week') return diffDays <= 0 && diffDays >= -7;
+                    if (currentFilter === 'month') return diffDays <= 0 && diffDays >= -30;
                 }
-                return true;
+                return false;
             });
 
             if (filtered.length === 0) {
@@ -1590,7 +1587,10 @@
                 return currentSortDir === 'desc' ? valB - valA : valA - valB;
             });
 
-            filtered.forEach(order => {
+            // [더보기 기능] 현재 limit만큼만 보여줌
+            const pagedItems = filtered.slice(0, currentHistoryLimit);
+
+            pagedItems.forEach(order => {
                 const isCancelled = (order.item && order.item.includes('[취소]')) ||
                     (order.note && order.note.includes('[취소]')) ||
                     order.received === "canceled" ||
@@ -1621,7 +1621,7 @@
                 const isOrderToday = parseKRDate(orderTimeFull).toDateString() === new Date().toDateString();
                 const canDelete = isOrderToday && !isCancelled && !isReceived && !isProcessing;
 
-                let statusText = isReceived ? '픽업완료' : (isCancelled ? '취소완료' : '미픽업');
+                let statusText = isReceived ? '픽업완료' : (isCancelled ? '취소완료' : '입고(미픽업)');
                 let statusColor = isReceived ? '#4CAF50' : (isCancelled ? '#999' : '#FF6D00');
 
                 if (isProcessing) {
@@ -1640,7 +1640,7 @@
                         </div>
                         <div style="text-align:right; min-width:90px; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
                             <div style="font-size:0.85rem; color:#455464; font-weight:700;">${order.qty}개 / ${parseInt(order.total || 0).toLocaleString()}원</div>
-                            ${(currentStatusFilter !== 'order' || isProcessing) ? `<div style="font-size:0.95rem; font-weight:800; color:${statusColor};">${statusText}</div>` : ''}
+                            ${(true || isProcessing) ? `<div style="font-size:0.95rem; font-weight:800; color:${statusColor};">${statusText}</div>` : ''}
                             ${canDelete ? `<button onclick="deleteOrderServer('${orderTimeFull}', '${order.name}', '${order.item}', '${order.pickupDate}')" 
                                  style="margin-top:4px; width:100%; height:28px; background:#eff2f5; color:#666; border:none; border-radius:6px; font-size:0.75rem; font-weight:700; cursor:pointer;">주문취소</button>` : ''}
                             ${isProcessing ? `<div style="margin-top:4px; width:100%; height:28px; display:flex; align-items:center; justify-content:center; background:#f5f5f5; color:#999; border-radius:6px; font-size:0.75rem; font-weight:700;">대기중</div>` : ''}
@@ -1649,6 +1649,20 @@
                 `;
                 list.appendChild(orderDiv);
             });
+
+            // 더보기 버튼
+            if (filtered.length > currentHistoryLimit) {
+                const moreDiv = document.createElement('div');
+                moreDiv.style.textAlign = 'center';
+                moreDiv.style.padding = '20px 0';
+                moreDiv.innerHTML = `<button onclick="loadMoreHistory()" style="background:#f5f5f5; border:none; border-radius:30px; padding:10px 25px; font-weight:800; color:#555; cursor:pointer;">더보기 +</button>`;
+                list.appendChild(moreDiv);
+            }
+        }
+
+        function loadMoreHistory() {
+            currentHistoryLimit += 10;
+            renderHistory();
         }
 
         async function deleteOrderServer(timestamp, name, item, pickupDate) {
