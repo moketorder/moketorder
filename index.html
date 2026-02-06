@@ -1034,7 +1034,7 @@
             </div>
         </div>
     </div>
-    <script>const API_URL = 'https://script.google.com/macros/s/AKfycbz3cXYR1iOY5itgrICDMeHzbL3YRCunRmSXV-aFq5aiFzdDjeMg-j4VsyqQpYojcPyi/exec'
+    <script>const API_URL = 'https://script.google.com/macros/s/AKfycbyMc3OPjAmrQsAUINHYWbOHIDMtOYt950m0qZYt4k_F-4i7zVZdS-B8tnnI4dnMBwHD/exec'
 
         // [카카오 초기화]
         try {
@@ -1390,6 +1390,9 @@
             const displayName = name.trim() || "주문자";
             title.style.fontSize = "1.35rem";
             title.innerHTML = `<span style="background:var(--white); color:var(--nego-orange); padding:2px 10px; border-radius:15px; margin-right:5px; font-weight:900;">${displayName}</span>님의 주문내역`;
+
+            modal.style.display = 'flex';
+            checkScrollLock();
 
             // 1. [로컬 캐시] 이전에 불러온 내역이 있다면 즉시 표시 (사용자별 구분)
             const cacheKey = `history_cache_${name}_${phone}`;
