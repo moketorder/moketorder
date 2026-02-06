@@ -1034,7 +1034,7 @@
             </div>
         </div>
     </div>
-    <script>const API_URL = 'https://script.google.com/macros/s/AKfycbyksbdZYOu4M7pObcxXrjyF2wZbEp65T-UKj46woollp7IxwJenbY_DUavmUcESSpdE/exec'
+    <script>const API_URL = 'https://script.google.com/macros/s/AKfycbwlg_FeNfzaNt9yetOqV3zRW7a5h45e0y4bWUHqMfrfM-SR0EhBN7Y-0GbotaTld6GU/exec'
 
         // [카카오 초기화]
         try {
@@ -1394,8 +1394,8 @@
             modal.style.display = 'flex';
             checkScrollLock();
 
-            // 1. [로컬 캐시] 이전에 불러온 내역이 있다면 즉시 표시 (사용자별 구분)
-            const cacheKey = `history_cache_${name}_${phone}`;
+            fullHistoryData = []; // [중요] 이전 사용자의 데이터 잔상을 제거하기 위해 무조건 초기화
+
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
                 fullHistoryData = JSON.parse(cached);
