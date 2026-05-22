@@ -5042,7 +5042,7 @@
                         let currentPrice = parseInt(pData.price || 0);
                         if (/과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]/.test(itemName)) { currentPrice = Math.floor(currentPrice * 0.95); }
 
-                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: q * currentPrice, date: finalDate, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff });
+                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: q * currentPrice, date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff });
                     }
                 }
 
@@ -5054,7 +5054,7 @@
                         let baseName = it.item + " (배달합산)", displayName = baseName;
                         if (usedNames[baseName]) { displayName = `${it.item} (배달합산-${++usedNames[baseName]})`; }
                         else { usedNames[baseName] = 1; }
-                        allItems.push({ name: displayName, qty: it.qty, price: parseInt(it.price || 0), subtotal: parseInt(it.total || 0), date: mKey, isCategorized: isCategorized, isExtra: true, isPushedByCutoff: false, originalData: { timestamp: it.timestamp, name: it.name, item: it.item, phone: it.phone || phone } });
+                        allItems.push({ name: displayName, qty: it.qty, price: parseInt(it.price || 0), subtotal: parseInt(it.total || 0), date: mKey, matchKey: mKey, isCategorized: isCategorized, isExtra: true, isPushedByCutoff: false, originalData: { timestamp: it.timestamp, name: it.name, item: it.item, phone: it.phone || phone } });
                     });
                 }
 
@@ -5484,7 +5484,8 @@
                 // 2. Firebase 재고 차감 (병렬 실행 및 대기)
                 const stockPromises = allItems.map(async it => {
                     if (it.name === "배달비") return;
-                    const adjKey = fGetAdjKey(it.date, it.name);
+                    const targetKey = it.matchKey || it.date;
+                    const adjKey = fGetAdjKey(targetKey, it.name);
                     const diff = -it.qty;
                     try {
                         const r = await fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json?t=${Date.now()}`);
@@ -5527,10 +5528,11 @@
 
                 allItems.forEach(it => {
                     if (it.name === "배달비") return;
-                    const p = productsData.find(pd => pd.matchKey === it.date && pd.name === it.name);
+                    const targetKey = it.matchKey || it.date;
+                    const p = productsData.find(pd => pd.matchKey === targetKey && pd.name === it.name);
                     if (p) {
                         p.stock = parseInt(p.stock || 0) - (parseInt(it.qty) || 0);
-                        const itemKey = (it.date || "") + "|" + it.name;
+                        const itemKey = (targetKey || "") + "|" + it.name;
                         pendingStockUpdates[itemKey] = {
                             stock: p.stock,
                             expire: Date.now() + 15000
