@@ -4998,7 +4998,7 @@
 
                         const isFV = /과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]/.test(itemName);
                         const isCostco = mKey.includes("코스트코");
-                        const isCutoffTarget = (shippingMethod === '배달주문') || (shippingMethod === '매장픽업' && (isFV || isCostco));
+                        const isCutoffTarget = (shippingMethod === '배달주문') || (shippingMethod === '매장픽업' && (isFV || isCostco || isOnSite));
 
                         let isPushedByCutoff = false;
 
@@ -5038,11 +5038,7 @@
                                 let isOff = false;
                                 if (checkDay === 0) isOff = true; // 일요일 무조건 휴무
                                 else if (checkDay === 6) { // 토요일 휴무 조건
-                                    if (shippingMethod === '배달주문') isOff = true; // 배달은 토요일 휴무
-                                    else if (now.getDay() === 6) { // 매장픽업 토요일 당일 주문인 경우
-                                        if (isDaily && currentHour >= 12) isOff = true;
-                                        else if (isOnSite && currentHour >= 18) isOff = true;
-                                    }
+                                    isOff = true; // [수정] 배달, 매장픽업(일반상품) 모두 토요일 휴무
                                 } else if (publicHolidays.includes(dStr)) {
                                     isOff = true; // 공휴일 휴무
                                 }
