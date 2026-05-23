@@ -1480,9 +1480,7 @@
             </div>
             <div style="display:flex; justify-content:center; margin-bottom:10px;">
                 <div style="text-align:left; line-height:2.2; font-weight:700; font-size:16px;">
-                    • 월요일 - 금요일 : 11:00 - 20:00<br>
-                    • 토요일 : 11:00 - 18:00<br>
-                    • 휴무일 : 일요일, 1월1일, 설날연휴, 추석연휴
+                    • 월요일 - 일요일 : 00:00 - 24:00
                 </div>
             </div>
             <button class="btn-common btn-close" onclick="closeModal('hours-modal')">닫기</button>
@@ -2313,23 +2311,45 @@
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
             
+            let hasReserve = false;
             let hasCostco = false;
             let hasFV = false;
+            let hasOnSite = false;
 
             for (const name in cart) {
                 if (cart[name] > 0) {
                     const p = productsData.find(pd => pd.name === name);
                     if (p) {
                         const mk = String(p.matchKey || "").trim();
-                        if (mk.includes("코스트코")) hasCostco = true;
-                        if (/과일|야채|채소/.test(mk) || /\[과일\]|\[야채\]|\[채소\]/.test(name)) hasFV = true;
+                        const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
+                        if (isDate) {
+                            hasReserve = true;
+                        } else if (mk.includes("코스트코")) {
+                            hasCostco = true;
+                        } else {
+                            const isFV = /과일|야채|채소/.test(mk) || /\[과일\]|\[야채\]|\[채소\]/.test(name);
+                            if (isFV) hasFV = true;
+                            else hasOnSite = true;
+                        }
                     }
                 }
             }
 
-            // [추가] 코스트코 상품 주말/공휴일 픽업 제한 안내
-            if (isHoliday && hasCostco) {
-                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[코스트코 상품 안내]</span>코스트코 상품은 주말 및 공휴일에 픽업이 불가능하며, <span style="color:var(--nego-orange);">다음 평일</span>부터 픽업 가능합니다.`;
+            let regLabelParts = [];
+            if (hasFV) regLabelParts.push("과일/야채");
+            if (hasOnSite) regLabelParts.push("상시판매");
+            if (hasCostco) regLabelParts.push("코스트코");
+            const combinedRegLabel = regLabelParts.join(", ");
+            const hasAnyRegular = (hasFV || hasOnSite || hasCostco);
+
+            let extraMsg = "";
+            if (hasFV || hasOnSite) {
+                extraMsg = "<br><span style='font-size:0.9em; color:#666;'>(매장 내 진열상품은 현장에서 구매 가능합니다.)</span>";
+            }
+
+            // [수정] 일반 상품(과일/야채, 상시판매, 코스트코) 주말/공휴일 픽업 제한 안내
+            if (isHoliday && hasAnyRegular) {
+                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[${combinedRegLabel} 안내]</span>${combinedRegLabel} 상품은 주말 및 공휴일에 픽업이 불가능하며, <span style="color:var(--nego-orange);">다음 평일</span>부터 픽업 가능합니다.${extraMsg}`;
                 showSystemModal(holidayMsg + "<br><br>주문하시겠습니까?", 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
@@ -2338,10 +2358,8 @@
                 return;
             }
 
-            if ((hasFV || hasCostco) && currentHour >= 12) {
-                const timeStr = `${now.getHours()}시 ${String(now.getMinutes()).padStart(2, '0')}분`;
-                const labelStr = (hasFV && hasCostco) ? "과일, 야채, 코스트코 한정" : (hasCostco ? "코스트코 한정" : "과일, 야채 한정");
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${labelStr}]</span>낮 12시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 예약됩니다.\n(주말, 공휴일인경우 다음 평일에 픽업예약)\n\n주문하시겠습니까?`;
+            if (hasAnyRegular && currentHour >= 12) {
+                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${combinedRegLabel} 안내]</span>낮 12시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 예약됩니다.\n(주말, 공휴일인경우 다음 평일에 픽업예약)${extraMsg}\n\n주문하시겠습니까?`;
                 
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
