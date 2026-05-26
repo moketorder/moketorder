@@ -4998,13 +4998,16 @@
 
                         const isFV = /과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]/.test(itemName);
                         const isCostco = mKey.includes("코스트코");
+                        const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
+                        const isDaily = ['과일', '야채', '기타'].includes(mKey) || isFV;
+                        const isOnSite = ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || (!isDateItem && !isDaily);
+
                         const isCutoffTarget = (shippingMethod === '배달주문') || (shippingMethod === '매장픽업' && (isFV || isCostco || isOnSite));
 
                         let isPushedByCutoff = false;
 
                         // 1. [공통] 12시 이후 내일로 보정 (배달/과채 전용)
                         if (isCutoffTarget && currentHour >= 12) {
-                            const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
                             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                             if (!isDateItem || mKey <= todayStr) {
                                 const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1);
@@ -5014,9 +5017,6 @@
                         }
 
                         // 2. [주말] 카테고리별 월요일 보정 (토요일 차별화 / 일요일 전체)
-                        const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
-                        const isDaily = ['과일', '야채', '기타'].includes(mKey) || isFV;
-                        const isOnSite = ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || (!isDateItem && !isDaily);
 
                         // 1-2. [신규] 상시판매: 20시(토요일은 18시) 이후 내일로 보정
                         const isOnSiteThreshold = (now.getDay() === 6) ? 18 : 20;
