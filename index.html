@@ -4110,6 +4110,23 @@
                 return String(a).localeCompare(String(b));
             });
 
+            // [추가] 코스트코 카테고리에 상품이 없으면 탭 자체를 숨기고 비율 조절
+            const costcoTabBtn = document.querySelector('.main-tab-btn[data-tab="costco"]');
+            if (costcoTabBtn) {
+                if (costcoFilters.length === 0) {
+                    costcoTabBtn.style.display = 'none';
+                    // 만약 현재 코스트코 탭이 활성화 상태였는데 상품이 없어져 숨겨졌다면 기본 탭(reserve)으로 변경
+                    if (currentMainTab === 'costco') {
+                        currentMainTab = 'reserve';
+                        document.querySelectorAll('.main-tab-btn').forEach(btn => {
+                            btn.classList.toggle('active', btn.dataset.tab === 'reserve');
+                        });
+                    }
+                } else {
+                    costcoTabBtn.style.display = '';
+                }
+            }
+
             // 3. UI 영역 설정
             const filterAreaDates = document.getElementById('date-filters');
             const filterAreaCategories = document.getElementById('date-filters-categories');
