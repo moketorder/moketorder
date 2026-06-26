@@ -4018,6 +4018,9 @@
             if (!data || data.length === 0) return;
             productsData = data; // 최신 데이터 유지
 
+            // [개선] 훨씬 유연한 날짜 인식 (문자열 중간에 날짜 형태만 있어도 공동구매로 간주)
+            const dateRegex = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/;
+
             // 1. 공통 필터링: 공개 상태 확인 및 오늘 이후 상품만 취급
             const futureData = data.filter(p => {
                 const status = (p.status || "").trim();
@@ -4041,6 +4044,16 @@
                     const pDate = new Date(y, m - 1, d);
                     if (!isNaN(pDate.getTime())) {
                         pDate.setHours(0, 0, 0, 0);
+
+                        // [추가] 공동구매 카테고리 상품의 경우 해당 날짜 오후 12시(정오) 이후에는 미노출 처리
+                        const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
+                        if (isReserveDate && !isAdminMode) {
+                            const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
+                            if (new Date() >= cutoffDate) {
+                                return false; // 정오가 지났으므로 제외
+                            }
+                        }
+
                         return pDate >= today;
                     }
                 }
@@ -4059,8 +4072,7 @@
                 return String(a).localeCompare(String(b));
             });
 
-            // [개선] 훨씬 유연한 날짜 인식 (문자열 중간에 날짜 형태만 있어도 공동구매로 간주)
-            const dateRegex = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/;
+            // [개선] 훨씬 유연한 날짜 인식 (dateRegex는 함수 시작 부분에서 정의됨)
 
             // 온사이트 및 과채류 키워드 정의
             const onSiteKeywords = ["냉동", "냉장", "상온", "실온", "현장판매", "상시판매"];
