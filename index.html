@@ -4339,7 +4339,11 @@
                         const parts = cleanDate.split('-');
                         if (parts.length === 3) {
                             const pDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                            if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
+                            if (!isNaN(pDate.getTime())) { 
+                                pDate.setHours(0, 0, 0, 0); 
+                                if (pDate < today) return false; 
+                                if (pDate.getTime() === today.getTime() && new Date().getHours() >= 13) return false; 
+                            }
                         }
                     }
                     return true;
@@ -4354,7 +4358,11 @@
                             const parts = cleanDate.split('-');
                             if (parts.length === 3) {
                                 const pDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
+                                if (!isNaN(pDate.getTime())) { 
+                                    pDate.setHours(0, 0, 0, 0); 
+                                    if (pDate < today) return false; 
+                                    if (pDate.getTime() === today.getTime() && new Date().getHours() >= 13) return false; 
+                                }
                             }
                         }
                         return p.name.includes('[과일]') || p.name.includes('[과일구매]') || /과일|과일구매/.test(s);
@@ -4372,7 +4380,11 @@
                                     let m = parts.length === 3 ? parseInt(parts[1]) : parseInt(parts[0]);
                                     let d = parts.length === 3 ? parseInt(parts[2]) : parseInt(parts[1]);
                                     const pDate = new Date(y, m - 1, d);
-                                    if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
+                                    if (!isNaN(pDate.getTime())) { 
+                                        pDate.setHours(0, 0, 0, 0); 
+                                        if (pDate < today) return false; 
+                                        if (pDate.getTime() === today.getTime() && new Date().getHours() >= 13) return false; 
+                                    }
                                 }
                             }
                             return /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name) || /야채|야채구매|채소|채소구매/.test(s);
