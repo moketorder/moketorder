@@ -3464,7 +3464,9 @@
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div style="font-size:16px; font-weight:800; color:var(--item-black); flex:1; padding-right:10px; display:flex; align-items:center; overflow:hidden;">
-                                    ${group.shippingMethod === '배달주문' ? '<span style="background:var(--sub-blue); color:var(--main-blue); font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">배달</span>' : ''}
+                                    ${group.shippingMethod === '배달주문' 
+                                        ? '<span style="background:var(--sub-blue); color:var(--main-blue); font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">배달</span>' 
+                                        : '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">픽업</span>'}
                                     <span style="display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">${displaySummary}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:6px;">
@@ -3546,7 +3548,9 @@
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <div style="flex:1;">
                                         <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.2; margin-bottom:4px;">
-                                            ${order.shippingMethod === '배달주문' && order.item !== '배달비' ? '<span style="color:var(--main-blue); font-size:12px; margin-right:4px;">[배달]</span>' : ''}
+                                            ${order.shippingMethod === '배달주문' && order.item !== '배달비' 
+                                                ? '<span style="color:var(--main-blue); font-size:12px; margin-right:4px;">[배달]</span>' 
+                                                : (order.item !== '배달비' ? '<span style="color:#2e7d32; font-size:12px; margin-right:4px;">[픽업]</span>' : '')}
                                             ${order.item}
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px;">
@@ -5082,9 +5086,15 @@
                                 if (checkDay === 0) isOff = true; // 일요일 무조건 휴무
                                 else if (checkDay === 6) { // 토요일 휴무 조건
                                     if (shippingMethod === '배달주문') isOff = true; // 배달은 토요일 휴무
-                                    else if (now.getDay() === 6) { // 매장픽업 토요일 당일 주문인 경우
-                                        if (isDaily && currentHour >= 12) isOff = true;
-                                        else if (isOnSite && currentHour >= 18) isOff = true;
+                                    else {
+                                        // 매장픽업
+                                        if (isDaily) {
+                                            // 토요일은 기본적으로 과채류/예약픽업 휴무 (단, 토요일 당일 12시 이전 주문인 경우만 예외적으로 당일 픽업 가능)
+                                            if (now.getDay() !== 6 || currentHour >= 12) isOff = true;
+                                        } else if (isOnSite) {
+                                            // 상시판매 상품은 토요일 당일 18시 이후 주문인 경우만 휴무
+                                            if (now.getDay() === 6 && currentHour >= 18) isOff = true;
+                                        }
                                     }
                                 } else if (publicHolidays.includes(dStr)) {
                                     isOff = true; // 공휴일 휴무
