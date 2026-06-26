@@ -4034,10 +4034,13 @@
                 if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
 
                 const s = String(p.matchKey || "").trim();
+                const isFruitVeg = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[과일구매\]|\[야채구매\]/.test(p.name);
+                
                 // [개선] 문자열 어디든 날짜 패턴(M/D 또는 YMD)이 있으면 추출
                 const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
+                
+                let y, m, d, hasParsedDate = false;
                 if (dm) {
-                    let y, m, d;
                     if (dm[1]) { // YMD 형식
                         y = parseInt(dm[1]); if (y < 100) y += 2000;
                         m = parseInt(dm[2]); d = parseInt(dm[3]);
@@ -4045,20 +4048,43 @@
                         y = new Date().getFullYear();
                         m = parseInt(dm[4]); d = parseInt(dm[5]);
                     }
+                    hasParsedDate = true;
+                } else if (isFruitVeg) {
+                    // 과일/야채 카테고리이면서 날짜가 명시되지 않은 경우 오늘 날짜로 취급
+                    const now = new Date();
+                    y = now.getFullYear();
+                    m = now.getMonth() + 1;
+                    d = now.getDate();
+                    hasParsedDate = true;
+                }
+
+                if (hasParsedDate) {
                     const pDate = new Date(y, m - 1, d);
                     if (!isNaN(pDate.getTime())) {
                         pDate.setHours(0, 0, 0, 0);
 
-                        // [추가] 공동구매 카테고리 상품의 경우 해당 날짜 오후 12시(정오) 이후에는 미노출 처리
-                        const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
-                        if (isReserveDate && !isAdminMode) {
-                            const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
-                            if (new Date() >= cutoffDate) {
-                                return false; // 정오가 지났으므로 제외
+                        if (!isAdminMode) {
+                            if (isFruitVeg) {
+                                // 과일/야채 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
+                                const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
+                                if (new Date() >= cutoffDate) {
+                                    return false; // 13시가 지났으므로 제외
+                                }
+                            } else {
+                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 12시(정오) 이후에는 미노출 처리
+                                const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
+                                if (isReserveDate) {
+                                    const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
+                                    if (new Date() >= cutoffDate) {
+                                        return false; // 정오가 지났으므로 제외
+                                    }
+                                }
                             }
                         }
 
-                        return pDate >= today;
+                        if (dm) {
+                            return pDate >= today;
+                        }
                     }
                 }
                 return true;
@@ -4306,23 +4332,53 @@
                 // 1. 비공개 필터링
                 if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
 
-                // 2. 공동구매 상품 오후 12시(정오) 마감 필터링
                 const s = String(p.matchKey || "").trim();
+                const isFruitVeg = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[과일구매\]|\[야채구매\]/.test(p.name);
+                
+                // [개선] 문자열 어디든 날짜 패턴(M/D 또는 YMD)이 있으면 추출
                 const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
+                
+                let y, m, d, hasParsedDate = false;
                 if (dm) {
-                    let y, m, d;
-                    if (dm[1]) {
+                    if (dm[1]) { // YMD 형식
                         y = parseInt(dm[1]); if (y < 100) y += 2000;
                         m = parseInt(dm[2]); d = parseInt(dm[3]);
-                    } else {
+                    } else { // MD 형식
                         y = new Date().getFullYear();
                         m = parseInt(dm[4]); d = parseInt(dm[5]);
                     }
-                    const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
-                    if (isReserveDate && !isAdminMode) {
-                        const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
-                        if (new Date() >= cutoffDate) {
-                            return false; // 정오가 지났으므로 제외
+                    hasParsedDate = true;
+                } else if (isFruitVeg) {
+                    // 과일/야채 카테고리이면서 날짜가 명시되지 않은 경우 오늘 날짜로 취급
+                    const now = new Date();
+                    y = now.getFullYear();
+                    m = now.getMonth() + 1;
+                    d = now.getDate();
+                    hasParsedDate = true;
+                }
+
+                if (hasParsedDate) {
+                    const pDate = new Date(y, m - 1, d);
+                    if (!isNaN(pDate.getTime())) {
+                        pDate.setHours(0, 0, 0, 0);
+
+                        if (!isAdminMode) {
+                            if (isFruitVeg) {
+                                // 과일/야채 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
+                                const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
+                                if (new Date() >= cutoffDate) {
+                                    return false; // 13시가 지났으므로 제외
+                                }
+                            } else {
+                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 12시(정오) 이후에는 미노출 처리
+                                const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
+                                if (isReserveDate) {
+                                    const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
+                                    if (new Date() >= cutoffDate) {
+                                        return false; // 정오가 지났으므로 제외
+                                    }
+                                }
+                            }
                         }
                     }
                 }
