@@ -1480,7 +1480,9 @@
             </div>
             <div style="display:flex; justify-content:center; margin-bottom:10px;">
                 <div style="text-align:left; line-height:2.2; font-weight:700; font-size:16px;">
-                    • 월요일 - 일요일 : 00:00 - 24:00
+                    • 월요일 - 금요일 : 11:00 - 20:00<br>
+                    • 토요일 : 11:00 - 18:00<br>
+                    • 휴무일 : 일요일, 1월1일, 설날연휴, 추석연휴
                 </div>
             </div>
             <button class="btn-common btn-close" onclick="closeModal('hours-modal')">닫기</button>
@@ -2311,45 +2313,23 @@
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
             
-            let hasReserve = false;
             let hasCostco = false;
             let hasFV = false;
-            let hasOnSite = false;
 
             for (const name in cart) {
                 if (cart[name] > 0) {
                     const p = productsData.find(pd => pd.name === name);
                     if (p) {
                         const mk = String(p.matchKey || "").trim();
-                        const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
-                        if (isDate) {
-                            hasReserve = true;
-                        } else if (mk.includes("코스트코")) {
-                            hasCostco = true;
-                        } else {
-                            const isFV = /과일|야채|채소/.test(mk) || /\[과일\]|\[야채\]|\[채소\]/.test(name);
-                            if (isFV) hasFV = true;
-                            else hasOnSite = true;
-                        }
+                        if (mk.includes("코스트코")) hasCostco = true;
+                        if (/과일|야채|채소/.test(mk) || /\[과일\]|\[야채\]|\[채소\]/.test(name)) hasFV = true;
                     }
                 }
             }
 
-            let regLabelParts = [];
-            if (hasFV) regLabelParts.push("과일/야채");
-            if (hasOnSite) regLabelParts.push("상시판매");
-            if (hasCostco) regLabelParts.push("코스트코");
-            const combinedRegLabel = regLabelParts.join(", ");
-            const hasAnyRegular = (hasFV || hasOnSite || hasCostco);
-
-            let extraMsg = "";
-            if (hasFV || hasOnSite) {
-                extraMsg = "<br><span style='font-size:0.9em; color:#666;'>(매장 내 진열상품은 현장에서 구매 가능합니다.)</span>";
-            }
-
-            // [수정] 일반 상품(과일/야채, 상시판매, 코스트코) 주말/공휴일 픽업 제한 안내
-            if (isHoliday && hasAnyRegular) {
-                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[${combinedRegLabel} 안내]</span>${combinedRegLabel} 상품은 주말 및 공휴일에 픽업이 불가능하며, <span style="color:var(--nego-orange);">다음 평일</span>부터 픽업 가능합니다.${extraMsg}`;
+            // [추가] 코스트코 상품 주말/공휴일 픽업 제한 안내
+            if (isHoliday && hasCostco) {
+                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[코스트코 상품 안내]</span>코스트코 상품은 주말 및 공휴일에 픽업이 불가능하며, <span style="color:var(--nego-orange);">다음 평일</span>부터 픽업 가능합니다.`;
                 showSystemModal(holidayMsg + "<br><br>주문하시겠습니까?", 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
@@ -2358,8 +2338,10 @@
                 return;
             }
 
-            if (hasAnyRegular && currentHour >= 12) {
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${combinedRegLabel} 안내]</span>낮 12시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 예약됩니다.\n(주말, 공휴일인경우 다음 평일에 픽업예약)${extraMsg}\n\n주문하시겠습니까?`;
+            if ((hasFV || hasCostco) && currentHour >= 12) {
+                const timeStr = `${now.getHours()}시 ${String(now.getMinutes()).padStart(2, '0')}분`;
+                const labelStr = (hasFV && hasCostco) ? "과일, 야채, 코스트코 한정" : (hasCostco ? "코스트코 한정" : "과일, 야채 한정");
+                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${labelStr}]</span>낮 12시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 예약됩니다.\n(주말, 공휴일인경우 다음 평일에 픽업예약)\n\n주문하시겠습니까?`;
                 
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
@@ -4128,28 +4110,6 @@
                 return String(a).localeCompare(String(b));
             });
 
-            // [추가] 코스트코 상품 존재 여부에 따른 탭 표시/숨김
-            const hasCostcoProducts = futureData.some(p => {
-                const mk = String(p.matchKey || "").trim();
-                const name = String(p.name || "").trim();
-                return costcoKeywords.some(k => mk.includes(k) || name.includes(k));
-            });
-            const costcoTabBtn = document.querySelector('button[data-tab="costco"]');
-            if (costcoTabBtn) {
-                if (!hasCostcoProducts) {
-                    costcoTabBtn.style.display = 'none';
-                    // 현재 선택된 탭이 코스트코라면 기본 탭(reserve)으로 자동 전환
-                    if (currentMainTab === 'costco') {
-                        currentMainTab = 'reserve';
-                        document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.remove('active'));
-                        const reserveBtn = document.querySelector('button[data-tab="reserve"]');
-                        if (reserveBtn) reserveBtn.classList.add('active');
-                    }
-                } else {
-                    costcoTabBtn.style.display = ''; // 기본 display 값 복구(flex에 의해 넓이 자동 조정)
-                }
-            }
-
             // 3. UI 영역 설정
             const filterAreaDates = document.getElementById('date-filters');
             const filterAreaCategories = document.getElementById('date-filters-categories');
@@ -4339,11 +4299,7 @@
                         const parts = cleanDate.split('-');
                         if (parts.length === 3) {
                             const pDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                            if (!isNaN(pDate.getTime())) { 
-                                pDate.setHours(0, 0, 0, 0); 
-                                if (pDate < today) return false; 
-                                if (pDate.getTime() === today.getTime() && new Date().getHours() >= 13) return false; 
-                            }
+                            if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
                         }
                     }
                     return true;
@@ -4358,11 +4314,7 @@
                             const parts = cleanDate.split('-');
                             if (parts.length === 3) {
                                 const pDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                if (!isNaN(pDate.getTime())) { 
-                                    pDate.setHours(0, 0, 0, 0); 
-                                    if (pDate < today) return false; 
-                                    if (pDate.getTime() === today.getTime() && new Date().getHours() >= 13) return false; 
-                                }
+                                if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
                             }
                         }
                         return p.name.includes('[과일]') || p.name.includes('[과일구매]') || /과일|과일구매/.test(s);
@@ -4380,11 +4332,7 @@
                                     let m = parts.length === 3 ? parseInt(parts[1]) : parseInt(parts[0]);
                                     let d = parts.length === 3 ? parseInt(parts[2]) : parseInt(parts[1]);
                                     const pDate = new Date(y, m - 1, d);
-                                    if (!isNaN(pDate.getTime())) { 
-                                        pDate.setHours(0, 0, 0, 0); 
-                                        if (pDate < today) return false; 
-                                        if (pDate.getTime() === today.getTime() && new Date().getHours() >= 13) return false; 
-                                    }
+                                    if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
                                 }
                             }
                             return /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name) || /야채|야채구매|채소|채소구매/.test(s);
@@ -5032,16 +4980,13 @@
 
                         const isFV = /과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]/.test(itemName);
                         const isCostco = mKey.includes("코스트코");
-                        const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
-                        const isDaily = ['과일', '야채', '기타'].includes(mKey) || isFV;
-                        const isOnSite = ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || (!isDateItem && !isDaily);
-
-                        const isCutoffTarget = (shippingMethod === '배달주문') || (shippingMethod === '매장픽업' && (isFV || isCostco || isOnSite));
+                        const isCutoffTarget = (shippingMethod === '배달주문') || (shippingMethod === '매장픽업' && (isFV || isCostco));
 
                         let isPushedByCutoff = false;
 
                         // 1. [공통] 12시 이후 내일로 보정 (배달/과채 전용)
                         if (isCutoffTarget && currentHour >= 12) {
+                            const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
                             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                             if (!isDateItem || mKey <= todayStr) {
                                 const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1);
@@ -5051,6 +4996,9 @@
                         }
 
                         // 2. [주말] 카테고리별 월요일 보정 (토요일 차별화 / 일요일 전체)
+                        const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
+                        const isDaily = ['과일', '야채', '기타'].includes(mKey) || isFV;
+                        const isOnSite = ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || (!isDateItem && !isDaily);
 
                         // 1-2. [신규] 상시판매: 20시(토요일은 18시) 이후 내일로 보정
                         const isOnSiteThreshold = (now.getDay() === 6) ? 18 : 20;
@@ -5072,7 +5020,11 @@
                                 let isOff = false;
                                 if (checkDay === 0) isOff = true; // 일요일 무조건 휴무
                                 else if (checkDay === 6) { // 토요일 휴무 조건
-                                    isOff = true; // [수정] 배달, 매장픽업(일반상품) 모두 토요일 휴무
+                                    if (shippingMethod === '배달주문') isOff = true; // 배달은 토요일 휴무
+                                    else if (now.getDay() === 6) { // 매장픽업 토요일 당일 주문인 경우
+                                        if (isDaily && currentHour >= 12) isOff = true;
+                                        else if (isOnSite && currentHour >= 18) isOff = true;
+                                    }
                                 } else if (publicHolidays.includes(dStr)) {
                                     isOff = true; // 공휴일 휴무
                                 }
