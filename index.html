@@ -4293,6 +4293,38 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
+            // [추가] 공통 필터링 적용 (비공개 및 12시 마감 처리)
+            const dateRegex = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/;
+            const visibleProducts = productsData.filter(p => {
+                const status = (p.status || "").trim();
+                const mKey = (p.matchKey || "").trim();
+
+                // 1. 비공개 필터링
+                if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
+
+                // 2. 공동구매 상품 오후 12시(정오) 마감 필터링
+                const s = String(p.matchKey || "").trim();
+                const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
+                if (dm) {
+                    let y, m, d;
+                    if (dm[1]) {
+                        y = parseInt(dm[1]); if (y < 100) y += 2000;
+                        m = parseInt(dm[2]); d = parseInt(dm[3]);
+                    } else {
+                        y = new Date().getFullYear();
+                        m = parseInt(dm[4]); d = parseInt(dm[5]);
+                    }
+                    const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
+                    if (isReserveDate && !isAdminMode) {
+                        const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
+                        if (new Date() >= cutoffDate) {
+                            return false; // 정오가 지났으므로 제외
+                        }
+                    }
+                }
+                return true;
+            });
+
             const getPriority = (name) => {
                 const n = String(name || "").trim();
                 // [머릿말] 이름 앞에 기호/괄호가 있는 경우만 상단(1)으로 보냄
@@ -4304,10 +4336,10 @@
             let filteredData = [];
 
             if (targetKey === '사다드림') {
-                filteredData = productsData.filter(p => p.name.includes("사다드림"));
+                filteredData = visibleProducts.filter(p => p.name.includes("사다드림"));
             } else {
                 filteredData = targetKey === '전체상품_예약'
-                ? productsData.filter(p => {
+                ? visibleProducts.filter(p => {
                     const s = String(p.matchKey).trim();
                     // [수정] 온사이트 및 과채류를 명확히 제외하고 나머지는 모두 공동구매 전체보기에 포함
                     const onSiteKeywords = ["냉동", "냉장", "상온", "실온", "현장판매", "상시판매"];
@@ -4334,7 +4366,7 @@
                     return true;
                 })
                 : targetKey === '과일_예약'
-                    ? productsData.filter(p => {
+                    ? visibleProducts.filter(p => {
                         const s = String(p.matchKey).trim();
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
                         if (!isDate && !/과일|과일구매/.test(s)) return false;
@@ -4349,7 +4381,7 @@
                         return p.name.includes('[과일]') || p.name.includes('[과일구매]') || /과일|과일구매/.test(s);
                     })
                     : targetKey === '야채_예약'
-                        ? productsData.filter(p => {
+                        ? visibleProducts.filter(p => {
                             const s = String(p.matchKey).trim();
                             const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
                             if (!isDate && !/야채|야채구매|채소|채소구매/.test(s)) return false;
@@ -4366,11 +4398,11 @@
                             }
                             return /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name) || /야채|야채구매|채소|채소구매/.test(s);
                         })
-                        : targetKey === '기타_예약' ? productsData.filter(p => String(p.matchKey).trim() === "기타")
+                        : targetKey === '기타_예약' ? visibleProducts.filter(p => String(p.matchKey).trim() === "기타")
                             : targetKey === '전체상품_코스트코'
-                                ? productsData.filter(p => String(p.matchKey).trim().includes("코스트코"))
+                                ? visibleProducts.filter(p => String(p.matchKey).trim().includes("코스트코"))
                                 : targetKey === '전체상품_현장'
-                                    ? productsData.filter(p => {
+                                    ? visibleProducts.filter(p => {
                                         const s = String(p.matchKey).trim();
                                         // 날짜 예약건 제외
                                         if (/(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s) && !s.includes("상시판매") && !s.includes("현장판매")) return false;
@@ -4382,7 +4414,7 @@
                                         const isFruit = p.name.includes('[과일]') || p.name.includes('[과일구매]') || s === "과일구매" || s === "과일";
                                         return !(isVeg || isFruit || s === "기타");
                                     })
-                                    : productsData.filter(p => {
+                                    : visibleProducts.filter(p => {
                                         if (p.matchKey !== targetKey) return false;
                                         const s = String(p.matchKey).trim();
                                         const isVeg = p.name.includes('[야채]') || p.name.includes('[야채구매]') || s === "야채구매" || s === "야채";
