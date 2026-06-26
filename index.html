@@ -1520,7 +1520,7 @@
     <div class="sticky-header-group">
         <!-- [신규] 대분류 탭 영역 -->
         <div class="main-tabs">
-            <button class="main-tab-btn active" data-tab="reserve" onclick="switchMainTab('reserve')">공동구매</button>
+            <button class="main-tab-btn" data-tab="reserve" onclick="switchMainTab('reserve')">공동구매</button>
             <button class="main-tab-btn" data-tab="fruit-veg" onclick="switchMainTab('fruit-veg')">과일 / 야채</button>
             <button class="main-tab-btn" data-tab="on-site" onclick="switchMainTab('on-site')">상시판매</button>
             <button class="main-tab-btn" data-tab="costco" onclick="switchMainTab('costco')">코스트코</button>
@@ -1728,6 +1728,9 @@
 
         const FIREBASE_DB_URL = "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
+        // [설정] 특정 지역 주소 입력 시 픽업 여부를 묻지 않고 배달주문으로 강제 진행할 키워드 목록
+        const FORCE_DELIVERY_REGIONS = ["남양주시"]; // 예: ["은하수", "샘마을"] 등 원하는 키워드를 입력해 두면 작동합니다.
+
         // [카카오 초기화]
         try {
             if (typeof Kakao !== 'undefined') {
@@ -1755,6 +1758,41 @@
         let today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // [추가] 카테고리 순서 시간별 동적 설정 및 기본 탭 설정
+        function initMainTabs(isInitialPageLoad = false) {
+            const now = new Date();
+            const hour = now.getHours();
+            const isFruitVegFirst = (hour >= 6 && hour < 13);
+            
+            // 1. 첫 페이지 로드 시에만 기본 탭 설정
+            if (isInitialPageLoad) {
+                currentMainTab = isFruitVegFirst ? 'fruit-veg' : 'reserve';
+                
+                // 버튼 활성화 상태 업데이트
+                document.querySelectorAll('.main-tab-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.tab === currentMainTab);
+                });
+            }
+            
+            // 2. CSS flexbox order를 활용하여 탭 배치 순서 동적 변경
+            const btnReserve = document.querySelector('.main-tab-btn[data-tab="reserve"]');
+            const btnFruitVeg = document.querySelector('.main-tab-btn[data-tab="fruit-veg"]');
+            const btnOnSite = document.querySelector('.main-tab-btn[data-tab="on-site"]');
+            const btnCostco = document.querySelector('.main-tab-btn[data-tab="costco"]');
+            
+            if (isFruitVegFirst) {
+                if (btnFruitVeg) btnFruitVeg.style.order = '1';
+                if (btnReserve) btnReserve.style.order = '2';
+                if (btnOnSite) btnOnSite.style.order = '3';
+                if (btnCostco) btnCostco.style.order = '4';
+            } else {
+                if (btnReserve) btnReserve.style.order = '1';
+                if (btnFruitVeg) btnFruitVeg.style.order = '2';
+                if (btnOnSite) btnOnSite.style.order = '3';
+                if (btnCostco) btnCostco.style.order = '4';
+            }
+        }
+
         // [대분류 탭 전환]
         function switchMainTab(type) {
             currentMainTab = type;
@@ -1766,17 +1804,12 @@
             // 2. 제목 변경
             const title = document.getElementById('main-section-title');
             if (title) {
-                if (type === 'reserve') {
+                if (type === 'reserve' || type === 'fruit-veg') {
                     title.style.display = 'none';
                 } else if (type === 'on-site') {
                     title.style.display = 'block';
                     title.innerHTML = `
                         <div style="font-size: 18px; font-weight: 800; color: #ff4d4d; letter-spacing: -0.5px; line-height: 1.4;">매장 판매로 품절될 경우 제공되지 못할 수 있습니다.</div>
-                    `;
-                } else if (type === 'fruit-veg') {
-                    title.style.display = 'block';
-                    title.innerHTML = `
-                        <div style="font-size: 18px; font-weight: 900; color: var(--nego-orange); margin-bottom: 6px;">[과일, 야채한정] 예약구매시 5% 할인!!</div>                        
                     `;
                 } else if (type === 'costco') {
                     title.style.display = 'block';
@@ -3771,6 +3804,7 @@
         const AUTO_LOAD_INTERVAL = 60000;
 
         async function loadData(force = false) {
+            initMainTabs(false);
             const productArea = document.getElementById('product-list');
 
             // [상태 잠금 강제 해제] 수동 새로고침 시에는 모든 잠금을 풀고 서버 데이터를 신뢰함
@@ -4156,11 +4190,15 @@
             if (costcoTabBtn) {
                 if (costcoFilters.length === 0) {
                     costcoTabBtn.style.display = 'none';
-                    // 만약 현재 코스트코 탭이 활성화 상태였는데 상품이 없어져 숨겨졌다면 기본 탭(reserve)으로 변경
+                    // 만약 현재 코스트코 탭이 활성화 상태였는데 상품이 없어져 숨겨졌다면 기본 탭으로 변경
                     if (currentMainTab === 'costco') {
-                        currentMainTab = 'reserve';
+                        const now = new Date();
+                        const hour = now.getHours();
+                        const isFruitVegFirst = (hour >= 6 && hour < 13);
+                        const defaultTab = isFruitVegFirst ? 'fruit-veg' : 'reserve';
+                        currentMainTab = defaultTab;
                         document.querySelectorAll('.main-tab-btn').forEach(btn => {
-                            btn.classList.toggle('active', btn.dataset.tab === 'reserve');
+                            btn.classList.toggle('active', btn.dataset.tab === defaultTab);
                         });
                     }
                 } else {
@@ -4962,10 +5000,6 @@
                     const mKey = product.matchKey || "";
                     let currentPrice = parseInt(product.price || 0);
 
-                    if (mKey === '과일' || mKey === '야채') {
-                        currentPrice = Math.floor(currentPrice * 0.95);
-                    }
-
                     const date = product.displayDate;
                     if (!grouped[date]) grouped[date] = [];
                     grouped[date].push({ ...product, qty: q, price: currentPrice });
@@ -5038,6 +5072,19 @@
                 showSystemModal("상품이 없습니다. 상품을 선택해 주세요.", 'alert');
                 return;
             }
+
+            // [추가] 특정 지역 주소인 경우 픽업 여부를 묻지 않고 바로 배달주문으로 강제 진행
+            const inputAddr = document.getElementById('input-address')?.value || "";
+            const savedAddr = localStorage.getItem('moket_user_address') || "";
+            const userAddr = inputAddr || savedAddr;
+            const isForceDelivery = FORCE_DELIVERY_REGIONS.some(region => userAddr.trim() !== "" && region.trim() !== "" && userAddr.includes(region));
+
+            if (isForceDelivery) {
+                console.log(`[배달 강제] 사용자 주소(${userAddr})가 특정 지역 키워드에 매칭되어 배달주문으로 강제 진행합니다.`);
+                handleDeliveryOrderClick();
+                return;
+            }
+
             if (!isDeliveryEnabled) {
                 selectPickup();
                 return;
@@ -5166,7 +5213,6 @@
 
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(finalDate);
                         let currentPrice = parseInt(pData.price || 0);
-                        if (/과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]/.test(itemName)) { currentPrice = Math.floor(currentPrice * 0.95); }
 
                         allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: q * currentPrice, date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff });
                     }
@@ -5713,6 +5759,9 @@
 
             // 주문내역은 배경에서 삭제 (UI 안막음)
             setTimeout(() => localStorage.removeItem('moket_order_history'), 100);
+
+            // [추가] 시간 기반 카테고리 순서 동적 설정 및 기본 탭 설정
+            initMainTabs(true);
 
             // 데이터 로드와 프로필 로드를 병렬로 시작
             loadData();
