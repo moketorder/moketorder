@@ -3648,7 +3648,41 @@
                 renderHistory();
 
                 const phone = document.getElementById('input-phone').value; // 연락처 가져오기 추가
+                const cleanPhone = normP(phone);
+                const rawItemName = String(item).replace(/\[취소\]/g, "").replace(/['"]/g, '').trim();
+                const formattedTimestamp = fullHistoryData[targetIdx].timestamp;
+                const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(rawItemName);
+                const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
 
+                const updatedItem = "[취소] " + rawItemName;
+
+                // 1. Firebase 주문 상태 변경 (PATCH)
+                const fbPromise = fetch(fbItemUrl, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        item: updatedItem,
+                        received: "취소완료",
+                        canceled: true
+                    })
+                });
+
+                // 2. Firebase 전역 재고 복구 (+ 처리)
+                const safeDate = fSafeKey(matchKey || pickupDate || "");
+                const safeName = fSafeKey(rawItemName);
+                const adjKey = safeDate + "_" + safeName;
+                const diff = parseInt(fullHistoryData[targetIdx].qty) || 1;
+
+                const stockPromise = fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`)
+                    .then(r => r.json())
+                    .then(currentAdj => {
+                        const newAdj = (currentAdj || 0) + diff;
+                        return fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`, {
+                            method: 'PUT',
+                            body: JSON.stringify(newAdj)
+                        });
+                    }).catch(e => console.error("재고 복구 실패:", e));
+
+                // 3. GAS 스프레드시트 동기화 (배경 실행)
                 const payload = {
                     header: 'delete',
                     timestamp: String(timestamp).trim(),
@@ -3661,77 +3695,39 @@
 
                 fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
                     .then(res => res.json())
-                    .then(result => {
-                        isHistoryProcessing = false;
-                        if (targetIdx !== -1) {
-                            fullHistoryData[targetIdx].isProcessing = false;
-                        }
-
-                        if (result.result === 'success') {
-                            if (targetIdx !== -1) {
-                                if (!fullHistoryData[targetIdx].item.includes('[취소]')) {
-                                    fullHistoryData[targetIdx].item = "[취소] " + fullHistoryData[targetIdx].item;
-                                }
-                                fullHistoryData[targetIdx].received = "취소완료";
-                                fullHistoryData[targetIdx].canceled = true;
-
-                                const name = document.getElementById('input-name').value;
-                                const phone = document.getElementById('input-phone').value;
-                                localStorage.setItem(`history_cache_${name}_${phone}`, JSON.stringify(fullHistoryData));
-
-                                const mKey = matchKey || "no-date";
-                                const itemKey = mKey + "|" + String(item).replace(/['"]/g, '').trim();
-                                const p = productsData.find(pd => pd.name === String(item).replace(/['"]/g, '').trim() && (pd.matchKey === mKey || pd.displayDate === String(pickupDate).trim()));
-
-                                if (p) {
-                                    p.stock = parseInt(p.stock || 0) + (parseInt(fullHistoryData[targetIdx].qty) || 1);
-                                    pendingStockUpdates[itemKey] = { stock: p.stock, expire: Date.now() + 15000 };
-
-                                    // [추가] Firebase 전역 재고 복구 (+ 처리)
-                                    const safeDate = fSafeKey(matchKey || pickupDate || "");
-                                    const safeName = fSafeKey(String(item).replace(/\[취소\]/g, "").replace(/['"]/g, '').trim());
-                                    const adjKey = safeDate + "_" + safeName;
-                                    const diff = parseInt(fullHistoryData[targetIdx].qty) || 1;
-
-                                    fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`)
-                                        .then(r => r.json())
-                                        .then(currentAdj => {
-                                            const newAdj = (currentAdj || 0) + diff;
-                                            fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`, {
-                                                method: 'PUT',
-                                                body: JSON.stringify(newAdj)
-                                            });
-                                        });
-
-                                    const activeBtn = document.querySelector('.date-btn.active');
-                                    if (activeBtn) renderList(activeBtn.dataset.date);
-                                }
-                            }
-                            showSystemModal("주문이 취소되었습니다.", 'alert');
-                            renderHistory();
-                            setTimeout(() => loadData(), 2000);
-                        } else {
-                            renderHistory();
-                            showSystemModal("취소에 실패했습니다. " + (result.message || "잠시 후 다시 시도해 주세요."), 'alert');
-                        }
+                    .then(gasResult => {
+                        console.log("GAS 취소 동기화 완료:", gasResult);
                     })
-                    .catch(err => {
-                        console.error("취소 실패:", err);
-                        showSystemModal("⚠️ 취소 처리에 실패했습니다.\n" + (err.message || "네트워크 오류"), 'alert');
-                        isHistoryProcessing = false;
-                        document.getElementById('system-modal').style.display = 'none';
+                    .catch(err => console.error("GAS 취소 동기화 네트워크 실패:", err));
 
-                        // [재고 동기화] 실패 시 최신 재고 상태를 다시 불러옴
-                        loadData();
+                // 4. Firebase 완료 시 UI 즉시 갱신 (GAS를 기다리지 않음)
+                Promise.all([fbPromise, stockPromise]).then(() => {
+                    isHistoryProcessing = false;
+                    if (targetIdx !== -1) {
+                        fullHistoryData[targetIdx].isProcessing = false;
+                        fullHistoryData[targetIdx].item = updatedItem;
+                        fullHistoryData[targetIdx].received = "취소완료";
+                        fullHistoryData[targetIdx].canceled = true;
 
-                        const errIdx = fullHistoryData.findIndex(d =>
-                            String(d.timestamp).trim() === String(timestamp).trim() &&
-                            String(d.matchKey || "").trim() === String(matchKey || "").trim() && // matchKey 비교 추가
-                            String(d.item).replace(/['"]/g, '').trim() === String(item).replace(/['"]/g, '').trim()
-                        );
-                        if (errIdx !== -1) fullHistoryData[errIdx].isProcessing = false;
-                        renderHistory();
-                    });
+                        const nameVal = document.getElementById('input-name').value;
+                        const phoneVal = document.getElementById('input-phone').value;
+                        localStorage.setItem(`history_cache_${nameVal}_${phoneVal}`, JSON.stringify(fullHistoryData));
+
+                        const mKey = matchKey || "no-date";
+                        const itemKey = mKey + "|" + rawItemName;
+                        const p = productsData.find(pd => pd.name === rawItemName && (pd.matchKey === mKey || pd.displayDate === String(pickupDate).trim()));
+
+                        if (p) {
+                            p.stock = parseInt(p.stock || 0) + diff;
+                            pendingStockUpdates[itemKey] = { stock: p.stock, expire: Date.now() + 15000 };
+
+                            const activeBtn = document.querySelector('.date-btn.active');
+                            if (activeBtn) renderList(activeBtn.dataset.date);
+                        }
+                    }
+                    showSystemModal("주문이 취소되었습니다.", 'alert');
+                    renderHistory();
+                });
 
                 return true;
             });
