@@ -1744,23 +1744,52 @@
         function initMainTabs(isInitialPageLoad = false) {
             const now = new Date();
             const hour = now.getHours();
-            const isFruitVegFirst = (hour >= 6 && hour < 13);
+            const currentDay = now.getDay();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+            
+            const isAfterCutoffOrHoliday = isHoliday || (hour >= 13);
+            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour >= 8 && hour < 13);
             
             // 1. 첫 페이지 로드 시에만 기본 탭 설정
             if (isInitialPageLoad) {
                 currentMainTab = isFruitVegFirst ? 'fruit-veg' : 'reserve';
-                
-                // 버튼 활성화 상태 업데이트
-                document.querySelectorAll('.main-tab-btn').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.tab === currentMainTab);
-                });
             }
             
-            // 2. CSS flexbox order를 활용하여 탭 배치 순서 동적 변경
+            // 만약 현재 활성화된 탭이 숨김 처리 대상인데 비노출 시간대라면 'reserve'로 강제 변경
+            if (isAfterCutoffOrHoliday && (currentMainTab === 'fruit-veg' || currentMainTab === 'costco')) {
+                currentMainTab = 'reserve';
+            }
+            
+            // 버튼 활성화 상태 업데이트
+            document.querySelectorAll('.main-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === currentMainTab);
+            });
+            
+            // 2. CSS flexbox order를 활용하여 탭 배치 순서 동적 변경 및 노출 제어
             const btnReserve = document.querySelector('.main-tab-btn[data-tab="reserve"]');
             const btnFruitVeg = document.querySelector('.main-tab-btn[data-tab="fruit-veg"]');
             const btnOnSite = document.querySelector('.main-tab-btn[data-tab="on-site"]');
             const btnCostco = document.querySelector('.main-tab-btn[data-tab="costco"]');
+            
+            if (isAfterCutoffOrHoliday) {
+                if (btnReserve) btnReserve.style.display = 'block';
+                if (btnOnSite) btnOnSite.style.display = 'block';
+                if (btnFruitVeg) btnFruitVeg.style.display = 'none';
+                if (btnCostco) btnCostco.style.display = 'none';
+            } else {
+                if (btnReserve) btnReserve.style.display = 'block';
+                if (btnOnSite) btnOnSite.style.display = 'block';
+                if (btnFruitVeg) btnFruitVeg.style.display = 'block';
+                // 코스트코는 상품이 있을 때만 표시
+                const hasCostcoItems = productsData.some(p => {
+                    const status = (p.status || "").trim();
+                    const mKey = (p.matchKey || "").trim();
+                    if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
+                    return mKey.includes("코스트코");
+                });
+                if (btnCostco) btnCostco.style.display = hasCostcoItems ? 'block' : 'none';
+            }
             
             if (isFruitVegFirst) {
                 if (btnFruitVeg) btnFruitVeg.style.order = '1';
@@ -4172,20 +4201,23 @@
                 return String(a).localeCompare(String(b));
             });
 
-            // [추가] 코스트코 카테고리에 상품이 없으면 탭 자체를 숨기고 비율 조절
+            // [추가] 코스트코 카테고리에 상품이 없거나 주말/공휴일/평일 1시 이후이면 탭 자체를 숨김
             const costcoTabBtn = document.querySelector('.main-tab-btn[data-tab="costco"]');
             if (costcoTabBtn) {
-                if (costcoFilters.length === 0) {
+                const nowForCostco = new Date();
+                const hourForCostco = nowForCostco.getHours();
+                const dayForCostco = nowForCostco.getDay();
+                const dStrForCostco = `${nowForCostco.getFullYear()}-${String(nowForCostco.getMonth() + 1).padStart(2, '0')}-${String(nowForCostco.getDate()).padStart(2, '0')}`;
+                const isHolidayForCostco = (dayForCostco === 0 || dayForCostco === 6 || publicHolidays.includes(dStrForCostco));
+                const isAfterCutoffOrHolidayForCostco = isHolidayForCostco || (hourForCostco >= 13);
+
+                if (costcoFilters.length === 0 || isAfterCutoffOrHolidayForCostco) {
                     costcoTabBtn.style.display = 'none';
-                    // 만약 현재 코스트코 탭이 활성화 상태였는데 상품이 없어져 숨겨졌다면 기본 탭으로 변경
+                    // 만약 현재 코스트코 탭이 활성화 상태였는데 숨겨졌다면 공동구매(reserve) 탭으로 변경
                     if (currentMainTab === 'costco') {
-                        const now = new Date();
-                        const hour = now.getHours();
-                        const isFruitVegFirst = (hour >= 6 && hour < 13);
-                        const defaultTab = isFruitVegFirst ? 'fruit-veg' : 'reserve';
-                        currentMainTab = defaultTab;
+                        currentMainTab = 'reserve';
                         document.querySelectorAll('.main-tab-btn').forEach(btn => {
-                            btn.classList.toggle('active', btn.dataset.tab === defaultTab);
+                            btn.classList.toggle('active', btn.dataset.tab === 'reserve');
                         });
                     }
                 } else {
@@ -4524,10 +4556,6 @@
                     // 숫자가 아닌 문자열이나 빈 칸 등은 무제한(Infinity)으로 처리
                     if (p.stock === undefined || p.stock === "" || isNaN(p.stock)) return Infinity;
                     let s = parseInt(p.stock);
-                    const sKey = String(p.matchKey || "").trim();
-                    // 과채류 특정 시간 무제한 로직 (단, 원래 재고가 0보다 클 때만 적용하거나 전체 적용할지 판단)
-                    // 사장님 요청에 따라 12시~06시 사이 과채류는 품절되지 않게 함 (공동구매 연동)
-                    if ((nowHour >= 12 || nowHour < 6) && (sKey === "과일" || sKey === "야채" || sKey === "과일구매" || sKey === "야채구매")) return Infinity;
                     return s;
                 };
 
@@ -4648,14 +4676,6 @@
 
                 const currentQty = cart[p.name] || 0;
                 let stock = p.stock !== undefined && p.stock !== "" ? parseInt(p.stock) : Infinity;
-
-                // [신규] 과채 예약구매 수량 제한 해제 로직 (매일 12시 ~ 익일 06시)
-                const sKey = String(p.matchKey || "").trim();
-                const nowHour = new Date().getHours();
-                const matchesFV = (sKey === "과일" || sKey === "야채" || sKey === "과일구매" || sKey === "야채구매");
-                if ((nowHour >= 12 || nowHour < 6) && matchesFV) {
-                    stock = Infinity;
-                }
 
                 const isSoldOut = stock <= 0;
                 const isLowStock = !isSoldOut && stock <= 5;
