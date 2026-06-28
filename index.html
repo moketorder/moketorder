@@ -1344,7 +1344,6 @@
         <ul class="menu-list">
             <li onclick="openSideModal('profile-modal')">주문자 변경</li>
             <li onclick="openSideModal('location-modal')">매장위치</li>
-            <li onclick="openSideModal('hours-modal')">영업시간</li>
             <li onclick="openSideModal('bank-modal')">계좌번호</li>
             <li onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기</li>
 
@@ -1469,23 +1468,6 @@
             <a href="https://map.naver.com/v5/search/MOKET 모켓" target="_blank" class="btn-common btn-naver">네이버지도</a>
             <a href="https://map.kakao.com/link/search/MOKET 모켓" target="_blank" class="btn-common btn-kakao">카카오맵</a>
             <button class="btn-common btn-close" onclick="closeModal('location-modal')">닫기</button>
-        </div>
-    </div>
-    <div id="hours-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div
-                style="background:var(--moket-green); padding: 15px 20px 12px 20px; border-radius: var(--common-radius) var(--common-radius) 0 0; margin: -25px -25px 10px -25px; text-align: center;">
-                <h3 style="margin: 0; font-weight: 800; color: var(--white); font-size: 20px; letter-spacing: 1px;">
-                    영업시간 안내</h3>
-            </div>
-            <div style="display:flex; justify-content:center; margin-bottom:10px;">
-                <div style="text-align:left; line-height:2.2; font-weight:700; font-size:16px;">
-                    • 월요일 - 금요일 : 11:00 - 20:00<br>
-                    • 토요일 : 11:00 - 18:00<br>
-                    • 휴무일 : 일요일, 1월1일, 설날연휴, 추석연휴
-                </div>
-            </div>
-            <button class="btn-common btn-close" onclick="closeModal('hours-modal')">닫기</button>
         </div>
     </div>
     <div id="bank-modal" class="modal-overlay">
@@ -2227,7 +2209,7 @@
             if (isHoliday && hasAnyRegular) {
                 let holidayMsg = "";
                 if (hasReserve) {
-                    holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>주말 및 공휴일에 주문하신 일반 상품은 <span style="color:var(--nego-orange);">다음 평일</span>에 배달되고, 예약 상품은 각 <span style="color:var(--nego-orange);">입고일</span>에 배송됩니다.\n(입고일이 주말 및 공휴일인 경우 다음 평일에 배달)`;
+                    holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 상품과 같이 주문하신 상시판매 상품은 공동구매 상품 <span style="color:var(--nego-orange);">입고일</span>에 같이 <span style="color:var(--nego-orange);">합배송</span>됩니다.`;
                 } else {
                     holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>주말 및 공휴일에 주문하신 상품은 <span style="color:var(--nego-orange);">\n다음 평일</span>에 배달됩니다.`;
                 }
@@ -2247,23 +2229,23 @@
                 if (hasAnyRegular) {
                     showModal = true;
                     if (hasReserve) {
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>낮 12시 이후 주문하신 ${combinedRegLabel} 상품은 <span style="color:var(--nego-orange);">내일</span> 배달되고, 예약 상품은 <span style="color:var(--nego-orange);">입고일</span>에 배달됩니다.\n(주말, 공휴일인 경우 다음 평일에 배달)`;
+                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>낮 12시 이후 주문하신 ${combinedRegLabel} 상품은 <span style="color:var(--nego-orange);">내일</span> 배달되고, 예약 상품은 <span style="color:var(--nego-orange);">입고일</span>에 배달됩니다.`;
                     } else {
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>낮 12시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.\n(주말, 공휴일인 경우 다음 평일에 배달)`;
+                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>낮 12시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.`;
                     }
                 } else if (hasReserve) {
                     showModal = true;
-                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의\n<span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.\n(주말, 공휴일인 경우 다음 평일에 배달)`;
+                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의\n<span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
                 }
             } else {
                 // 12시 이전
                 if (hasReserve) {
                     showModal = true;
                     if (hasAnyRegular) {
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>${combinedRegLabel} 상품은 <span style="color:var(--nego-orange);">오늘</span> 배달되고, 예약 상품은 각 <span style="color:var(--nego-orange);">입고일</span>에 배달됩니다.\n(주말, 공휴일인 경우 다음 평일에 배달)`;
+                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>${combinedRegLabel} 상품은 <span style="color:var(--nego-orange);">오늘</span> 배달되고, 예약 상품은 각 <span style="color:var(--nego-orange);">입고일</span>에 배달됩니다.`;
                     } else {
                         // 예약상품만 있는 경우
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의 <span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.\n(주말, 공휴일인 경우 다음 평일에 배달)`;
+                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의 <span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
                     }
                 } else {
                     // 일반상품만 12시 이전인 경우: 별도 안내 없이 바로 진행
@@ -4098,6 +4080,15 @@
 
                         if (!isAdminMode) {
                             if (isFruitVeg) {
+                                // [수정] 주말 및 공휴일에는 미노출 처리
+                                const now = new Date();
+                                const currentDay = now.getDay();
+                                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                                const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+                                if (isHoliday) {
+                                    return false;
+                                }
+
                                 // 과일/야채 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
                                 const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
                                 if (new Date() >= cutoffDate) {
@@ -4401,6 +4392,15 @@
 
                         if (!isAdminMode) {
                             if (isFruitVeg) {
+                                // [수정] 주말 및 공휴일에는 미노출 처리
+                                const now = new Date();
+                                const currentDay = now.getDay();
+                                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                                const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+                                if (isHoliday) {
+                                    return false;
+                                }
+
                                 // 과일/야채 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
                                 const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
                                 if (new Date() >= cutoffDate) {
@@ -5113,11 +5113,26 @@
                 const phone = phoneNode.value;
                 const currentDay = now.getDay();
 
-                // [추가] 주말 및 공휴일 안내 모달 (USER 요청)
+                // [추가] 주말 및 공휴일 안내 모달 (USER 요청: 일반 상품이 포함된 경우에만 주말 안내 표시)
                 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
 
-                if (isHoliday && !holidayConfirmed && shippingMethod === '배달주문') {
+                let hasAnyRegular = false;
+                for (const name in cart) {
+                    if (cart[name] > 0) {
+                        const p = productsData.find(pd => pd.name === name);
+                        if (p) {
+                            const mk = String(p.matchKey || "").trim();
+                            const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
+                            if (!isDate) {
+                                hasAnyRegular = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (isHoliday && hasAnyRegular && !holidayConfirmed && shippingMethod === '배달주문') {
                     const holidayMsg = "주말 및 공휴일에 주문하신 상품은\n<span style='color:var(--nego-orange);'>다음 평일</span>에 배달됩니다.\n\n주문하시겠습니까?";
                     showSystemModal(holidayMsg, 'confirm', () => {
                         completeOrder(shippingMethod, extraItems, cutoffConfirmed, true);
