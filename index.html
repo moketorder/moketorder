@@ -1757,7 +1757,7 @@
             }
             
             // 만약 현재 활성화된 탭이 숨김 처리 대상인데 비노출 시간대라면 'reserve'로 강제 변경
-            if (isAfterCutoffOrHoliday && (currentMainTab === 'fruit-veg' || currentMainTab === 'costco')) {
+            if (isAfterCutoffOrHoliday && currentMainTab === 'costco') {
                 currentMainTab = 'reserve';
             }
             
@@ -1775,7 +1775,7 @@
             if (isAfterCutoffOrHoliday) {
                 if (btnReserve) btnReserve.style.display = 'block';
                 if (btnOnSite) btnOnSite.style.display = 'block';
-                if (btnFruitVeg) btnFruitVeg.style.display = 'none';
+                if (btnFruitVeg) btnFruitVeg.style.display = 'block';
                 if (btnCostco) btnCostco.style.display = 'none';
             } else {
                 if (btnReserve) btnReserve.style.display = 'block';
@@ -1798,8 +1798,8 @@
                 if (btnCostco) btnCostco.style.order = '4';
             } else {
                 if (btnReserve) btnReserve.style.order = '1';
-                if (btnFruitVeg) btnFruitVeg.style.order = '2';
-                if (btnOnSite) btnOnSite.style.order = '3';
+                if (btnOnSite) btnOnSite.style.order = '2';
+                if (btnFruitVeg) btnFruitVeg.style.order = '3';
                 if (btnCostco) btnCostco.style.order = '4';
             }
         }
@@ -4353,7 +4353,11 @@
             if (activeFilter) {
                 renderList(activeFilter);
             } else {
-                document.getElementById('product-list').innerHTML = `<div style="text-align:center; padding:80px 20px; color:#999; font-weight:700;">현재 주문 가능한 상품이 없습니다.</div>`;
+                let emptyText = "현재 주문 가능한 상품이 없습니다.";
+                if (currentMainTab === 'fruit-veg') {
+                    emptyText = "매일 오전 8시에 상품이 올라옵니다.<br>(주말 및 공휴일 제외)";
+                }
+                document.getElementById('product-list').innerHTML = `<div style="text-align:center; padding:80px 20px; color:#999; font-weight:700;">${emptyText}</div>`;
             }
         }
 
@@ -4633,7 +4637,11 @@
             if (filteredData.length === 0) {
                 const emptyMsg = document.createElement('div');
                 emptyMsg.style = "text-align:center; padding:80px 20px; color:#999; font-weight:700;";
-                emptyMsg.innerHTML = "현재 주문 가능한 상품이 없습니다.";
+                if (currentMainTab === 'fruit-veg') {
+                    emptyMsg.innerHTML = "매일 오전 8시에 상품이 올라옵니다.<br>(주말 및 공휴일 제외)";
+                } else {
+                    emptyMsg.innerHTML = "현재 주문 가능한 상품이 없습니다.";
+                }
                 container.appendChild(emptyMsg);
                 return;
             }
