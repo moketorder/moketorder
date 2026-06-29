@@ -4307,17 +4307,20 @@
                 // [?섏젙] ?곹뭹紐낆뿉 '?щ떎?쒕┝'???ы븿???곹뭹???덈뒗吏 ?뺤씤
                 const hasSadaItems = futureData.some(p => p.name.includes("?щ떎?쒕┝"));
                 
-                // [?섏젙] ?좎쭨 由ъ뒪???욎뿉 ?щ떎?쒕┝ 諛??뱀닔 移댄뀒怨좊━?ㅼ쓣 諛곗튂
-                const finalDates = ['?꾩껜?곹뭹_?덉빟'];
-                if (hasSadaItems) finalDates.push('?щ떎?쒕┝');
+                // [수정] 상품명에 '사다드림'이 포함된 상품이 있는지 확인
+                const hasSadaItems = futureData.some(p => p.name.includes("사다드림"));
+                
+                // [수정] 날짜 리스트 앞에 사다드림 및 특수 카테고리들을 배치
+                const finalDates = ['전체상품_예약'];
+                if (hasSadaItems) finalDates.push('사다드림');
                 finalDates.push(...reserveCategories, ...dateFilters);
                 
                 finalDates.forEach((date, idx) => {
                     const btn = document.createElement('button');
                     btn.className = 'date-btn' + (idx === 0 ? ' active' : '');
                     btn.dataset.date = date;
-                    if (date === '?꾩껜?곹뭹_?덉빟') btn.innerText = '?꾩껜?곹뭹';
-                    else if (date === '?щ떎?쒕┝') btn.innerText = '?щ떎?쒕┝';
+                    if (date === '전체상품_예약') btn.innerText = '전체상품';
+                    else if (date === '사다드림') btn.innerText = '사다드림';
                     else {
                         const found = futureData.find(p => p.matchKey === date);
                         btn.innerText = found ? found.displayDate : date;
@@ -4615,7 +4618,7 @@
 
                                         const isVeg = p.name.includes('[야채]') || p.name.includes('[야채구매]') || s === "야채구매" || s === "야채";
                                         const isFruit = p.name.includes('[과일]') || p.name.includes('[과일구매]') || s === "과일구매" || s === "과일";
-                                        return !(isVeg || isFruit);
+                                        return true;
                                     })
                                     : visibleProducts.filter(p => {
                                         if (p.matchKey !== targetKey) return false;
