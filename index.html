@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="ko">
 
 <head>
@@ -4438,17 +4438,18 @@
             const container = document.getElementById('product-list');
             container.innerHTML = '';
 
-            // [Re-added] Admin mode guide
+            // [추가] 관리자 모드 안내 표시
             if (isAdminMode) {
                 const adminMsg = document.createElement('div');
                 adminMsg.style = "background:#e3f2fd; color:#1976d2; padding:12px; margin-bottom:15px; border-radius:var(--common-radius); font-size:13px; font-weight:700; text-align:center; border: 1px solid #bbdefb;";
-                adminMsg.innerHTML = "👨‍💻 관리자 모드 활성 중 (: " + (isProductListEnabled ? 'ON' : 'OFF') + ")<br><span style='font-size:11px; font-weight: normal; color:#5c6bc0;'>사장님뻘는  상품이  보임니다.</span>";
+                adminMsg.innerHTML = `👨‍💻 관리자 모드 활성 중 (전체공개: ${isProductListEnabled ? '✅ON' : '🌑OFF'})<br><span style='font-size:11px; font-weight: normal; color:#5c6bc0;'>사장님께는 모든 상품이 항상 보입니다.</span>`;
                 container.appendChild(adminMsg);
             }
 
-            // [Re-added] Private status check
+            // [추가] 비공개 상태에서 일반 사용자가 들어온 경우
             if (!isAdminMode && !isProductListEnabled) {
-                container.innerHTML = "<div style='text-align:center; padding:80px 20px; color:#999; font-weight:700;'>현재는   .<br>(주문 가능  - 오전 10시 ~  오전 6시)</div>";
+                container.innerHTML = `<div style="text-align:center; padding:80px 20px; color:#999; font-weight:700;">현재는 주문이 불가능 합니다.<br>
+                            (주문 가능 시간 - 오전 10시 ~ 다음날 오전 6시)</div>`;
                 return;
             }
 
@@ -4735,7 +4736,7 @@
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(p.matchKey);
                         if (isDate) prefix = '픽업/배달 예정일 : ';
                     }
-                    header.innerHTML = `${iconSvg}<span style="color:var(--nego-orange);">${prefix}${p.displayDate || p.matchKey}</span>`;
+                    header.innerHTML = `${iconSvg}${prefix}${p.displayDate || p.matchKey}`;
                     currentGroupBox.appendChild(header);
 
                     // 상품이 담길 내부 컨테이너 (여백 조정)
