@@ -4440,9 +4440,7 @@
 
             if (currentMainTab === 'reserve') {
                 filterAreaDates.style.display = 'flex';
-                // [?섏젙] ?곹뭹紐낆뿉 '?щ떎?쒕┝'???ы븿???곹뭹???덈뒗吏 ?뺤씤
-                const hasSadaItems = futureData.some(p => p.name.includes("?щ떎?쒕┝"));
-                
+                                
                 // [수정] 상품명에 '사다드림'이 포함된 상품이 있는지 확인
                 const hasSadaItems = futureData.some(p => p.name.includes("사다드림"));
                 
@@ -4469,13 +4467,13 @@
                     };
                     filterAreaDates.appendChild(btn);
                 });
-                activeFilter = '?꾩껜?곹뭹_?덉빟';
+                activeFilter = '전체상품_예약';
             } else if (currentMainTab === 'on-site') {
                 filterAreaCategories.style.display = 'flex';
                 if (categoryFilters.length <= 3) filterAreaCategories.classList.add('compact-view');
                 else filterAreaCategories.classList.remove('compact-view');
 
-                const finalCats = ['?꾩껜?곹뭹_?꾩옣', ...categoryFilters];
+                const finalCats = ['전체상품_현장', ...categoryFilters];
                 finalCats.forEach((cat, idx) => {
                     const btn = document.createElement('button');
                     btn.className = 'date-btn' + (idx === 0 ? ' active' : '');
