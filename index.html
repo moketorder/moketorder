@@ -3920,8 +3920,10 @@
                         const p = productsData.find(pd => pd.name === rawItemName && (pd.matchKey === mKey || pd.displayDate === String(pickupDate).trim()));
 
                         if (p) {
-                            p.stock = parseInt(p.stock || 0) + diff;
-                            pendingStockUpdates[itemKey] = { stock: p.stock, expire: Date.now() + 15000 };
+                            if (p.originalStock !== "") { // 원본 재고가 빈값(무제한)이 아닐 때만 로컬 재고 복구를 계산합니다.
+                                p.stock = parseInt(p.stock || 0) + diff;
+                                pendingStockUpdates[itemKey] = { stock: p.stock, expire: Date.now() + 15000 };
+                            }
 
                             const activeBtn = document.querySelector('.date-btn.active');
                             if (activeBtn) renderList(activeBtn.dataset.date);
@@ -4059,9 +4061,11 @@
                         let currentStock = p.stock;
                         if (adj === "unlimited") {
                             currentStock = "";
-                        } else if (adj !== 0) {
-                            const baseStock = (p.stock === "") ? 0 : parseInt(p.stock || 0);
-                            currentStock = Math.max(0, baseStock + adj);
+                        } else if (p.stock !== "") { // 원본 재고가 빈값(무제한)이 아닐 때만 실시간 변동분을 반영합니다.
+                            if (adj !== 0) {
+                                const baseStock = parseInt(p.stock || 0);
+                                currentStock = Math.max(0, baseStock + adj);
+                            }
                         }
 
                         return {
@@ -4323,12 +4327,12 @@
                                     return false; // 8시 이전 또는 13시 이후이므로 제외
                                 }
                             } else {
-                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 12시(정오) 이후에는 미노출 처리
+                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
                                 const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
                                 if (isReserveDate) {
-                                    const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
+                                    const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
                                     if (new Date() >= cutoffDate) {
-                                        return false; // 정오가 지났으므로 제외
+                                        return false; // 13시가 지났으므로 제외
                                     }
                                 }
                             }
@@ -4659,12 +4663,12 @@
                                     return false; // 8시 이전 또는 13시 이후이므로 제외
                                 }
                             } else {
-                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 12시(정오) 이후에는 미노출 처리
+                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
                                 const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
                                 if (isReserveDate) {
-                                    const cutoffDate = new Date(y, m - 1, d, 12, 0, 0, 0);
+                                    const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
                                     if (new Date() >= cutoffDate) {
-                                        return false; // 정오가 지났으므로 제외
+                                        return false; // 13시가 지났으므로 제외
                                     }
                                 }
                             }
@@ -5985,7 +5989,7 @@
                     if (it.name === "배달비") return;
                     const targetKey = it.matchKey || it.date;
                     const p = productsData.find(pd => pd.matchKey === targetKey && pd.name === it.name);
-                    if (p) {
+                    if (p && p.originalStock !== "") { // 원본 재고가 빈값(무제한)이 아닐 때만 로컬 차감을 계산합니다.
                         p.stock = parseInt(p.stock || 0) - (parseInt(it.qty) || 0);
                         const itemKey = (targetKey || "") + "|" + it.name;
                         pendingStockUpdates[itemKey] = {
