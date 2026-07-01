@@ -4057,15 +4057,13 @@
                     .map((p, idx) => {
                         const mKey = (p.matchKey || p.date || "").trim();
                         const adjKey = fGetAdjKey(mKey, p.name);
-                        const adj = globalAdjustments[adjKey] || 0;
+                        const adj = globalAdjustments[adjKey];
                         let currentStock = p.stock;
                         if (adj === "unlimited") {
                             currentStock = "";
-                        } else if (p.stock !== "") { // 원본 재고가 빈값(무제한)이 아닐 때만 실시간 변동분을 반영합니다.
-                            if (adj !== 0) {
-                                const baseStock = parseInt(p.stock || 0);
-                                currentStock = Math.max(0, baseStock + adj);
-                            }
+                        } else if (adj !== undefined) {
+                            const baseStock = (p.stock === "") ? 0 : parseInt(p.stock || 0);
+                            currentStock = Math.max(0, baseStock + parseInt(adj));
                         }
 
                         return {
