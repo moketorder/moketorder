@@ -2425,9 +2425,32 @@
             const combinedRegLabel = regLabelParts.join(" 및 ");
             const hasAnyRegular = (hasFV || hasOnSite || hasCostco);
 
-            // [추가] 공동구매 상품과 상시판매 상품 혼합 주문 시 안내 (최우선순위)
+            // [추가] 공동구매 상품과 일반(상시/과일) 상품 혼합 주문 시 안내 (최우선순위)
             if (hasReserve && hasAnyRegular) {
-                const msg = `공동구매상품과 상시판매상품을 같이 주문시에는 공동구매 상품 입고일에 합배송 됩니다.<br><br>배달주문 하시겠습니까?`;
+                let hasNonFruitRegular = hasOnSite || hasCostco;
+                for (const name in cart) {
+                    if (cart[name] > 0) {
+                        const p = productsData.find(pd => pd.name === name);
+                        if (p) {
+                            const mk = String(p.matchKey || "").trim();
+                            const nameStr = String(p.name || "").trim();
+                            const isVegOrEtc = /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]|\[기타\]|\[기타구매\]/.test(nameStr) || /야채|야채구매|채소|채소구매|기타|기타구매/.test(mk);
+                            if (isVegOrEtc) {
+                                hasNonFruitRegular = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                let msg = "";
+                if (hasNonFruitRegular) {
+                    msg = `공동구매상품과 상시판매상품을 같이 주문시에는 공동구매 상품 입고일에 합배송 됩니다.<br><br>배달주문 하시겠습니까?`;
+                } else {
+                    const dayText = currentHour >= 13 ? "내일" : "오늘";
+                    msg = `과일과 공동구매상품을 같이 주문시에는 과일은 ${dayText} 배송되고 공동구매상품은 입고일에 배송됩니다.<br><br>배달주문 하시겠습니까?`;
+                }
+
                 showSystemModal(msg, 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
@@ -5580,7 +5603,9 @@
                         }
 
                         // [합배송 처리] 배달주문이고 공동구매 입고일이 있는 경우, 상시판매 상품의 배달일을 공동구매 입고일로 묶음
-                        if (shippingMethod === '배달주문' && reserveDate && !isDateItem) {
+                        // (단, 과일 상품은 합배송 대상에서 제외하여 당일/익일 배송 유지)
+                        const isFruit = isFV && !/야채|채소|기타|\[야채\]|\[채소\]|\[기타\]/.test(itemName) && !/야채|채소|기타/.test(mKey);
+                        if (shippingMethod === '배달주문' && reserveDate && !isDateItem && !isFruit) {
                             finalDate = reserveDate;
                         }
 
