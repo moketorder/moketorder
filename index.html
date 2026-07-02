@@ -4941,11 +4941,15 @@
                         : ``;
 
                     let prefix = '';
+                    let dateHtml = p.displayDate || p.matchKey;
                     if (currentMainTab === 'reserve') {
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(p.matchKey);
-                        if (isDate) prefix = '픽업/배달 예정일 : ';
+                        if (isDate) {
+                            prefix = '픽업/배달 예정일 : ';
+                            dateHtml = `<span style="color: var(--nego-orange);">${dateHtml}</span>`;
+                        }
                     }
-                    header.innerHTML = `${iconSvg}${prefix}${p.displayDate || p.matchKey}`;
+                    header.innerHTML = `${iconSvg}${prefix}${dateHtml}`;
                     currentGroupBox.appendChild(header);
 
                     // 상품이 담길 내부 컨테이너 (여백 조정)
