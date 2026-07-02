@@ -4500,7 +4500,7 @@
                     else if (date === '사다드림') btn.innerText = '사다드림';
                     else {
                         const found = futureData.find(p => p.matchKey === date);
-                        btn.innerText = found ? found.displayDate : date;
+                        btn.innerText = (found && found.displayDate) ? found.displayDate : date;
                     }
                     btn.onclick = () => {
                         document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
@@ -4524,7 +4524,11 @@
                     if (cat === '전체상품_현장') btn.innerText = '전체상품';
                     else {
                         const found = futureData.find(p => p.matchKey === cat);
-                        btn.innerText = found ? found.displayDate : cat;
+                        let displayName = (found && found.displayDate) ? found.displayDate : cat;
+                        if (displayName === "냉동") displayName = "🧊냉동";
+                        else if (displayName === "냉장") displayName = "❄️냉장";
+                        else if (displayName === "상온") displayName = "🌡️상온";
+                        btn.innerText = displayName;
                     }
                     btn.onclick = () => {
                         document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
