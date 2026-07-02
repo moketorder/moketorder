@@ -2401,20 +2401,44 @@
             // [수정] 변수 선언 위치 이동 (ReferenceError 해결)
             // 일반 상품 명칭 조합 (과일/야채, 상시판매, 코스트코 분리)
             let regLabelParts = [];
-            if (hasFV) regLabelParts.push("과일/야채");
+            if (hasFV) {
+                // 실제로 장바구니에 야채, 채소, 기타 상품이 들어있는지 체크하여 과일만 주문하는지 확인
+                let hasOnlyFruit = true;
+                for (const name in cart) {
+                    if (cart[name] > 0) {
+                        const p = productsData.find(pd => pd.name === name);
+                        if (p) {
+                            const mk = String(p.matchKey || "").trim();
+                            const nameStr = String(p.name || "").trim();
+                            const isVegOrEtc = /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]|\[기타\]|\[기타구매\]/.test(nameStr) || /야채|야채구매|채소|채소구매|기타|기타구매/.test(mk);
+                            if (isVegOrEtc) {
+                                hasOnlyFruit = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                regLabelParts.push(hasOnlyFruit ? "과일" : "과일/야채");
+            }
             if (hasOnSite) regLabelParts.push("상시판매");
             if (hasCostco) regLabelParts.push("코스트코");
             const combinedRegLabel = regLabelParts.join(" 및 ");
             const hasAnyRegular = (hasFV || hasOnSite || hasCostco);
 
+            // [추가] 공동구매 상품과 상시판매 상품 혼합 주문 시 안내 (최우선순위)
+            if (hasReserve && hasAnyRegular) {
+                const msg = `공동구매상품과 상시판매상품을 같이 주문시에는 공동구매 상품 입고일에 합배송 됩니다.<br><br>배달주문 하시겠습니까?`;
+                showSystemModal(msg, 'confirm', () => {
+                    holidayConfirmedStatus = true;
+                    cutoffConfirmedStatus = true;
+                    checkCombinedDelivery();
+                });
+                return;
+            }
+
             // [추가] 주말 및 공휴일 안내 모달 (USER 요청: 일반 상품이 포함된 경우에만 주말 안내 표시)
             if (isHoliday && hasAnyRegular) {
-                let holidayMsg = "";
-                if (hasReserve) {
-                    holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 상품과 같이 주문하신 상시판매 상품은 공동구매 상품 <span style="color:var(--nego-orange);">입고일</span>에 같이 <span style="color:var(--nego-orange);">합배송</span>됩니다.`;
-                } else {
-                    holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>주말 및 공휴일에 주문하신 상품은 <span style="color:var(--nego-orange);">\n다음 평일</span>에 배달됩니다.`;
-                }
+                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>주말 및 공휴일에 주문하신 상품은 <span style="color:var(--nego-orange);">\n다음 평일</span>에 배달됩니다.`;
 
                 showSystemModal(holidayMsg + "<br><br>배달주문 하시겠습니까?", 'confirm', () => {
                     holidayConfirmedStatus = true;
@@ -2430,11 +2454,7 @@
             if (currentHour >= 13) {
                 if (hasAnyRegular) {
                     showModal = true;
-                    if (hasReserve) {
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>오후 1시 이후 주문하신 ${combinedRegLabel} 상품은 <span style="color:var(--nego-orange);">내일</span> 배달되고, 예약 상품은 <span style="color:var(--nego-orange);">입고일</span>에 배달됩니다.`;
-                    } else {
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>오후 1시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.`;
-                    }
+                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>오후 1시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.`;
                 } else if (hasReserve) {
                     showModal = true;
                     msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의\n<span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
@@ -2443,12 +2463,7 @@
                 // 13시 이전
                 if (hasReserve) {
                     showModal = true;
-                    if (hasAnyRegular) {
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>${combinedRegLabel} 상품은 <span style="color:var(--nego-orange);">오늘</span> 배달되고, 예약 상품은 각 <span style="color:var(--nego-orange);">입고일</span>에 배달됩니다.`;
-                    } else {
-                        // 예약상품만 있는 경우
-                        msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의 <span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
-                    }
+                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의 <span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
                 } else {
                     // 일반상품만 1시 이전인 경우: 별도 안내 없이 바로 진행
                     showModal = false;
@@ -5378,6 +5393,48 @@
 
             const submitBtn = document.getElementById('btn-submit-order');
 
+            // [추가] 실시간 상품 목록 확인 및 삭제 여부 검증
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerText = "상품 확인 중...";
+                submitBtn.style.opacity = "0.6";
+            }
+
+            try {
+                // 최신 데이터를 서버에서 강제로 새로고침하여 검증
+                await loadData(true);
+            } catch (e) {
+                console.error("실시간 상품 정보 확인 실패:", e);
+                showSystemModal("실시간 상품 정보를 불러오지 못했습니다.<br>네트워크 연결을 확인해주세요.", 'alert');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "주문확정";
+                    submitBtn.style.opacity = "1";
+                }
+                return;
+            }
+
+            // 장바구니에 담긴 상품 중 판매가 종료된(리스트에서 사라진) 상품이 있는지 검사
+            const deletedItems = [];
+            for (const itemName in cart) {
+                if (cart[itemName] > 0) {
+                    const exists = productsData.some(p => p.name === itemName);
+                    if (!exists) {
+                        deletedItems.push(itemName);
+                    }
+                }
+            }
+
+            if (deletedItems.length > 0) {
+                showSystemModal(`죄송합니다. 다음 상품은 판매가 종료되어 주문할 수 없습니다:<br><br><strong style="color:var(--nego-orange);">${deletedItems.join(', ')}</strong><br><br>해당 상품을 장바구니에서 제외한 후 다시 주문해 주세요.`, 'alert');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "주문확정";
+                    submitBtn.style.opacity = "1";
+                }
+                return;
+            }
+
             try {
                 const nameNode = document.getElementById('input-name');
                 const phoneNode = document.getElementById('input-phone');
@@ -5424,6 +5481,28 @@
                 const isWeekendAfterCutoff = (currentDay === 6 && currentHour >= 13) || currentDay === 0;
 
                 const allItems = [];
+
+                // [추가] 공동구매 상품 입고일 확인 (배달주문 시 상시판매 상품을 합배송하기 위함)
+                let reserveDate = null;
+                if (shippingMethod === '배달주문') {
+                    for (const name in cart) {
+                        if (cart[name] > 0) {
+                            const p = productsData.find(pd => pd.name === name);
+                            if (p) {
+                                const mk = String(p.matchKey || "").trim();
+                                const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
+                                if (isDate) {
+                                    let dStr = mk.replace(/\./g, '-').trim();
+                                    if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
+                                    const pt = dStr.split('-');
+                                    if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                                    reserveDate = dStr;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // 1. 데이터 수집 및 시간 보정
                 for (const itemName in cart) {
@@ -5498,6 +5577,11 @@
                                 }
                             }
                             finalDate = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
+                        }
+
+                        // [합배송 처리] 배달주문이고 공동구매 입고일이 있는 경우, 상시판매 상품의 배달일을 공동구매 입고일로 묶음
+                        if (shippingMethod === '배달주문' && reserveDate && !isDateItem) {
+                            finalDate = reserveDate;
                         }
 
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(finalDate);
