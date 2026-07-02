@@ -4097,11 +4097,14 @@
                         const adjKey = fGetAdjKey(mKey, p.name);
                         const adj = globalAdjustments[adjKey];
                         let currentStock = p.stock;
-                        if (adj === "unlimited") {
+                        const isSheetStockUnlimited = (p.stock === "" || p.stock === null || p.stock === undefined || String(p.stock).trim() === "무제한");
+                        const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited"));
+                        if (isUnlimited) {
                             currentStock = "";
                         } else if (adj !== undefined) {
-                            const baseStock = (p.stock === "") ? 0 : parseInt(p.stock || 0);
-                            currentStock = Math.max(0, baseStock + parseInt(adj));
+                            const baseStock = parseInt(p.stock || 0);
+                            const parsedAdj = parseInt(adj);
+                            currentStock = isNaN(parsedAdj) ? baseStock : Math.max(0, baseStock + parsedAdj);
                         }
 
                         return {
@@ -4871,9 +4874,10 @@
                     if (spA !== spB) return spA - spB;
                 }
 
-                // [수정] 현장판매 또는 특정 카테고리 선택 시 등록 순서 내림차순 (최신 등록 상품부터)
+                // [수정] 현장판매, 과일/야채 또는 특정 카테고리 선택 시 등록 순서 내림차순 (최신 등록 상품부터)
                 const isOnSiteTab = currentMainTab === 'on-site';
-                if (isOnSiteTab || targetKey === '전체상품_현장') {
+                const isFruitVegTab = currentMainTab === 'fruit-veg';
+                if (isOnSiteTab || isFruitVegTab || targetKey === '전체상품_현장') {
                     if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
                 }
 
@@ -6058,12 +6062,23 @@
                 // 2. Firebase 재고 차감 (병렬 실행 및 대기)
                 const stockPromises = allItems.map(async it => {
                     if (it.name === "배달비") return;
+
+                    // 상품 정보 찾기
+                    const pData = productsData.find(pd => pd.name === it.name);
+                    if (pData) {
+                        const isSheetStockUnlimited = (pData.stock === "" || pData.stock === null || pData.stock === undefined || String(pData.stock).trim() === "무제한" || pData.originalStock === "" || pData.originalStock === null || pData.originalStock === undefined || String(pData.originalStock).trim() === "무제한");
+                        if (isSheetStockUnlimited) return; // 무제한 상품은 재고 차감 불필요
+                    }
+
                     const targetKey = it.matchKey || it.date;
                     const adjKey = fGetAdjKey(targetKey, it.name);
                     const diff = -it.qty;
                     try {
                         const r = await fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json?t=${Date.now()}`);
                         const currentAdj = await r.json();
+                        if (currentAdj === "unlimited" || (currentAdj !== null && String(currentAdj).startsWith("unlimited"))) {
+                            return; // Firebase 상에서 무제한인 경우도 차감 생략
+                        }
                         const newAdj = (currentAdj || 0) + diff;
                         await fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`, {
                             method: 'PUT',
