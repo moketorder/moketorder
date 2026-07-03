@@ -1454,6 +1454,13 @@
                 style="display:none; margin-top:15px; background:white; border:1.5px solid #9C27B0; color:#9C27B0; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🗓️
                 임시 휴무일(공휴일) 관리</button>
 
+            <button id="ADMIN_SATURDAY_WEEKDAY_ON" onclick="adminToggleSaturdayWeekday(true)"
+                style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">📅
+                토요일 평일 작동 활성화 (주문 가동)</button>
+            <button id="ADMIN_SATURDAY_WEEKDAY_OFF" onclick="adminToggleSaturdayWeekday(false)"
+                style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">📅
+                토요일 주말 작동 (배달 휴무)</button>
+
             <button id="ADMIN_LOGIN_ON" onclick="adminToggleLoginEntry(true)"
                 style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🔒
                 전체 로그인 화면 강제하기</button>
@@ -1769,7 +1776,7 @@
             const hour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
             const isAfterCutoffOrHoliday = isHoliday || (hour >= 13);
             const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour >= 8 && hour < 13);
@@ -1894,6 +1901,7 @@
                         'ADMIN_DELIVERY_ON', 'ADMIN_DELIVERY_OFF',
                         'ADMIN_DELIVERY_FEE_ON', 'ADMIN_DELIVERY_FEE_OFF',
                         'ADMIN_HOLIDAY_MANAGE',
+                        'ADMIN_SATURDAY_WEEKDAY_ON', 'ADMIN_SATURDAY_WEEKDAY_OFF',
                         'ADMIN_LOGIN_ON', 'ADMIN_LOGIN_OFF', 'btn-unlink-kakao',
                         'ADMIN_PRODUCT_LIST_ON', 'ADMIN_PRODUCT_LIST_OFF', 'ADMIN_HR'
                     ];
@@ -2071,6 +2079,7 @@
                     'ADMIN_DELIVERY_ON', 'ADMIN_DELIVERY_OFF',
                     'ADMIN_DELIVERY_FEE_ON', 'ADMIN_DELIVERY_FEE_OFF',
                     'ADMIN_HOLIDAY_MANAGE',
+                    'ADMIN_SATURDAY_WEEKDAY_ON', 'ADMIN_SATURDAY_WEEKDAY_OFF',
                     'ADMIN_LOGIN_ON', 'ADMIN_LOGIN_OFF', 'btn-unlink-kakao',
                     'ADMIN_PRODUCT_LIST_ON', 'ADMIN_PRODUCT_LIST_OFF', 'ADMIN_HR'
                 ];
@@ -2337,6 +2346,77 @@
         setInterval(fetchProductListStatus, 10000);
         fetchProductListStatus();
 
+        // [신규] 토요일 평일 가동 여부 제어 로직
+        let isSaturdayAsWeekday = false;
+
+        async function fetchSaturdayWeekdayStatus() {
+            try {
+                const res = await fetch(FIREBASE_DB_URL + "saturday_as_weekday.json?t=" + Date.now());
+                const status = await res.json();
+                if (status !== null) isSaturdayAsWeekday = (status === true);
+                updateSaturdayWeekdayUI();
+            } catch (e) {
+                console.error("토요일 평일 설정 로드 실패:", e);
+                updateSaturdayWeekdayUI();
+            }
+        }
+
+        function updateSaturdayWeekdayUI() {
+            const onBtn = document.getElementById('ADMIN_SATURDAY_WEEKDAY_ON');
+            const offBtn = document.getElementById('ADMIN_SATURDAY_WEEKDAY_OFF');
+
+            if (onBtn && offBtn) {
+                if (isSaturdayAsWeekday) {
+                    onBtn.innerHTML = '📅 토요일 평일 작동 활성화 [현재 적용중]';
+                    onBtn.style.background = '#e1f5fe';
+                    onBtn.style.border = '1.5px solid #2196F3';
+                    onBtn.style.color = '#2196F3';
+                    onBtn.style.opacity = '1';
+
+                    offBtn.innerHTML = '📅 토요일 주말 작동 (배달 휴무)';
+                    offBtn.style.background = 'white';
+                    offBtn.style.border = '1.5px solid #ff4d4d';
+                    offBtn.style.color = '#ff4d4d';
+                    offBtn.style.opacity = '0.5';
+                } else {
+                    offBtn.innerHTML = '📅 토요일 주말 작동 [현재 적용중]';
+                    offBtn.style.background = '#eceff1';
+                    offBtn.style.border = '1.5px solid #607D8B';
+                    offBtn.style.color = '#607D8B';
+                    offBtn.style.opacity = '1';
+
+                    onBtn.innerHTML = '📅 토요일 평일 작동 활성화';
+                    onBtn.style.background = 'white';
+                    onBtn.style.border = '1.5px solid var(--moket-green)';
+                    onBtn.style.color = 'var(--moket-green)';
+                    onBtn.style.opacity = '0.5';
+                }
+            }
+        }
+
+        async function adminToggleSaturdayWeekday(status) {
+            if (!isAdminMode) return;
+            const url = FIREBASE_DB_URL + "saturday_as_weekday.json";
+            try {
+                showSystemModal("구성을 변경 중입니다...", 'loading');
+                const res = await fetch(url, {
+                    method: 'PUT',
+                    body: JSON.stringify(status)
+                });
+                if (res.ok) {
+                    showSystemModal(`토요일이 즉시 ${status ? '평일(주문가동)' : '주말(배달휴무)'} 처리되었습니다.`, 'alert');
+                    isSaturdayAsWeekday = status;
+                    updateSaturdayWeekdayUI();
+                    processAndRender(cachedProducts || productsData);
+                }
+            } catch (e) {
+                showSystemModal("상태 변경 실패: " + e.toString(), 'alert');
+            }
+        }
+
+        setInterval(fetchSaturdayWeekdayStatus, 10000);
+        fetchSaturdayWeekdayStatus();
+
 
         function handleDeliveryOrderClick() {
             if (!isDeliveryEnabled) {
@@ -2371,7 +2451,7 @@
             const currentHour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
 
             let hasReserve = false;
             let hasFV = false;
@@ -2511,7 +2591,7 @@
                 while (true) {
                     const chkDay = targetDateObj.getDay();
                     const dStr = `${targetDateObj.getFullYear()}-${String(targetDateObj.getMonth() + 1).padStart(2, '0')}-${String(targetDateObj.getDate()).padStart(2, '0')}`;
-                    let isOff = (chkDay === 0 || chkDay === 6 || publicHolidays.includes(dStr));
+                    let isOff = (chkDay === 0 || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
                     if (isOff) targetDateObj.setDate(targetDateObj.getDate() + 1);
                     else break;
                 }
@@ -2565,7 +2645,7 @@
             const currentHour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
             let hasCostco = false;
             let hasFV = false;
@@ -2706,6 +2786,7 @@
             fetchDeliveryFeeStatus();
             fetchLoginEntryStatus();
             fetchHolidays();
+            fetchSaturdayWeekdayStatus();
         });
 
         // [추가] Firebase 키에 사용할 수 없는 문자 세척 함수 (. # $ [ ] / 등 제거)
@@ -4353,7 +4434,7 @@
                                 const now = new Date();
                                 const currentDay = now.getDay();
                                 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                                const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+                                const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
                                 if (isHoliday) {
                                     return false;
                                 }
@@ -4454,7 +4535,7 @@
                 const hourForCostco = nowForCostco.getHours();
                 const dayForCostco = nowForCostco.getDay();
                 const dStrForCostco = `${nowForCostco.getFullYear()}-${String(nowForCostco.getMonth() + 1).padStart(2, '0')}-${String(nowForCostco.getDate()).padStart(2, '0')}`;
-                const isHolidayForCostco = (dayForCostco === 0 || dayForCostco === 6 || publicHolidays.includes(dStrForCostco));
+                const isHolidayForCostco = (dayForCostco === 0 || (dayForCostco === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStrForCostco));
                 const isAfterCutoffOrHolidayForCostco = isHolidayForCostco || (hourForCostco >= 13);
 
                 if (costcoFilters.length === 0 || isAfterCutoffOrHolidayForCostco) {
@@ -4693,7 +4774,7 @@
                                 const now = new Date();
                                 const currentDay = now.getDay();
                                 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                                const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+                                const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
                                 if (isHoliday) {
                                     return false;
                                 }
@@ -5481,7 +5562,7 @@
 
                 // [추가] 주말 및 공휴일 안내 모달 (USER 요청: 일반 상품이 포함된 경우에만 주말 안내 표시)
                 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                const isHoliday = (currentDay === 0 || currentDay === 6 || publicHolidays.includes(todayStr));
+                const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
 
                 let hasAnyRegular = false;
                 for (const name in cart) {
@@ -5571,7 +5652,7 @@
                         const isOnSite = ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || (!isDateItem && !isDaily);
 
                         // 1-2. [신규] 상시판매: 20시(토요일은 18시) 이후 내일로 보정
-                        const isOnSiteThreshold = (now.getDay() === 6) ? 18 : 20;
+                        const isOnSiteThreshold = (now.getDay() === 6 && !isSaturdayAsWeekday) ? 18 : 20;
                         if (isOnSite && currentHour >= isOnSiteThreshold) {
                             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                             if (!isDateItem || mKey <= todayStr) {
@@ -5589,7 +5670,7 @@
 
                                 let isOff = false;
                                 if (checkDay === 0) isOff = true; // 일요일 무조건 휴무
-                                else if (checkDay === 6) { // 토요일 휴무 조건
+                                else if (checkDay === 6 && !isSaturdayAsWeekday) { // 토요일 휴무 조건
                                     if (shippingMethod === '배달주문') isOff = true; // 배달은 토요일 휴무
                                     else {
                                         // 매장픽업
@@ -5654,7 +5735,7 @@
                         const dStr = `${targetDateObj.getFullYear()}-${String(targetDateObj.getMonth() + 1).padStart(2, '0')}-${String(targetDateObj.getDate()).padStart(2, '0')}`;
                         let isOff = false;
                         if (chkDay === 0) isOff = true;
-                        else if (chkDay === 6) isOff = true; // 배달은 토요일 휴무
+                        else if (chkDay === 6 && !isSaturdayAsWeekday) isOff = true; // 배달은 토요일 휴무
                         else if (publicHolidays.includes(dStr)) isOff = true;
 
                         if (isOff) targetDateObj.setDate(targetDateObj.getDate() + 1);
@@ -6193,6 +6274,7 @@
             fetchDeliveryFeeStatus();
             fetchLoginEntryStatus();
             fetchProductListStatus();
+            fetchSaturdayWeekdayStatus();
 
             // [복구] 사용자 정보 없으면 로그인 유도창(카카오 로그인) 띄움
 
