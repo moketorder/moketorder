@@ -2346,14 +2346,22 @@
         setInterval(fetchProductListStatus, 10000);
         fetchProductListStatus();
 
-        // [신규] 토요일 평일 가동 여부 제어 로직
-        let isSaturdayAsWeekday = false;
+        // [신규] 토요일 평일 가동 여부 제어 로직 (첫 로드 시 후다닥 점프 현상 방지를 위해 localStorage 동기 캐시 우선 로드)
+        let isSaturdayAsWeekday = localStorage.getItem('moket_saturday_as_weekday') === 'true';
 
         async function fetchSaturdayWeekdayStatus() {
             try {
                 const res = await fetch(FIREBASE_DB_URL + "saturday_as_weekday.json?t=" + Date.now());
                 const status = await res.json();
-                if (status !== null) isSaturdayAsWeekday = (status === true);
+                if (status !== null) {
+                    const hasChanged = (isSaturdayAsWeekday !== (status === true));
+                    isSaturdayAsWeekday = (status === true);
+                    localStorage.setItem('moket_saturday_as_weekday', isSaturdayAsWeekday);
+                    if (hasChanged) {
+                        initMainTabs();
+                        processAndRender(cachedProducts || productsData);
+                    }
+                }
                 updateSaturdayWeekdayUI();
             } catch (e) {
                 console.error("토요일 평일 설정 로드 실패:", e);
@@ -2406,7 +2414,9 @@
                 if (res.ok) {
                     showSystemModal(`토요일이 즉시 ${status ? '평일(주문가동)' : '주말(배달휴무)'} 처리되었습니다.`, 'alert');
                     isSaturdayAsWeekday = status;
+                    localStorage.setItem('moket_saturday_as_weekday', status);
                     updateSaturdayWeekdayUI();
+                    initMainTabs();
                     processAndRender(cachedProducts || productsData);
                 }
             } catch (e) {
