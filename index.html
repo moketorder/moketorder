@@ -1943,7 +1943,7 @@
             const adjKey = safeDate + "_" + safeName;
             
             try {
-                const res = await fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`, {
+                const res = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(adj)
@@ -2025,7 +2025,7 @@
             try {
                 if (inputElement) inputElement.disabled = true;
                 
-                const res = await fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`, {
+                const res = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(adj)
@@ -4003,11 +4003,11 @@
                 const adjKey = safeDate + "_" + safeName;
                 const diff = parseInt(fullHistoryData[targetIdx].qty) || 1;
 
-                const stockPromise = fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`)
+                const stockPromise = fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`)
                     .then(r => r.json())
                     .then(currentAdj => {
                         const newAdj = (currentAdj || 0) + diff;
-                        return fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`, {
+                        return fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
                             method: 'PUT',
                             body: JSON.stringify(newAdj)
                         });
@@ -4186,7 +4186,7 @@
                     .map((p, idx) => {
                         const mKey = (p.matchKey || p.date || "").trim();
                         const adjKey = fGetAdjKey(mKey, p.name);
-                        const adj = globalAdjustments[adjKey];
+                        const adj = globalAdjustments[encodeURIComponent(adjKey)] || globalAdjustments[adjKey];
                         let currentStock = p.stock;
                         const isSheetStockUnlimited = (p.stock === "" || p.stock === null || p.stock === undefined || String(p.stock).trim() === "무제한");
                         const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited"));
@@ -6169,13 +6169,13 @@
                     const adjKey = fGetAdjKey(targetKey, it.name);
                     const diff = -it.qty;
                     try {
-                        const r = await fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json?t=${Date.now()}`);
+                        const r = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json?t=${Date.now()}`);
                         const currentAdj = await r.json();
                         if (currentAdj === "unlimited" || (currentAdj !== null && String(currentAdj).startsWith("unlimited"))) {
                             return; // Firebase 상에서 무제한인 경우도 차감 생략
                         }
                         const newAdj = (currentAdj || 0) + diff;
-                        await fetch(`${FIREBASE_DB_URL}global_stock/${adjKey}.json`, {
+                        await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
                             method: 'PUT',
                             body: JSON.stringify(newAdj)
                         });
