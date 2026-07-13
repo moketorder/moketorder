@@ -4380,7 +4380,7 @@
                                 });
                             }).catch(e => console.error("재고 복구 실패:", e));
 
-                        // 1-3. GAS 스프레드시트 동기화 (배경 실행)
+                        // 1-3. GAS 스프레드시트 동기화 (배경 비동기 실행 - 대기 제외)
                         const gasPayload = {
                             header: 'delete',
                             timestamp: String(order.timestamp).trim(),
@@ -4390,12 +4390,12 @@
                             pickupDate: String(order.pickupDate).trim(),
                             matchKey: String(order.matchKey || "").trim()
                         };
-                        const gasPromise = fetch(API_URL, {
+                        fetch(API_URL, {
                             method: 'POST',
                             body: JSON.stringify(gasPayload)
                         }).catch(e => console.error("GAS 취소 전송 실패:", e));
 
-                        await Promise.all([fbPromise, stockPromise, gasPromise]);
+                        await Promise.all([fbPromise, stockPromise]);
 
                         // 1-4. 로컬 메모리 상태 즉시 반영 및 재고 락 설정
                         order.isProcessing = false;
@@ -7191,42 +7191,42 @@
                 });
                 await Promise.all(stockPromises);
 
+                // [추가] 픽업 합산된 항목들의 원본 행 상태 변경 및 Firebase 데이터 삭제 (GAS 비동기 대기 없이 즉시 병렬 실행)
+                allItems.forEach(async it => {
+                    if (it.isExtra && it.originalData) {
+                        try {
+                            // 1. GAS 스프레드시트 서버 합산 처리
+                            fetch(API_URL, {
+                                method: 'POST',
+                                body: JSON.stringify({ header: 'combine', ...it.originalData })
+                            }).catch(e => console.error("GAS 합산 처리 실패:", e));
+
+                            // 2. Firebase 실시간 데이터베이스에서 기존 개별 주문 삭제
+                            const origPhone = String(it.originalData.phone || phone).replace(/\D/g, "");
+                            const origOrderKey = fSafeKey(it.originalData.timestamp) + "_" + fSafeKey(it.originalData.item);
+                            const origFbUrl = `${FIREBASE_DB_URL}orders/${origPhone}/${origOrderKey}.json`;
+                            fetch(origFbUrl, { method: 'DELETE' })
+                                .then(() => {
+                                    // 로컬 캐시(fullHistoryData)에서도 삭제하여 UI 싱크 맞춤
+                                    if (typeof fullHistoryData !== 'undefined' && Array.isArray(fullHistoryData)) {
+                                        fullHistoryData = fullHistoryData.filter(h => h.timestamp !== it.originalData.timestamp || h.item !== it.originalData.item);
+                                        const cacheKey = `history_cache_${name}_${cleanPhone}`;
+                                        localStorage.setItem(cacheKey, JSON.stringify(fullHistoryData));
+                                    }
+                                    console.log(`[합배송 처리] 이전 개별 주문 Firebase 삭제 완료: ${it.originalData.item}`);
+                                })
+                                .catch(e => console.error("Firebase 합산 원본 삭제 실패:", e));
+                        } catch (e) { console.error("합산 실패:", e); }
+                    }
+                });
+
                 // 3. GAS 스프레드시트 동기화 (배경에서 실행)
-                const gasPromise = fetch(API_URL, {
+                fetch(API_URL, {
                     method: 'POST',
                     redirect: 'follow',
                     body: JSON.stringify(payload)
                 }).then(res => res.json()).then(gasResult => {
                     console.log("GAS 동기화 완료:", gasResult);
-                    if (gasResult.result === "success") {
-                        // [추가] 픽업 합산된 항목들의 원본 행 상태 변경 및 Firebase 데이터 삭제
-                        allItems.forEach(async it => {
-                            if (it.isExtra && it.originalData) {
-                                try {
-                                    // 1. GAS 스프레드시트 서버 합산 처리
-                                    fetch(API_URL, {
-                                        method: 'POST',
-                                        body: JSON.stringify({ header: 'combine', ...it.originalData })
-                                    });
-
-                                    // 2. Firebase 실시간 데이터베이스에서 기존 개별 주문 삭제
-                                    const origPhone = String(it.originalData.phone || phone).replace(/\D/g, "");
-                                    const origOrderKey = fSafeKey(it.originalData.timestamp) + "_" + fSafeKey(it.originalData.item);
-                                    const origFbUrl = `${FIREBASE_DB_URL}orders/${origPhone}/${origOrderKey}.json`;
-                                    fetch(origFbUrl, { method: 'DELETE' })
-                                        .then(() => {
-                                            // 로컬 캐시(fullHistoryData)에서도 삭제하여 UI 싱크 맞춤
-                                            if (typeof fullHistoryData !== 'undefined' && Array.isArray(fullHistoryData)) {
-                                                fullHistoryData = fullHistoryData.filter(h => h.timestamp !== it.originalData.timestamp || h.item !== it.originalData.item);
-                                                const cacheKey = `history_cache_${name}_${cleanPhone}`;
-                                                localStorage.setItem(cacheKey, JSON.stringify(fullHistoryData));
-                                            }
-                                        })
-                                        .catch(e => console.error("Firebase 합산 원본 삭제 실패:", e));
-                                } catch (e) { console.error("합산 실패:", e); }
-                            }
-                        });
-                    }
                 }).catch(err => console.error("GAS 동기화 네트워크 실패:", err));
 
                 // 4. 로컬 상태 업데이트 및 완료 안내 (Firebase 기록 완료 시 바로 표시)
