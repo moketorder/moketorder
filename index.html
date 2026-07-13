@@ -2905,6 +2905,19 @@
         }
 
         function selectPickup() {
+            // [신규] 삶은 옥수수 상품 픽업 예약 제한 방어 로직 (USER 요청)
+            let hasCorn = false;
+            for (const name in cart) {
+                if (cart[name] > 0 && name.includes("삶은 옥수수")) {
+                    hasCorn = true;
+                    break;
+                }
+            }
+            if (hasCorn) {
+                showSystemModal("삶은 옥수수는 배달주문만 가능합니다.<br><br>픽업주문은 매장에서 픽업하시면서 주문해주세요.", 'alert');
+                return;
+            }
+
             const now = new Date();
             const currentHour = now.getHours();
             const currentDay = now.getDay();
@@ -6282,25 +6295,7 @@
             
             const submitBtn = document.getElementById('btn-submit-order');
 
-            // [신규] 삶은 옥수수 상품 픽업 예약 제한 방어 로직 (USER 요청)
-            if (shippingMethod === '매장픽업') {
-                let hasCorn = false;
-                for (const name in cart) {
-                    if (cart[name] > 0 && name.includes("삶은 옥수수")) {
-                        hasCorn = true;
-                        break;
-                    }
-                }
-                if (hasCorn) {
-                    showSystemModal("삶은 옥수수는 현재 픽업예약이 어렵습니다.<br>삶은 옥수수를 빼고 주문 부탁드립니다.", 'alert');
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.innerText = "주문확정";
-                        submitBtn.style.opacity = "1";
-                    }
-                    return;
-                }
-            }
+
 
             // [신규] 당일배송 주말/공휴일 및 평일 13시 마감 및 06시 시작 제한 시간 차단
             if (currentDeliveryType === 'today') {
