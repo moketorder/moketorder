@@ -3894,7 +3894,13 @@
                     const data = await res.json();
                     if (data) {
                         // 객체 형태를 배열로 변환하고 최신순 정렬
-                        const allOrders = Object.values(data).sort((a, b) => {
+                        const allOrders = Object.entries(data).map(([key, val]) => {
+                            return {
+                                ...val,
+                                orderKey: key,
+                                phone: cleanPhone
+                            };
+                        }).sort((a, b) => {
                             return parseKRDate(b.timestamp) - parseKRDate(a.timestamp);
                         });
 
@@ -6563,7 +6569,7 @@
                         const mKey = it.matchKey || it.pickupDate || "";
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
                         let displayName = it.item;
-                        allItems.push({ name: displayName, qty: it.qty, price: parseInt(it.price || 0), subtotal: parseInt(it.total || 0), date: mKey, matchKey: mKey, isCategorized: isCategorized, isExtra: true, isPushedByCutoff: false, originalData: { timestamp: it.timestamp, name: it.name, item: it.item, phone: it.phone || phone, paid: it.paid } });
+                        allItems.push({ name: displayName, qty: it.qty, price: parseInt(it.price || 0), subtotal: parseInt(it.total || 0), date: mKey, matchKey: mKey, isCategorized: isCategorized, isExtra: true, isPushedByCutoff: false, originalData: { timestamp: it.timestamp, name: it.name, item: it.item, phone: it.phone || phone, paid: it.paid, orderKey: it.orderKey } });
                     });
                 }
 
@@ -7157,6 +7163,8 @@
                     const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(it.name);
                     const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
 
+                    const isItemPaid = it.isExtra && (it.originalData?.paid === true || it.originalData?.paid === "true" || String(it.originalData?.paid).toUpperCase() === "TRUE");
+
                     const itemPayload = {
                         ...payload,
                         timestamp: formattedTimestamp,
@@ -7167,7 +7175,8 @@
                         pickupDate: jsFormatPickup(getDisplayDate(it)),
                         cashReceipt: cashReceipt,
                         cashReceiptType: (cashReceipt === '발행') ? cashReceiptType : "",
-                        cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : ""
+                        cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : "",
+                        paid: isItemPaid
                     };
                     delete itemPayload.items;
 
@@ -7221,7 +7230,7 @@
 
                             // 2. Firebase 실시간 데이터베이스에서 기존 개별 주문 삭제
                             const origPhone = String(it.originalData.phone || phone).replace(/\D/g, "");
-                            const origOrderKey = fSafeKey(it.originalData.timestamp) + "_" + fSafeKey(it.originalData.item);
+                            const origOrderKey = it.originalData.orderKey || (fSafeKey(it.originalData.timestamp) + "_" + fSafeKey(it.originalData.item));
                             const origFbUrl = `${FIREBASE_DB_URL}orders/${origPhone}/${origOrderKey}.json`;
                             fetch(origFbUrl, { method: 'DELETE' })
                                 .then(() => {
