@@ -1878,7 +1878,7 @@
                 
                 // 2. 평일 15시 이후 및 06시 이전 당일구매 마감 차단
                 if (hour < 6 || hour >= 15) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 15시까지만 가능합니다.`, 'alert');
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'}<br>오전6시부터 오후3시까지만 가능합니다.`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -6319,7 +6319,7 @@
                     return;
                 }
                 if (currentHour < 6 || currentHour >= 15) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 15시까지만 가능합니다.`, 'alert');
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'}<br>오전6시부터 오후3시까지만 가능합니다.`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
