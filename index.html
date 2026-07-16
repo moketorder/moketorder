@@ -3789,11 +3789,12 @@
                         order.received === "취소완료";
 
                     const isReceived = (order.received === true || String(order.received).toUpperCase() === "TRUE");
+                    const isDelivered = (order.delivered === true || String(order.delivered).toUpperCase() === "TRUE");
                     const isStocked = (order.isStocked === true || String(order.isStocked).toUpperCase() === "TRUE");
                     const isDelivery = (order.shippingMethod === '배달주문');
 
-                    // 알림 대상: (입고완료 상태) AND (수령 전) AND (취소 아님) AND (배달 주문 아님)
-                    return isStocked && !isReceived && !isCanceled && !isDelivery;
+                    // 알림 대상: (입고완료 상태) AND (수령 전 및 배달 전) AND (취소 아님) AND (배달 주문 아님)
+                    return isStocked && !isReceived && !isDelivered && !isCanceled && !isDelivery;
                 });
 
                 console.log("[미픽업 확인] 최종 미픽업 항목 수:", unpickedItems.length);
