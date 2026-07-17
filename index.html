@@ -5013,7 +5013,7 @@
                 const dateB = new Date(String(b).replace(/\./g, '-')).getTime();
                 const isDateA = !isNaN(dateA) && String(a).includes('.');
                 const isDateB = !isNaN(dateB) && String(b).includes('.');
-                if (isDateA && isDateB) return dateA - dateB;
+                if (isDateA && isDateB) return dateB - dateA;
                 if (isDateA) return -1;
                 if (isDateB) return 1;
                 return String(a).localeCompare(String(b));
@@ -5562,7 +5562,7 @@
                         // matchKey나 storage 중 하나라도 해당 단어를 포함하면 우선순위 부여
                         if (m.includes("냉동") || s.includes("냉동")) return 1;
                         if (m.includes("냉장") || s.includes("냉장")) return 2;
-                        if (m.includes("상온") || s.includes("실온") || m.includes("상온") || m.includes("실온")) return 3;
+                        if (m.includes("상온") || s.includes("실온")) return 3;
                         return 4;
                     };
                     const spA = getStoragePriority(a);
@@ -5570,14 +5570,9 @@
                     if (spA !== spB) return spA - spB;
                 }
 
-                // [수정] 현장판매, 과일/야채 또는 특정 카테고리 선택 시 등록 순서 내림차순 (최신 등록 상품부터)
-                const isOnSiteTab = currentMainTab === 'on-site';
-                const isFruitVegTab = currentMainTab === 'fruit-veg';
-                if (isOnSiteTab || isFruitVegTab || targetKey === '전체상품_현장') {
-                    if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
-                }
-
-                if (targetKey === '전체상품_예약') {
+                // 4. 공동구매(예약구매) 정렬
+                const isReserveTab = (currentMainTab === 'reserve' || targetKey === '전체상품_예약');
+                if (isReserveTab) {
                     // [정렬] 사다드림(0) > 특수 카테고리(1) > 날짜별(2)
                     const getReservePriority = (p) => {
                         const n = String(p.name || "").trim();
@@ -5593,19 +5588,25 @@
                     const rpB = getReservePriority(b);
                     if (rpA !== rpB) return rpA - rpB;
 
-                    // [수정] 업로드 순서(originalIndex)를 날짜보다 우선하여 정렬
-                    if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
-
+                    // 일반 날짜 상품(priority 2) 또는 동일 그룹인 경우, 날짜 기준 정렬 (가장 늦은 날짜부터 = 내림차순)
                     const dateRegex = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/;
-                    const isDateA = dateRegex.test(String(a.matchKey));
-                    const isDateB = dateRegex.test(String(b.matchKey));
+                    const matchKeyStrA = String(a.matchKey || "");
+                    const matchKeyStrB = String(b.matchKey || "");
+                    const isDateA = dateRegex.test(matchKeyStrA);
+                    const isDateB = dateRegex.test(matchKeyStrB);
 
                     if (isDateA && isDateB) {
-                        const dateA = new Date(String(a.matchKey).replace(/\./g, '-')).getTime() || 0;
-                        const dateB = new Date(String(b.matchKey).replace(/\./g, '-')).getTime() || 0;
-                        if (dateA !== dateB) return dateB - dateA;
+                        const dateA = new Date(matchKeyStrA.replace(/\./g, '-')).getTime() || 0;
+                        const dateB = new Date(matchKeyStrB.replace(/\./g, '-')).getTime() || 0;
+                        if (dateA !== dateB) return dateB - dateA; // 내림차순 (가장 늦은 날짜부터)
                     }
                 }
+
+                // 5. 기본 정렬: 업로드 및 수정 시간 기준 최신순 (updatedAt 또는 originalIndex 내림차순)
+                const timeA = a.updatedAt || a.originalIndex || 0;
+                const timeB = b.updatedAt || b.originalIndex || 0;
+                if (timeA !== timeB) return timeB - timeA;
+
                 return a.name.localeCompare(b.name, 'ko', { numeric: true, sensitivity: 'base' });
             });
 
@@ -6820,7 +6821,7 @@
                         <div style="font-size:32px; font-weight:900; color:var(--item-black); margin:8px 0;">
                             ${displayTotal.toLocaleString()}원
                         </div>
-                        ${allItems.some(it => it.isExtra) ? `
+                        ${(allItems.some(it => it.isExtra) && !showDeductNotice) ? `
                         <div style="font-size:14px; font-weight:800; color:#d32f2f; margin-top:-2px; margin-bottom:8px;">
                             (기존에 입금했을 시 차액만 입금바랍니다.)
                         </div>
