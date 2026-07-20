@@ -1876,9 +1876,9 @@
                     return;
                 }
                 
-                // 2. 평일 13시 이후 및 06시 이전 당일구매 마감 차단
-                if (hour < 6 || hour >= 13) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 13시까지만 가능합니다.`, 'alert');
+                // 2. 평일 15시 이후 및 06시 이전 당일구매 마감 차단
+                if (hour < 6 || hour >= 15) {
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 15시까지만 가능합니다.`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -1910,17 +1910,17 @@
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
-            const isAfterCutoffOrHoliday = isHoliday || (hour >= 13);
-            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour >= 8 && hour < 13);
+            const isAfterCutoffOrHoliday = isHoliday || (hour >= 15);
+            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour >= 8 && hour < 15);
             
             // 1. 첫 페이지 로드 시에만 기본 탭 설정
             if (isInitialPageLoad) {
-                if (hour < 8 || hour >= 13 || isHoliday) {
+                if (hour < 8 || hour >= 15 || isHoliday) {
                     currentDeliveryType = 'reserve';
-                    currentMainTab = 'reserve'; // 13시 이후, 8시 이전, 휴무일에는 예약배송으로 유도
+                    currentMainTab = 'reserve'; // 15시 이후, 8시 이전, 휴무일에는 예약배송으로 유도
                 } else {
                     currentDeliveryType = 'today';
-                    currentMainTab = 'today-fruit'; // 평일 8시 ~ 13시 사이에는 당일배송으로 기본 시작
+                    currentMainTab = 'today-fruit'; // 평일 8시 ~ 15시 사이에는 당일배송으로 기본 시작
                 }
             }
             
@@ -1976,7 +1976,7 @@
                     if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
                     return mKey.includes("코스트코");
                 });
-                const isAfterCutoffOrHolidayForCostco = isHoliday || (hour >= 13);
+                const isAfterCutoffOrHolidayForCostco = isHoliday || (hour >= 15);
                 const showCostco = hasCostcoItems && !isAfterCutoffOrHolidayForCostco;
 
                 if (currentMainTab === 'on-site') {
@@ -2577,7 +2577,7 @@
 
             // [신규] 장바구니 상품의 배달 기준일 계산하여 해당 일자에 기존 주문이 있는지 확인
             let targetDateObj = new Date(now);
-            if (currentHour >= 13) targetDateObj.setDate(targetDateObj.getDate() + 1);
+            if (currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
 
             while (true) {
                 const chkDay = targetDateObj.getDay();
@@ -2823,21 +2823,21 @@
             if (currentDeliveryType === 'reserve') {
                 showModal = true;
                 msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매상품중 가장 늦은 입고일에 맞춰 합배송 됩니다.${maxDateStr ? `<br>[배달예정일 : ${maxDateStr}]` : ''}`;
-            } else if (currentHour >= 13) {
+            } else if (currentHour >= 15) {
                 if (hasAnyRegular) {
                     showModal = true;
-                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>오후 1시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.`;
+                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>오후 3시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.`;
                 } else if (hasReserve) {
                     showModal = true;
                     msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의\n<span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
                 }
             } else {
-                // 13시 이전
+                // 15시 이전
                 if (hasReserve) {
                     showModal = true;
                     msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의 <span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
                 } else {
-                    // 일반상품만 1시 이전인 경우: 별도 안내 없이 바로 진행
+                    // 일반상품만 3시 이전인 경우: 별도 안내 없이 바로 진행
                     showModal = false;
                 }
             }
@@ -2855,7 +2855,7 @@
             function checkCombinedDelivery() {
                 // [신규] 장바구니 상품의 배달 기준일 계산
                 let targetDateObj = new Date(now);
-                if (currentHour >= 13) targetDateObj.setDate(targetDateObj.getDate() + 1);
+                if (currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
 
                 while (true) {
                     const chkDay = targetDateObj.getDay();
@@ -4984,20 +4984,20 @@
                                     return false;
                                 }
 
-                                // 과일/야채 상품의 경우 해당 날짜 오전 8시 이전 또는 오후 1시(13시) 이후에는 미노출 처리
+                                // 과일/야채 상품의 경우 해당 날짜 오전 8시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
                                 const startDate = new Date(y, m - 1, d, 8, 0, 0, 0);
-                                const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
+                                const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                 const nowTime = new Date();
                                 if (nowTime < startDate || nowTime >= cutoffDate) {
-                                    return false; // 8시 이전 또는 13시 이후이므로 제외
+                                    return false; // 8시 이전 또는 15시 이후이므로 제외
                                 }
                             } else {
-                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
+                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
                                 const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
                                 if (isReserveDate) {
-                                    const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
+                                    const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                     if (new Date() >= cutoffDate) {
-                                        return false; // 13시가 지났으므로 제외
+                                        return false; // 15시가 지났으므로 제외
                                     }
                                 }
                             }
@@ -5078,7 +5078,7 @@
                 return String(a).localeCompare(String(b));
             });
 
-            // [추가] 코스트코 카테고리에 상품이 없거나 주말/공휴일/평일 1시 이후이면 탭 자체를 숨김
+            // [추가] 코스트코 카테고리에 상품이 없거나 주말/공휴일/평일 3시 이후이면 탭 자체를 숨김
             const costcoTabBtn = document.querySelector('.main-tab-btn[data-tab="costco"]');
             if (costcoTabBtn) {
                 const nowForCostco = new Date();
@@ -5086,7 +5086,7 @@
                 const dayForCostco = nowForCostco.getDay();
                 const dStrForCostco = `${nowForCostco.getFullYear()}-${String(nowForCostco.getMonth() + 1).padStart(2, '0')}-${String(nowForCostco.getDate()).padStart(2, '0')}`;
                 const isHolidayForCostco = (dayForCostco === 0 || (dayForCostco === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStrForCostco));
-                const isAfterCutoffOrHolidayForCostco = isHolidayForCostco || (hourForCostco >= 13);
+                const isAfterCutoffOrHolidayForCostco = isHolidayForCostco || (hourForCostco >= 15);
 
                 if (costcoFilters.length === 0 || isAfterCutoffOrHolidayForCostco) {
                     costcoTabBtn.style.display = 'none';
@@ -5349,21 +5349,21 @@
                                         return false;
                                     }
 
-                                    // 과일/야채 상품의 경우 해당 날짜 오전 8시 이전 또는 오후 1시(13시) 이후에는 미노출 처리
+                                    // 과일/야채 상품의 경우 해당 날짜 오전 8시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
                                     const startDate = new Date(y, m - 1, d, 8, 0, 0, 0);
-                                    const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
+                                    const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                     const nowTime = new Date();
                                     if (nowTime < startDate || nowTime >= cutoffDate) {
-                                        return false; // 8시 이전 또는 13시 이후이므로 제외
+                                        return false; // 8시 이전 또는 15시 이후이므로 제외
                                     }
                                 }
                             } else {
-                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 1시(13시) 이후에는 미노출 처리
+                                // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
                                 const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
                                 if (isReserveDate) {
-                                    const cutoffDate = new Date(y, m - 1, d, 13, 0, 0, 0);
+                                    const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                     if (new Date() >= cutoffDate) {
-                                        return false; // 13시가 지났으므로 제외
+                                        return false; // 15시가 지났으므로 제외
                                     }
                                 }
                             }
@@ -7369,8 +7369,13 @@
                 setTimeout(() => checkUnpickedOrders(), 1000);
             }
 
-            // 미픽업 확인
-            // setTimeout(checkUnpickedOrders, 1000);
+            // URL 파라미터 감지하여 주문내역 모달 자동 오픈
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('tab') === 'history') {
+                setTimeout(() => {
+                    openHistoryModal(true);
+                }, 500);
+            }
         });
 
         // [속도 개선] 사용자가 앱에 다시 들어오거나 다른 탭에서 돌아오면 자동으로 최신 데이터 갱신
