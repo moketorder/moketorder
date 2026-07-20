@@ -1938,9 +1938,22 @@
             if (!tabContainer) return;
 
             if (currentDeliveryType === 'today') {
+                // 당일배송 과일에 야채가 포함되어 있는지 체크
+                let todayFruitLabel = '과일';
+                if (typeof cachedProducts !== 'undefined' && cachedProducts.length > 0) {
+                    const hasTodayVeg = cachedProducts.some(p => {
+                        const status = (p.status || "").trim();
+                        const mKey = (p.matchKey || "").trim();
+                        if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
+                        if (mKey !== 'today-fruit') return false;
+                        return /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name);
+                    });
+                    if (hasTodayVeg) todayFruitLabel = '과일 / 야채';
+                }
+                
                 // 당일배송 모드 탭 목록
                 tabContainer.innerHTML = `
-                    <button class="main-tab-btn ${currentMainTab === 'today-fruit' ? 'active' : ''}" data-tab="today-fruit" onclick="switchMainTab('today-fruit')">과일</button>
+                    <button class="main-tab-btn ${currentMainTab === 'today-fruit' ? 'active' : ''}" data-tab="today-fruit" onclick="switchMainTab('today-fruit')">${todayFruitLabel}</button>
                     <button class="main-tab-btn ${currentMainTab === 'today-frozen' ? 'active' : ''}" data-tab="today-frozen" onclick="switchMainTab('today-frozen')">냉동</button>
                     <button class="main-tab-btn ${currentMainTab === 'today-refrigerated' ? 'active' : ''}" data-tab="today-refrigerated" onclick="switchMainTab('today-refrigerated')">냉장</button>
                     <button class="main-tab-btn ${currentMainTab === 'today-room' ? 'active' : ''}" data-tab="today-room" onclick="switchMainTab('today-room')">상온</button>
@@ -4136,6 +4149,11 @@
 
                 // 취소 가능한 품목이 1개라도 있는지 판별
                 let hasCancelable = false;
+                let allDelivered = true;
+                let hasDeliveredPhoto = false;
+                let deliveredPhotoKey = '';
+                let nonCanceledCount = 0;
+
                 Object.values(group.pickupGroups).forEach(items => {
                     items.forEach(order => {
                         const isCombined = (order.item && order.item.includes('[배달합산]'));
@@ -4148,12 +4166,45 @@
                         const isReceived = (order.received === true || String(order.received).toUpperCase() === "TRUE");
                         const isStocked = (order.isStocked === true || String(order.isStocked).toUpperCase() === "TRUE");
                         const isDelivered = (order.delivered === true || String(order.delivered).toUpperCase() === "TRUE");
-                        const orderCanDelete = !isCancelled && !isReceived && !isProcessing && !isStocked && !order.onSite && !isDelivered && !isCombined;
+                        
+                        // 숨김처리된 상품 여부 확인
+                        const pData = productsData.find(p => p.name === order.item);
+                        let isHiddenProduct = false;
+                        if (!pData) {
+                            isHiddenProduct = true;
+                        } else {
+                            const status = (pData.status || "").trim();
+                            const mKey = (pData.matchKey || "").trim();
+                            const isPrivate = (status === "비공개" || mKey === "비공개");
+                            const showField = pData.show === false || pData.show === 'false';
+                            const showTodayField = pData.showToday !== undefined && (pData.showToday === false || pData.showToday === 'false');
+                            const showReserveField = pData.showReserve !== undefined && (pData.showReserve === false || pData.showReserve === 'false');
+                            if (isPrivate || showField || showTodayField || showReserveField) {
+                                isHiddenProduct = true;
+                            }
+                        }
+
+                        if (!isCombined && !isCancelled && order.item !== '배달비') {
+                            nonCanceledCount++;
+                            if (!isDelivered) {
+                                allDelivered = false;
+                            }
+                            if (order.deliveryPhoto) {
+                                hasDeliveredPhoto = true;
+                                deliveredPhotoKey = order.phone + "_" + order.orderKey;
+                                // Save the delivery photo so that viewCustomerDeliveryPhoto can find it
+                                window.deliveryPhotos = window.deliveryPhotos || {};
+                                window.deliveryPhotos[deliveredPhotoKey] = order.deliveryPhoto;
+                            }
+                        }
+
+                        const orderCanDelete = !isCancelled && !isReceived && !isProcessing && !isStocked && !order.onSite && !isDelivered && !isCombined && !isHiddenProduct;
                         if (orderCanDelete) {
                             hasCancelable = true;
                         }
                     });
                 });
+                const showDeliveredBadge = (nonCanceledCount > 0 && allDelivered);
 
                 htmlBuffer += `
                     <div style="background:var(--white); border: 1.5px solid #eee; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
@@ -4182,6 +4233,17 @@
                                              style="padding: 4px 10px; background:#ffd8d8; color:#d32f2f; border:1px solid #ffb8b8; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; transition: all 0.2s;">
                                             주문취소
                                         </button>
+                                    ` : ''}
+                                    ${showDeliveredBadge ? `
+                                        <span style="padding: 4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box;">
+                                            배달완료
+                                        </span>
+                                        ${hasDeliveredPhoto ? `
+                                            <button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${deliveredPhotoKey}')" 
+                                                 style="padding: 4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box;">
+                                                완료사진
+                                            </button>
+                                        ` : ''}
                                     ` : ''}
                                     <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s; transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                 </div>
@@ -4262,14 +4324,8 @@
                                         </div>
                                     </div>
                                     <div style="text-align:right; min-width:80px;">
-                                        <div style="font-size:13px; font-weight:800; color:${statusColor}; margin-bottom:4px;">${order.onSite ? '상시판매' : statusText}</div>
+                                        ${statusText !== '배달완료' ? `<div style="font-size:13px; font-weight:800; color:${statusColor}; margin-bottom:4px;">${order.onSite ? '상시판매' : statusText}</div>` : ''}
                                         ${isProcessing ? `<div style="width:70px; height:26px; display:flex; align-items:center; justify-content:center; background:#f5f5f5; color:#999; border-radius:4px; font-size:12px; font-weight:700;">대기중</div>` : ''}
-                                        ${(isDelivered && order.deliveryPhoto) ? `
-                                            <button onclick="viewCustomerDeliveryPhoto('${order.phone}_${order.orderKey}')" 
-                                                 style="padding: 3px 8px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer; margin-top:4px; display:inline-block; line-height:1.2; border-style:solid;">
-                                                완료사진
-                                            </button>
-                                        ` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -4328,7 +4384,25 @@
                 const isReceived = (d.received === true || String(d.received).toUpperCase() === "TRUE");
                 const isStocked = (d.isStocked === true || String(d.isStocked).toUpperCase() === "TRUE");
                 const isDelivered = (d.delivered === true || String(d.delivered).toUpperCase() === "TRUE");
-                return !isCancelled && !isReceived && !isProcessing && !isStocked && !d.onSite && !isDelivered && !isCombined;
+                
+                // 숨김처리된 상품 여부 확인
+                const pData = productsData.find(p => p.name === d.item);
+                let isHiddenProduct = false;
+                if (!pData) {
+                    isHiddenProduct = true;
+                } else {
+                    const status = (pData.status || "").trim();
+                    const mKey = (pData.matchKey || "").trim();
+                    const isPrivate = (status === "비공개" || mKey === "비공개");
+                    const showField = pData.show === false || pData.show === 'false';
+                    const showTodayField = pData.showToday !== undefined && (pData.showToday === false || pData.showToday === 'false');
+                    const showReserveField = pData.showReserve !== undefined && (pData.showReserve === false || pData.showReserve === 'false');
+                    if (isPrivate || showField || showTodayField || showReserveField) {
+                        isHiddenProduct = true;
+                    }
+                }
+
+                return !isCancelled && !isReceived && !isProcessing && !isStocked && !d.onSite && !isDelivered && !isCombined && !isHiddenProduct;
             });
 
             if (targetOrders.length === 0) {
@@ -5113,9 +5187,44 @@
             let activeFilter = null;
 
             if (currentDeliveryType === 'today') {
-                // [당일배송 모드] 소분류 필터를 완전히 숨기고, 즉시 탭 키값에 맞추어 목록 렌더링
-                renderList(currentMainTab);
-                return; // 필터 버튼 그리기 생략하고 종료
+                // 당일배송 과일에 야채가 포함되어 있는지 체크
+                const hasTodayVeg = futureData.some(p => {
+                    const s = String(p.matchKey || "").trim();
+                    if (s !== 'today-fruit') return false;
+                    return /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name);
+                });
+
+                if (currentMainTab === 'today-fruit' && hasTodayVeg) {
+                    // 당일구매 과일/야채 소분류 노출
+                    filterAreaCategories.style.display = 'flex';
+                    filterAreaCategories.classList.add('compact-view');
+
+                    const fvCats = [
+                        { key: 'today-fruit-only', label: '과일' },
+                        { key: 'today-veg-only', label: '야채' }
+                    ];
+
+                    fvCats.forEach((cat, idx) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'date-btn' + (idx === 0 ? ' active' : '');
+                        btn.dataset.date = cat.key;
+                        btn.innerText = cat.label;
+                        btn.onclick = () => {
+                            document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            renderList(cat.key);
+                            if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        };
+                        filterAreaCategories.appendChild(btn);
+                    });
+
+                    renderList('today-fruit-only'); // 기본적으로 과일만 먼저 보여줌
+                    return;
+                } else {
+                    // [당일배송 모드] 소분류 필터를 완전히 숨기고, 즉시 탭 키값에 맞추어 목록 렌더링
+                    renderList(currentMainTab);
+                    return; // 필터 버튼 그리기 생략하고 종료
+                }
             }
 
             if (currentMainTab === 'reserve') {
@@ -5383,7 +5492,7 @@
 
             let filteredData = [];
 
-            if (targetKey === 'today-fruit') {
+            if (targetKey === 'today-fruit' || targetKey === 'today-fruit-only') {
                 // 당일배송 - 과일: 예약배송의 과일 필터링과 동일하게 과일 상품만 추출
                 filteredData = visibleProducts.filter(p => {
                     const s = String(p.matchKey).trim();
@@ -5397,7 +5506,33 @@
                             if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
                         }
                     }
-                    return p.name.includes('[과일]') || p.name.includes('[과일구매]') || /과일|과일구매/.test(s);
+                    const isFruit = p.name.includes('[과일]') || p.name.includes('[과일구매]') || /과일|과일구매/.test(s);
+                    
+                    // 만약 'today-fruit-only'라면 야채 키워드가 포함된 상품은 제외함
+                    if (targetKey === 'today-fruit-only') {
+                        const isVeg = /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name);
+                        return isFruit && !isVeg;
+                    }
+                    
+                    return isFruit;
+                });
+            } else if (targetKey === 'today-veg-only') {
+                // 당일배송 - 야채: matchKey가 과일/야채이고 야채 키워드가 포함된 상품만 추출
+                filteredData = visibleProducts.filter(p => {
+                    const s = String(p.matchKey).trim();
+                    const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
+                    if (!isDate && !/과일|과일구매/.test(s)) return false;
+                    if (isDate) {
+                        const cleanDate = s.replace(/\./g, '-');
+                        const parts = cleanDate.split('-');
+                        if (parts.length === 3) {
+                            const pDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            if (!isNaN(pDate.getTime())) { pDate.setHours(0, 0, 0, 0); if (pDate < today) return false; }
+                        }
+                    }
+                    
+                    const isVeg = /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name);
+                    return isVeg;
                 });
             } else if (targetKey === 'today-frozen') {
                 // 당일배송 - 냉동: matchKey나 storage 등에 "냉동"이 들어간 상품
@@ -5574,10 +5709,11 @@
                     if (spA !== spB) return spA - spB;
                 }
 
-                // [수정] 현장판매, 과일/야채 또는 특정 카테고리 선택 시 등록 순서 내림차순 (최신 등록 상품부터)
+                // [수정] 현장판매, 과일/야채, 당일구매 과일 또는 특정 카테고리 선택 시 등록 순서 내림차순 (최신 등록 상품부터)
                 const isOnSiteTab = currentMainTab === 'on-site';
                 const isFruitVegTab = currentMainTab === 'fruit-veg';
-                if (isOnSiteTab || isFruitVegTab || targetKey === '전체상품_현장') {
+                const isTodayFruitTab = currentMainTab === 'today-fruit' || targetKey === 'today-fruit' || targetKey === 'today-fruit-only' || targetKey === 'today-veg-only';
+                if (isOnSiteTab || isFruitVegTab || isTodayFruitTab || targetKey === '전체상품_현장') {
                     if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
                 }
 
@@ -5620,7 +5756,7 @@
             if (filteredData.length === 0) {
                 const emptyMsg = document.createElement('div');
                 emptyMsg.style = "text-align:center; padding:80px 20px; color:#999; font-weight:700;";
-                if (targetKey === 'today-fruit') {
+                if (targetKey === 'today-fruit' || targetKey === 'today-fruit-only' || targetKey === 'today-veg-only') {
                     emptyMsg.style = "text-align:center; padding:80px 20px; color:#999; font-weight:700; font-size:18px; line-height:1.5;";
                     const now = new Date();
                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
