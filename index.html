@@ -3031,12 +3031,9 @@
 
                 const isRegularSale = String(item.pickupDate).includes("상시판매") || String(item.pickupDate).includes("현장판매");
 
-                const isCancelled = (item.item && (item.item.includes('[취소]') || item.item.includes('[배달합산]'))) ||
-                    (item.received === "canceled" || item.received === "취소완료") ||
-                    item.canceled === true || (String(item.canceled).toUpperCase() === "TRUE");
-
-                const isReceived = (item.received === true || String(item.received).toUpperCase() === "TRUE");
-                const isDelivered = (item.delivered === true || String(item.delivered).toUpperCase() === "TRUE");
+                const isCancelled = isOrderCancelled(item);
+                const isReceived = isOrderReceived(item);
+                const isDelivered = isOrderDelivered(item);
                 const isOnSite = (item.onSite === true || String(item.onSite).toUpperCase() === "TRUE");
 
                 const matchDate = (itemDate === targetDate) || (targetDate === todayStr && isRegularSale);
@@ -3792,22 +3789,19 @@
                 // 오브젝트 형태의 파이어베이스 데이터를 배열로 변환
                 const historyData = Object.values(fbData);
 
-                // [판별] '입고완료'인데 '수령완료'가 아니고 '취소'가 아닌 항목 필터링
+                // [판별] '입고완료'인데 '수령완료'가 아니고 '배달완료'가 아니고 '취소'가 아닌 항목 필터링
                 const unpickedItems = historyData.filter(order => {
                     const itemName = String(order.item || "");
 
-                    const isCanceled = itemName.includes("[취소]") ||
-                        order.canceled === true ||
-                        String(order.canceled).toUpperCase() === "TRUE" ||
-                        order.received === "canceled" ||
-                        order.received === "취소완료";
-
-                    const isReceived = (order.received === true || String(order.received).toUpperCase() === "TRUE");
-                    const isStocked = (order.isStocked === true || String(order.isStocked).toUpperCase() === "TRUE");
+                    const isCanceled = isOrderCancelled(order);
+                    const isReceived = isOrderReceived(order);
+                    const isDelivered = isOrderDelivered(order);
+                    const isStocked = isOrderStocked(order);
                     const isDelivery = (order.shippingMethod === '배달주문');
+                    const isDeliveryFee = itemName === "배달비";
 
-                    // 알림 대상: (입고완료 상태) AND (수령 전) AND (취소 아님) AND (배달 주문 아님)
-                    return isStocked && !isReceived && !isCanceled && !isDelivery;
+                    // 알림 대상: (입고완료 상태) AND (수령 전) AND (배달 완료 아님) AND (취소 아님) AND (배달 주문 아님) AND (배달비 아님)
+                    return isStocked && !isReceived && !isDelivered && !isCanceled && !isDelivery && !isDeliveryFee;
                 });
 
                 console.log("[미픽업 확인] 최종 미픽업 항목 수:", unpickedItems.length);
@@ -3975,6 +3969,54 @@
             renderHistory();
         }
 
+        // [신규] 주문 상태 판별용 통합 헬퍼 함수군 (구글 시트 수동 입력값 완벽 방어)
+        function isOrderCancelled(order) {
+            if (!order) return false;
+            const itemName = String(order.item || "");
+            const note = String(order.note || "");
+            const received = String(order.received || "");
+            const canceled = String(order.canceled || "");
+            return itemName.includes("[취소]") || 
+                   itemName.includes("[배달합산]") ||
+                   note.includes("[취소]") ||
+                   received === "canceled" || 
+                   received === "취소완료" || 
+                   received === "취소" || 
+                   canceled === "true" || 
+                   canceled.toUpperCase() === "TRUE" || 
+                   order.canceled === true;
+        }
+
+        function isOrderReceived(order) {
+            if (!order) return false;
+            const received = String(order.received || "");
+            return order.received === true || 
+                   received.toUpperCase() === "TRUE" || 
+                   received === "픽업완료" || 
+                   received === "수령완료" || 
+                   received === "O" || 
+                   received === "픽업";
+        }
+
+        function isOrderDelivered(order) {
+            if (!order) return false;
+            const delivered = String(order.delivered || "");
+            return order.delivered === true || 
+                   delivered.toUpperCase() === "TRUE" || 
+                   delivered === "배달완료" || 
+                   delivered === "O" || 
+                   delivered === "배달";
+        }
+
+        function isOrderStocked(order) {
+            if (!order) return false;
+            const isStocked = String(order.isStocked || "");
+            return order.isStocked === true || 
+                   isStocked.toUpperCase() === "TRUE" || 
+                   isStocked === "입고완료" || 
+                   isStocked === "입고";
+        }
+
         // [추가] 연락처 정규화 함수 (8210 -> 010)
         function normP(p) {
             if (!p || p === "비인증") return "";
@@ -4006,11 +4048,9 @@
 
             const now = new Date();
             const filtered = fullHistoryData.filter(item => {
-                const isCancelled = (item.item && item.item.includes('[취소]')) ||
-                    (item.received === "canceled" || item.received === "취소완료") ||
-                    (item.canceled === true || String(item.canceled).toUpperCase() === "TRUE");
-                const isReceived = (item.received === true || String(item.received).toUpperCase() === "TRUE");
-                const isDelivered = (item.delivered === true || String(item.delivered).toUpperCase() === "TRUE");
+                const isCancelled = isOrderCancelled(item);
+                const isReceived = isOrderReceived(item);
+                const isDelivered = isOrderDelivered(item);
 
                 // [하위 분류 필터 적용]
                 if (currentStatusFilter === 'all' || currentStatusFilter === 'order') {
@@ -4158,15 +4198,11 @@
                 Object.values(group.pickupGroups).forEach(items => {
                     items.forEach(order => {
                         const isCombined = (order.item && order.item.includes('[배달합산]'));
-                        const isCancelled = (order.item && order.item.includes('[취소]')) ||
-                            (order.note && order.note.includes('[취소]')) ||
-                            order.received === "canceled" ||
-                            order.received === "취소완료" ||
-                            (order.canceled === true || String(order.canceled).toUpperCase() === "TRUE");
+                        const isCancelled = isOrderCancelled(order);
                         const isProcessing = order.isProcessing === true;
-                        const isReceived = (order.received === true || String(order.received).toUpperCase() === "TRUE");
-                        const isStocked = (order.isStocked === true || String(order.isStocked).toUpperCase() === "TRUE");
-                        const isDelivered = (order.delivered === true || String(order.delivered).toUpperCase() === "TRUE");
+                        const isReceived = isOrderReceived(order);
+                        const isStocked = isOrderStocked(order);
+                        const isDelivered = isOrderDelivered(order);
                         
                         // 숨김처리된 상품 여부 확인
                         const pData = productsData.find(p => p.name === order.item);
@@ -4289,16 +4325,12 @@
                             window.deliveryPhotos[order.phone + "_" + order.orderKey] = order.deliveryPhoto;
                         }
                         const isCombined = (order.item && order.item.includes('[배달합산]'));
-                        const isCancelled = (order.item && order.item.includes('[취소]')) ||
-                            (order.note && order.note.includes('[취소]')) ||
-                            order.received === "canceled" ||
-                            order.received === "취소완료" ||
-                            (order.canceled === true || String(order.canceled).toUpperCase() === "TRUE");
+                        const isCancelled = isOrderCancelled(order);
 
                         const isProcessing = order.isProcessing === true;
-                        const isReceived = (order.received === true || String(order.received).toUpperCase() === "TRUE");
-                        const isStocked = (order.isStocked === true || String(order.isStocked).toUpperCase() === "TRUE");
-                        const isDelivered = (order.delivered === true || String(order.delivered).toUpperCase() === "TRUE");
+                        const isReceived = isOrderReceived(order);
+                        const isStocked = isOrderStocked(order);
+                        const isDelivered = isOrderDelivered(order);
 
                         let statusText = '';
                         let statusColor = '';
@@ -4376,15 +4408,11 @@
                 if (!isTimeMatch) return false;
 
                 const isCombined = (d.item && d.item.includes('[배달합산]'));
-                const isCancelled = (d.item && d.item.includes('[취소]')) ||
-                    (d.note && d.note.includes('[취소]')) ||
-                    d.received === "canceled" ||
-                    d.received === "취소완료" ||
-                    (d.canceled === true || String(d.canceled).toUpperCase() === "TRUE");
+                const isCancelled = isOrderCancelled(d);
                 const isProcessing = d.isProcessing === true;
-                const isReceived = (d.received === true || String(d.received).toUpperCase() === "TRUE");
-                const isStocked = (d.isStocked === true || String(d.isStocked).toUpperCase() === "TRUE");
-                const isDelivered = (d.delivered === true || String(d.delivered).toUpperCase() === "TRUE");
+                const isReceived = isOrderReceived(d);
+                const isStocked = isOrderStocked(d);
+                const isDelivered = isOrderDelivered(d);
                 
                 // 숨김처리된 상품 여부 확인
                 const pData = productsData.find(p => p.name === d.item);
