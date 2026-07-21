@@ -1878,7 +1878,8 @@
                 
                 // 2. 평일 15시 이후 및 06시 이전 당일구매 마감 차단
                 if (hour < 6 || hour >= 15) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 15시까지만 가능합니다.`, 'alert');
+                    const daysStr = isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일';
+                    showSystemModal(`당일구매 주문은<br><b>${daysStr} 06:00 ~ 15:00</b>에만 가능합니다.`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -5017,6 +5018,21 @@
                 // [수정] 상태 열 또는 픽업일 열에 '비공개'가 포함된 경우 일반 사용자에게는 숨김
                 if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
 
+                // [신규] 배송 유형(당일배송/예약배송)별 보이기/숨기기 따로 적용 (관리자 모드 아닐 때만 적용)
+                if (!isAdminMode) {
+                    if (currentDeliveryType === 'today') {
+                        const isShowToday = p.showToday !== undefined ? 
+                            (p.showToday === true || p.showToday === 'true') : 
+                            (p.show !== false && p.show !== 'false');
+                        if (!isShowToday) return false;
+                    } else {
+                        const isShowReserve = p.showReserve !== undefined ? 
+                            (p.showReserve === true || p.showReserve === 'true') : 
+                            (p.show !== false && p.show !== 'false');
+                        if (!isShowReserve) return false;
+                    }
+                }
+
                 const s = String(p.matchKey || "").trim();
                 const isFruitVeg = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
                 
@@ -6458,8 +6474,9 @@
                     }
                     return;
                 }
-                if (currentHour < 6 || currentHour >= 13) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 13시까지만 가능합니다.`, 'alert');
+                if (currentHour < 6 || currentHour >= 15) {
+                    const daysStr = isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일';
+                    showSystemModal(`당일구매 주문은<br><b>${daysStr} 06:00 ~ 15:00</b>에만 가능합니다.`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
@@ -6710,7 +6727,35 @@
                         const mKey = it.matchKey || it.pickupDate || "";
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
                         let displayName = it.item;
-                        allItems.push({ name: displayName, qty: it.qty, price: parseInt(it.price || 0), subtotal: parseInt(it.total || 0), date: mKey, matchKey: mKey, isCategorized: isCategorized, isExtra: true, isPushedByCutoff: false, originalData: { timestamp: it.timestamp, name: it.name, item: it.item, phone: it.phone || phone, paid: it.paid } });
+                        allItems.push({
+                            name: displayName,
+                            qty: it.qty,
+                            price: parseInt(it.price || 0),
+                            subtotal: parseInt(it.total || 0),
+                            date: mKey,
+                            matchKey: mKey,
+                            isCategorized: isCategorized,
+                            isExtra: true,
+                            isPushedByCutoff: false,
+                            paid: it.paid || false,
+                            isStocked: it.isStocked || false,
+                            received: it.received || false,
+                            delivered: it.delivered || false,
+                            deliveryPhoto: it.deliveryPhoto || null,
+                            deliveryPhotoTime: it.deliveryPhotoTime || null,
+                            originalData: {
+                                timestamp: it.timestamp,
+                                name: it.name,
+                                item: it.item,
+                                phone: it.phone || phone,
+                                paid: it.paid || false,
+                                isStocked: it.isStocked || false,
+                                received: it.received || false,
+                                delivered: it.delivered || false,
+                                deliveryPhoto: it.deliveryPhoto || null,
+                                deliveryPhotoTime: it.deliveryPhotoTime || null
+                            }
+                        });
                     });
                 }
 
@@ -7316,6 +7361,14 @@
                         cashReceiptType: (cashReceipt === '발행') ? cashReceiptType : "",
                         cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : ""
                     };
+                    if (it.isExtra) {
+                        if (it.paid !== undefined) itemPayload.paid = it.paid;
+                        if (it.isStocked !== undefined) itemPayload.isStocked = it.isStocked;
+                        if (it.received !== undefined) itemPayload.received = it.received;
+                        if (it.delivered !== undefined) itemPayload.delivered = it.delivered;
+                        if (it.deliveryPhoto !== undefined) itemPayload.deliveryPhoto = it.deliveryPhoto;
+                        if (it.deliveryPhotoTime !== undefined) itemPayload.deliveryPhotoTime = it.deliveryPhotoTime;
+                    }
                     delete itemPayload.items;
 
                     return fetch(fbItemUrl, {
