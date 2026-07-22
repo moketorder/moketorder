@@ -6618,8 +6618,7 @@
 
                 const allItems = [];
 
-                // 공통 날짜 판별용 기초 변수 정의
-                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                // 공통 날짜 판별용 기초 변수 정의 (todayStr은 함수 상단에 정의됨)
                 const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1);
                 const tomorrowStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
