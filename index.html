@@ -6614,29 +6614,48 @@
                     return;
                 }
 
-                const isWeekendAfterCutoff = (currentDay === 6 && currentHour >= 13) || currentDay === 0;
+                const isWeekendAfterCutoff = (currentDay === 6 && currentHour >= 15) || currentDay === 0;
 
                 const allItems = [];
 
-                // [추가] 공동구매 상품 입고일 확인 (배달주문 시 상시판매 상품을 합배송하기 위함)
-                let reserveDate = null;
-                if (shippingMethod === '배달주문') {
-                    for (const name in cart) {
-                        if (cart[name] > 0) {
-                            const p = productsData.find(pd => pd.name === name);
-                            if (p) {
-                                const mk = String(p.matchKey || "").trim();
-                                const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
-                                if (isDate) {
-                                    let dStr = mk.replace(/\./g, '-').trim();
-                                    if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
-                                    const pt = dStr.split('-');
-                                    if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
-                                    reserveDate = dStr;
-                                    break;
+                // 공통 날짜 판별용 기초 변수 정의
+                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1);
+                const tomorrowStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+
+                const currentDayNum = now.getDay();
+                const isTodayOff = (currentDayNum === 0) || 
+                                   (currentDayNum === 6 && !isSaturdayAsWeekday) || 
+                                   publicHolidays.includes(todayStr);
+
+                const isTodayOffOrAfterCutoff = isTodayOff || (currentHour >= 15);
+
+                // [추가] 공동구매 상품 입고일들 중 가장 늦은 날짜(maxReserveDate) 찾기
+                let maxReserveDate = null;
+                for (const name in cart) {
+                    if (cart[name] > 0) {
+                        const p = productsData.find(pd => pd.name === name);
+                        if (p) {
+                            const mk = String(p.matchKey || "").trim();
+                            const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
+                            if (isDate) {
+                                let dStr = mk.replace(/\./g, '-').trim();
+                                if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
+                                const pt = dStr.split('-');
+                                if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                                if (!maxReserveDate || dStr > maxReserveDate) {
+                                    maxReserveDate = dStr;
                                 }
                             }
                         }
+                    }
+                }
+
+                // 가장 늦은 공동구매 날짜가 오늘인 경우의 이월(영업일) 여부 결정
+                let unifiedReserveDate = maxReserveDate;
+                if (maxReserveDate === todayStr) {
+                    if (isTodayOffOrAfterCutoff) {
+                        unifiedReserveDate = tomorrowStr;
                     }
                 }
 
@@ -6652,37 +6671,36 @@
                         const isFV = /과일|야채|채소|기타/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]/.test(itemName);
                         const isCostco = mKey.includes("코스트코");
                         const isCutoffTarget = (shippingMethod === '배달주문') || (shippingMethod === '매장픽업' && (isFV || isCostco));
-
                         let isPushedByCutoff = false;
 
-                        // 1. [공통] 13시 이후 내일로 보정 (배달/과채 전용)
-                        if (isCutoffTarget && currentHour >= 13) {
-                            const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
-                            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                            if (!isDateItem || mKey <= todayStr) {
-                                const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1);
-                                finalDate = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
-                                isPushedByCutoff = true;
-                            }
-                        }
-
-                        // 2. [주말] 카테고리별 월요일 보정 (토요일 차별화 / 일요일 전체)
                         const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
                         const isDaily = !isDateItem && (["과일", "야채", "기타"].includes(mKey) || isFV);
                         const isOnSite = !isDateItem && (['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || !isDaily);
 
-                        // 1-2. [신규] 상시판매: 20시(토요일은 18시) 이후 내일로 보정
-                        const isOnSiteThreshold = (now.getDay() === 6 && !isSaturdayAsWeekday) ? 18 : 20;
-                        if (isOnSite && currentHour >= isOnSiteThreshold) {
-                            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                            if (!isDateItem || mKey <= todayStr) {
-                                const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1);
-                                finalDate = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+                        // 1. & 2. (상시판매/과채류/배달 등 일반 상품)은 시간에 관계없이 무조건 다음날(tomorrowStr)로 기록
+                        if (!isDateItem) {
+                            finalDate = tomorrowStr;
+                            
+                            // [예외] 오늘 날짜인 공동구매 상품과 같이 주문하는 경우에는 오후 3시까지 당일(todayStr)로 기록
+                            if (unifiedReserveDate === todayStr && !isTodayOffOrAfterCutoff) {
+                                finalDate = todayStr;
+                            }
+                        } else {
+                            // 3. 공동구매 상품
+                            if (mKey === todayStr) {
+                                // 오늘 날짜 공동구매 상품인 경우 오후 3시까지는 당일, 이후 또는 휴무일에는 다음 평일로 보정하기 위해 임시로 tomorrowStr로 보정
+                                if (isTodayOffOrAfterCutoff) {
+                                    finalDate = tomorrowStr;
+                                } else {
+                                    finalDate = todayStr;
+                                }
                             }
                         }
 
-                        // [신규] 휴일/주말 연속 건너뛰기 (while 루프 적용)
-                        if (isDaily || isOnSite) {
+                        // [공통] 휴일/주말 연속 건너뛰기 (while 루프 적용)
+                        // 일반 상품(1, 2번) 또는 다음날로 이월된 오늘날짜 공동구매 상품이 대상
+                        const needsHolidaySkip = !isDateItem || (isDateItem && finalDate === tomorrowStr);
+                        if (needsHolidaySkip) {
                             let dObj = new Date(finalDate.includes('-') ? finalDate : now);
                             while (true) {
                                 const checkDay = dObj.getDay();
@@ -6690,21 +6708,8 @@
 
                                 let isOff = false;
                                 if (checkDay === 0) isOff = true; // 일요일 무조건 휴무
-                                else if (checkDay === 6 && !isSaturdayAsWeekday) { // 토요일 휴무 조건
-                                    if (shippingMethod === '배달주문') isOff = true; // 배달은 토요일 휴무
-                                    else {
-                                        // 매장픽업
-                                        if (isDaily) {
-                                            // 토요일은 기본적으로 과채류/예약픽업 휴무 (단, 토요일 당일 13시 이전 주문인 경우만 예외적으로 당일 픽업 가능)
-                                            if (now.getDay() !== 6 || currentHour >= 13) isOff = true;
-                                        } else if (isOnSite) {
-                                            // 상시판매 상품은 토요일 당일 18시 이후 주문인 경우만 휴무
-                                            if (now.getDay() === 6 && currentHour >= 18) isOff = true;
-                                        }
-                                    }
-                                } else if (publicHolidays.includes(dStr)) {
-                                    isOff = true; // 공휴일 휴무
-                                }
+                                else if (checkDay === 6 && !isSaturdayAsWeekday) isOff = true; // 토요일 휴무 조건
+                                else if (publicHolidays.includes(dStr)) isOff = true; // 공휴일 휴무
 
                                 if (isOff) {
                                     dObj.setDate(dObj.getDate() + 1);
@@ -6715,11 +6720,11 @@
                             finalDate = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
                         }
 
-                        // [합배송 처리] 배달주문이고 공동구매 입고일이 있는 경우, 상시판매 상품의 배달일을 공동구매 입고일로 묶음
-                        // (단, 과일 상품은 합배송 대상에서 제외하여 당일/익일 배송 유지)
-                        const isFruit = isFV && !/야채|채소|기타|\[야채\]|\[채소\]|\[기타\]/.test(itemName) && !/야채|채소|기타/.test(mKey);
-                        if (shippingMethod === '배달주문' && reserveDate && !isDateItem && !isFruit) {
-                            finalDate = reserveDate;
+                        // [합배송 처리] 공동구매 입고일이 있는 경우, 다른 모든 일반 상품(또는 날짜가 더 이른 공동구매 상품)의 배송/픽업일을 가장 늦은 공동구매일로 맞춤
+                        if (unifiedReserveDate) {
+                            if (unifiedReserveDate > todayStr || !isTodayOffOrAfterCutoff) {
+                                finalDate = unifiedReserveDate;
+                            }
                         }
 
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(finalDate);
