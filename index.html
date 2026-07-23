@@ -2591,7 +2591,7 @@
 
             // [신규] 장바구니 상품의 배달 기준일 계산하여 해당 일자에 기존 주문이 있는지 확인
             let targetDateObj = new Date(now);
-            if (currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
+            if (currentDeliveryType === 'reserve' || currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
 
             while (true) {
                 const chkDay = targetDateObj.getDay();
@@ -2869,7 +2869,7 @@
             function checkCombinedDelivery() {
                 // [신규] 장바구니 상품의 배달 기준일 계산
                 let targetDateObj = new Date(now);
-                if (currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
+                if (currentDeliveryType === 'reserve' || currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
 
                 while (true) {
                     const chkDay = targetDateObj.getDay();
@@ -6880,7 +6880,7 @@
                 // 2. [배달전용] 날짜 검증 (USER 요청: 배달 날짜가 다른 상품 혼합 방지, 공휴일 스킵 적용)
                 if (shippingMethod === '배달주문') {
                     let targetDateObj = new Date(now);
-                    if (currentHour >= 13) {
+                    if (currentDeliveryType === 'reserve' || currentHour >= 15) {
                         targetDateObj.setDate(targetDateObj.getDate() + 1);
                     }
 
