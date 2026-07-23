@@ -848,6 +848,22 @@
             min-width: 0 !important;
         }
 
+        /* [추가] 날짜 필터 가로 스크롤 안내 가이드 */
+        .date-scroll-guide {
+            text-align: right;
+            font-size: 12.5px;
+            color: var(--nego-orange);
+            padding: 4px 12px 0 0;
+            font-weight: 800;
+            display: none;
+            animation: bounceRight 0.8s infinite alternate;
+        }
+
+        @keyframes bounceRight {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(4px); }
+        }
+
         /* 현장판매 카테고리: 3개 이하일 때 (균등 배분) */
         #date-filters-categories.compact-view .date-btn {
             padding: 0 6px;
@@ -1594,6 +1610,7 @@
             <!-- JavaScript에서 동적으로 버튼들을 생성하여 주입합니다. -->
         </div>
         <!-- [통합] 필터 영역 (하위 카테고리/날짜 표시) -->
+        <div class="date-scroll-guide" id="date-scroll-guide">옆으로 밀어서 날짜 더보기 ➔</div>
         <div class="date-filter-container" id="date-filters"></div>
         <div class="date-filter-container" id="date-filters-categories" style="display:none;"></div>
         <!-- [수정] 제목 영역 (ID 변경 및 동적 텍스트 적용 가능하게 함) -->
@@ -5227,6 +5244,8 @@
             filterAreaCategories.innerHTML = '';
             filterAreaDates.style.display = 'none';
             filterAreaCategories.style.display = 'none';
+            const dateScrollGuide = document.getElementById('date-scroll-guide');
+            if (dateScrollGuide) dateScrollGuide.style.display = 'none';
 
             let activeFilter = null;
 
@@ -5280,7 +5299,15 @@
                 // [수정] 날짜 리스트 앞에 사다드림 및 특수 카테고리들을 배치
                 const finalDates = ['전체상품_예약'];
                 if (hasSadaItems) finalDates.push('사다드림');
-                finalDates.push(...reserveCategories, ...dateFilters);
+                
+                // 공동구매 날짜 필터 최신순(내림차순) 정렬
+                const sortedDateFilters = [...dateFilters].sort((a, b) => {
+                    const dateA = new Date(String(a).replace(/\./g, '-')).getTime() || 0;
+                    const dateB = new Date(String(b).replace(/\./g, '-')).getTime() || 0;
+                    return dateB - dateA;
+                });
+                
+                finalDates.push(...reserveCategories, ...sortedDateFilters);
                 
                 finalDates.forEach((date, idx) => {
                     const btn = document.createElement('button');
@@ -5301,6 +5328,27 @@
                     filterAreaDates.appendChild(btn);
                 });
                 activeFilter = '전체상품_예약';
+
+                // [신규] 날짜 스크롤 가이드 표시 여부 판단 (가로 스크롤 발생 시 노출)
+                setTimeout(() => {
+                    const guide = document.getElementById('date-scroll-guide');
+                    if (guide) {
+                        const hasOverflow = filterAreaDates.scrollWidth > filterAreaDates.clientWidth;
+                        if (hasOverflow && filterAreaDates.scrollLeft < 10) {
+                            guide.style.display = 'block';
+                        } else {
+                            guide.style.display = 'none';
+                        }
+                    }
+                }, 100);
+
+                // 스크롤 시 가이드 숨김
+                filterAreaDates.onscroll = () => {
+                    const guide = document.getElementById('date-scroll-guide');
+                    if (guide && filterAreaDates.scrollLeft > 10) {
+                        guide.style.display = 'none';
+                    }
+                };
             } else if (currentMainTab === 'onsite-frozen') {
                 activeFilter = '냉동';
             } else if (currentMainTab === 'onsite-refrigerated') {
@@ -5760,11 +5808,10 @@
                     if (spA !== spB) return spA - spB;
                 }
 
-                // [수정] 현장판매, 과일/야채, 당일구매 과일 또는 특정 카테고리 선택 시 등록 순서 내림차순 (최신 등록 상품부터)
+                // [수정] 현장판매, 과일/야채 또는 특정 카테고리 선택 시 등록 순서 내림차순 (최신 등록 상품부터)
                 const isOnSiteTab = currentMainTab === 'on-site';
                 const isFruitVegTab = currentMainTab === 'fruit-veg';
-                const isTodayFruitTab = currentMainTab === 'today-fruit' || targetKey === 'today-fruit' || targetKey === 'today-fruit-only' || targetKey === 'today-veg-only';
-                if (isOnSiteTab || isFruitVegTab || isTodayFruitTab || targetKey === '전체상품_현장') {
+                if (isOnSiteTab || isFruitVegTab || targetKey === '전체상품_현장') {
                     if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
                 }
 
@@ -5784,9 +5831,7 @@
                     const rpB = getReservePriority(b);
                     if (rpA !== rpB) return rpA - rpB;
 
-                    // [수정] 업로드 순서(originalIndex)를 날짜보다 우선하여 정렬
-                    if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
-
+                    // 날짜가 늦은 순서(내림차순) 정렬 (dateB - dateA)
                     const dateRegex = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/;
                     const isDateA = dateRegex.test(String(a.matchKey));
                     const isDateB = dateRegex.test(String(b.matchKey));
@@ -5796,6 +5841,9 @@
                         const dateB = new Date(String(b.matchKey).replace(/\./g, '-')).getTime() || 0;
                         if (dateA !== dateB) return dateB - dateA;
                     }
+
+                    // 날짜가 같거나 없는 경우 업로드 순서(originalIndex) 내림차순 정렬
+                    if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
                 }
                 return a.name.localeCompare(b.name, 'ko', { numeric: true, sensitivity: 'base' });
             });
@@ -6320,7 +6368,6 @@
                     <div style="font-size: 12px; line-height: 1.5;">
                         <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
                             <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>✅ 주문량에 따라 배달코스가 달라져 개별 도착안내가 어렵습니다.</div>
                             <div>✅ 냉장/냉동제품은 보냉백에 넣어드리나 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인 바랍니다.</div>
                             <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
                         </div>
