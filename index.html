@@ -2666,83 +2666,166 @@
                 checkScrollLock();
             }
 
-            const pendingItemsForDate = getPendingItemsByDate(deliveryDate);
-            
-            let existingTotalExcludingFee = 0;
-            let hasExistingDeliveryFee = false;
-            let existingFeeItem = null;
-
-            pendingItemsForDate.forEach(item => {
-                const isFee = (item.item === "배달비");
-                if (isFee) {
-                    hasExistingDeliveryFee = true;
-                    existingFeeItem = item;
-                } else {
-                    const price = parseInt(item.price || 0);
-                    const qty = parseInt(item.qty || 0);
-                    existingTotalExcludingFee += price * qty;
+            // 헬퍼: 기존 특정 배달비 삭제 처리 함수
+            async function deleteExistingFee(feeItem, nVal, pVal) {
+                const cleanPhone = pVal.replace(/\D/g, "");
+                const orderKey = fSafeKey(feeItem.timestamp) + "_" + fSafeKey(feeItem.item);
+                const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+                
+                showSystemModal("기존 주문 배달비 조정 중입니다...", 'loading');
+                try {
+                    await fetch(fbItemUrl, { method: 'DELETE' });
+                    // 로컬 캐시에서도 삭제하여 UI 싱크 맞춤
+                    fullHistoryData = fullHistoryData.filter(it => it.timestamp !== feeItem.timestamp || it.item !== feeItem.item);
+                    localStorage.setItem(`history_cache_${nVal}_${cleanPhone}`, JSON.stringify(fullHistoryData));
+                } catch (e) {
+                    console.error("Existing fee deletion failed:", e);
                 }
-            });
+                document.getElementById('system-modal').style.display = 'none';
+                checkScrollLock();
+            }
 
-            let currentTotal = 0;
+            // 장바구니 품목 분리 (사다드림 vs 예약구매)
+            let sadaTotal = 0;
+            let reserveTotal = 0;
+            let hasSadaInCart = false;
+            let hasReserveInCart = false;
+
             for (const name in cart) {
                 if (cart[name] > 0) {
                     const p = productsData.find(pd => pd.name === name);
                     if (p) {
-                        currentTotal += (parseInt(p.price) || 0) * cart[name];
+                        const isSada = name.includes("사다드림") || p.matchKey === "사다드림";
+                        const price = (parseInt(p.price) || 0) * cart[name];
+                        if (isSada) {
+                            sadaTotal += price;
+                            hasSadaInCart = true;
+                        } else {
+                            reserveTotal += price;
+                            hasReserveInCart = true;
+                        }
                     }
                 }
             }
 
-            let skipDeliveryFeePrompt = false;
-
-            if (existingTotalExcludingFee >= 15000) {
-                // 1. 이미 15000원 넘는 주문이 있는 경우 배달비 부과 건너뜀
-                skipDeliveryFeePrompt = true;
-                window.isDeliveryFeeAddedUnder15000 = false;
-            } else if (hasExistingDeliveryFee) {
-                // 2. 이전에 배달비가 추가된 주문이 있는 경우
-                const combinedTotal = existingTotalExcludingFee + currentTotal;
-                if (combinedTotal >= 15000) {
-                    // 합산액이 15000원 이상이면 기존 배달비 삭제 후 배달비 없이 진행
-                    const cleanPhone = phoneVal.replace(/\D/g, "");
-                    const orderKey = fSafeKey(existingFeeItem.timestamp) + "_" + fSafeKey(existingFeeItem.item);
-                    const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
-                    
-                    showSystemModal("기존 주문 배달비 조정 중입니다...", 'loading');
-                    try {
-                        await fetch(fbItemUrl, { method: 'DELETE' });
-                        // 로컬 캐시에서도 삭제하여 UI 싱크 맞춤
-                        fullHistoryData = fullHistoryData.filter(it => it.timestamp !== existingFeeItem.timestamp || it.item !== existingFeeItem.item);
-                        localStorage.setItem(`history_cache_${nameVal}_${cleanPhone}`, JSON.stringify(fullHistoryData));
-                    } catch (e) {
-                        console.error("Existing fee deletion failed:", e);
-                    }
-                    document.getElementById('system-modal').style.display = 'none';
-                    checkScrollLock();
+            // 1. 사다드림 기존 주문 내역 및 배달비 조회
+            const pendingSadaItems = getPendingItemsByDate("사다드림");
+            let existingSadaTotal = 0;
+            let hasExistingSadaFee = false;
+            let existingSadaFeeItem = null;
+            pendingSadaItems.forEach(item => {
+                if (item.item === "배달비") {
+                    hasExistingSadaFee = true;
+                    existingSadaFeeItem = item;
+                } else {
+                    existingSadaTotal += parseInt(item.price || 0) * parseInt(item.qty || 0);
                 }
-                // 합산액과 관계없이 기존 배달비가 있었으므로 이번 주문에는 추가하지 않음
-                skipDeliveryFeePrompt = true;
-                window.isDeliveryFeeAddedUnder15000 = false;
+            });
+
+            // 2. 예약구매 기존 주문 내역 및 배달비 조회
+            const pendingReserveItems = getPendingItemsByDate(deliveryDate);
+            let existingReserveTotal = 0;
+            let hasExistingReserveFee = false;
+            let existingReserveFeeItem = null;
+            pendingReserveItems.forEach(item => {
+                if (item.item === "배달비") {
+                    hasExistingReserveFee = true;
+                    existingReserveFeeItem = item;
+                } else {
+                    existingReserveTotal += parseInt(item.price || 0) * parseInt(item.qty || 0);
+                }
+            });
+
+            // 3. 사다드림 배달비 부과 여부 판별
+            let needSadaFeePrompt = false;
+            if (hasSadaInCart) {
+                if (existingSadaTotal >= 15000) {
+                    window.isSadaDeliveryFeeAdded = false;
+                } else if (hasExistingSadaFee) {
+                    const combined = existingSadaTotal + sadaTotal;
+                    if (combined >= 15000 && existingSadaFeeItem) {
+                        await deleteExistingFee(existingSadaFeeItem, nameVal, phoneVal);
+                    }
+                    window.isSadaDeliveryFeeAdded = false;
+                } else if (sadaTotal < 15000 && !window.isSadaDeliveryFeeAdded && pendingSadaItems.length === 0) {
+                    needSadaFeePrompt = true;
+                }
+            } else {
+                window.isSadaDeliveryFeeAdded = false;
             }
 
-            const hasExistingOrderForDate = (pendingItemsForDate.length > 0);
+            // 4. 예약구매 배달비 부과 여부 판별
+            let needReserveFeePrompt = false;
+            if (hasReserveInCart) {
+                if (existingReserveTotal >= 15000) {
+                    window.isReserveDeliveryFeeAdded = false;
+                } else if (hasExistingReserveFee) {
+                    const combined = existingReserveTotal + reserveTotal;
+                    if (combined >= 15000 && existingReserveFeeItem) {
+                        await deleteExistingFee(existingReserveFeeItem, nameVal, phoneVal);
+                    }
+                    window.isReserveDeliveryFeeAdded = false;
+                } else if (reserveTotal < 15000 && !window.isReserveDeliveryFeeAdded && pendingReserveItems.length === 0) {
+                    needReserveFeePrompt = true;
+                }
+            } else {
+                window.isReserveDeliveryFeeAdded = false;
+            }
 
-            if (!skipDeliveryFeePrompt && currentTotal < 15000 && !window.isDeliveryFeeAddedUnder15000 && !hasExistingOrderForDate) {
-                // 사장님 요청 문구: '이상' 은 빼주고 '배달 주문은' 앞에 '배달' 넣어주고 한줄에 들어가게
-                // 현재 금액 밑에 한줄 띄고 배달비 3,000원을 추가하여 주문하시겠습니까? 하고 확인 취소 버튼 만들기
+            // 5. 종합 안내 또는 개별 안내 팝업
+            if (needSadaFeePrompt && needReserveFeePrompt) {
                 showSystemModal(
-                    `배달 최소주문금액이 미달되었습니다.<br><br><b>배달 주문은 <span style="color:var(--nego-orange); font-weight:800;">15,000원</span>부터 가능합니다.</b><br>(현재 주문금액: ${currentTotal.toLocaleString()}원)<br><br>배달비 ${deliveryFee.toLocaleString()}원을 추가하여 주문하시겠습니까?`,
+                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br><br>` +
+                    `• <b>사다드림 주문 금액:</b> ${sadaTotal.toLocaleString()}원<br>` +
+                    `• <b>예약구매 주문 금액:</b> ${reserveTotal.toLocaleString()}원<br><br>` +
+                    `사다드림과 예약구매 상품은 배송일이 다르므로 <b>각각 배달비 ${deliveryFee.toLocaleString()}원(총 ${(deliveryFee * 2).toLocaleString()}원)</b>이 추가됩니다.<br><br>` +
+                    `배달비를 추가하여 주문하시겠습니까?`,
                     'confirm',
                     async () => {
-                        window.isDeliveryFeeAddedUnder15000 = true;
-                        await handleDeliveryOrderClick(); // 우회(재귀) 재검증 진행
+                        window.isSadaDeliveryFeeAdded = true;
+                        window.isReserveDeliveryFeeAdded = true;
+                        await handleDeliveryOrderClick();
                     },
                     () => {
-                        window.isDeliveryFeeAddedUnder15000 = false; // 취소 시 초기화
+                        window.isSadaDeliveryFeeAdded = false;
+                        window.isReserveDeliveryFeeAdded = false;
                     }
                 );
-                return; // 배달 진행 차단 후 컨펌 결과 대기
+                return;
+            }
+
+            if (needSadaFeePrompt) {
+                showSystemModal(
+                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br><br>` +
+                    `• <b>사다드림 주문 금액:</b> ${sadaTotal.toLocaleString()}원<br><br>` +
+                    `배달비 ${deliveryFee.toLocaleString()}원을 추가하여 주문하시겠습니까?`,
+                    'confirm',
+                    async () => {
+                        window.isSadaDeliveryFeeAdded = true;
+                        await handleDeliveryOrderClick();
+                    },
+                    () => {
+                        window.isSadaDeliveryFeeAdded = false;
+                    }
+                );
+                return;
+            }
+
+            if (needReserveFeePrompt) {
+                showSystemModal(
+                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br><br>` +
+                    `• <b>예약구매 주문 금액:</b> ${reserveTotal.toLocaleString()}원<br><br>` +
+                    `배달비 ${deliveryFee.toLocaleString()}원을 추가하여 주문하시겠습니까?`,
+                    'confirm',
+                    async () => {
+                        window.isReserveDeliveryFeeAdded = true;
+                        await handleDeliveryOrderClick();
+                    },
+                    () => {
+                        window.isReserveDeliveryFeeAdded = false;
+                    }
+                );
+                return;
             }
  
             // 1. 배달 안내 및 11시 마감 체크
@@ -6439,18 +6522,34 @@
                 }
             }
 
-            if (window.isDeliveryFeeAddedUnder15000 && selectedShippingMethod === '배달주문') {
-                const feeDate = "배달비";
-                if (!grouped[feeDate]) grouped[feeDate] = [];
-                grouped[feeDate].push({
-                    name: "배달비",
-                    price: deliveryFee,
-                    qty: 1,
-                    displayDate: "배달비",
-                    matchKey: "배달비"
-                });
-                totalSum += deliveryFee;
-                totalQty += 1;
+            if (selectedShippingMethod === '배달주문') {
+                if (window.isSadaDeliveryFeeAdded) {
+                    const sadaKey = Object.keys(grouped).find(k => k && k.includes("사다드림")) || "사다드림";
+                    if (!grouped[sadaKey]) grouped[sadaKey] = [];
+                    grouped[sadaKey].push({
+                        name: "배달비",
+                        price: deliveryFee,
+                        qty: 1,
+                        displayDate: sadaKey,
+                        matchKey: "사다드림"
+                    });
+                    totalSum += deliveryFee;
+                    totalQty += 1;
+                }
+                if (window.isReserveDeliveryFeeAdded) {
+                    const resKey = Object.keys(grouped).find(k => k && !k.includes("사다드림") && k !== "배달비");
+                    if (resKey) {
+                        grouped[resKey].push({
+                            name: "배달비",
+                            price: deliveryFee,
+                            qty: 1,
+                            displayDate: resKey,
+                            matchKey: grouped[resKey][0]?.matchKey || "배달비"
+                        });
+                        totalSum += deliveryFee;
+                        totalQty += 1;
+                    }
+                }
             }
 
             const sortedDates = Object.keys(grouped).filter(d => d !== "배달비").sort((a, b) => {
@@ -6806,7 +6905,8 @@
 
                         // [합배송 처리] 공동구매 입고일이 있는 경우, 다른 모든 일반 상품(또는 날짜가 더 이른 공동구매 상품)의 배송/픽업일을 가장 늦은 공동구매일로 맞춤
                         if (unifiedReserveDate) {
-                            if (unifiedReserveDate > todayStr || !isTodayOffOrAfterCutoff) {
+                            const isSadaItem = itemName.includes('사다드림') || mKey === '사다드림';
+                            if ((unifiedReserveDate > todayStr || !isTodayOffOrAfterCutoff) && !isSadaItem) {
                                 finalDate = unifiedReserveDate;
                             }
                         }
@@ -6818,24 +6918,38 @@
                     }
                 }
 
-                // [신규] 15,000원 미만 배달비 추가 수락 시 최종 주문 항목(allItems)에 배달비 품목 주입
-                if (window.isDeliveryFeeAddedUnder15000 && shippingMethod === '배달주문') {
-                    let feeDate = todayStr;
-                    if (allItems.length > 0) {
-                        feeDate = allItems[0].date;
+                // 각각의 배달비 부과 로직에 따라 배달비 품목 주입
+                if (shippingMethod === '배달주문') {
+                    if (window.isSadaDeliveryFeeAdded) {
+                        allItems.push({
+                            name: "배달비",
+                            qty: 1,
+                            price: deliveryFee,
+                            subtotal: deliveryFee,
+                            date: "사다드림",
+                            matchKey: "사다드림",
+                            isCategorized: true,
+                            isFV: false,
+                            isOnSite: false,
+                            isPushedByCutoff: false
+                        });
                     }
-                    allItems.push({
-                        name: "배달비",
-                        qty: 1,
-                        price: deliveryFee,
-                        subtotal: deliveryFee,
-                        date: feeDate,
-                        matchKey: "배달비",
-                        isCategorized: false,
-                        isFV: false,
-                        isOnSite: false,
-                        isPushedByCutoff: false
-                    });
+                    if (window.isReserveDeliveryFeeAdded) {
+                        const resItem = allItems.find(it => !it.name.includes("사다드림") && it.matchKey !== "사다드림" && it.name !== "배달비");
+                        const resDate = resItem ? resItem.date : (maxReserveDate || todayStr);
+                        allItems.push({
+                            name: "배달비",
+                            qty: 1,
+                            price: deliveryFee,
+                            subtotal: deliveryFee,
+                            date: resDate,
+                            matchKey: resDate,
+                            isCategorized: false,
+                            isFV: false,
+                            isOnSite: false,
+                            isPushedByCutoff: false
+                        });
+                    }
                 }
 
                 if (shippingMethod === '배달주문' && extraItems && extraItems.length > 0) {
@@ -6892,6 +7006,9 @@
                         let maxReserveDate = null;
                         allItems.forEach(it => {
                             if (it.name === "배달비") return;
+                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                            if (isSadaItem) return;
+
                             const d = String(it.date || "");
                             const m = String(it.matchKey || "");
                             const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
@@ -6911,6 +7028,8 @@
 
                         if (maxReserveDate) {
                             allItems.forEach(it => {
+                                const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                                if (isSadaItem || it.name === "배달비") return;
                                 it.date = maxReserveDate;
                                 it.isCategorized = false;
                             });
@@ -6920,6 +7039,9 @@
                         const reserveDates = [];
                         allItems.forEach(it => {
                             if (it.name === "배달비") return;
+                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                            if (isSadaItem) return;
+
                             const d = String(it.date || "");
                             const m = String(it.matchKey || "");
                             const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
@@ -6946,7 +7068,8 @@
                                 const m = String(it.matchKey || "");
                                 const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
                                                    /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
-                                if (!isDateItem && it.name !== "배달비") {
+                                const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                                if (!isDateItem && it.name !== "배달비" && !isSadaItem) {
                                     it.date = minReserveDate;
                                     it.isCategorized = false;
                                 }
@@ -6978,6 +7101,9 @@
 
                     const uniqueDates = new Set();
                     allItems.forEach(it => {
+                        const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                        if (isSadaItem || it.name === "배달비") return;
+
                         let d = it.date || "";
                         if (it.isCategorized || d.includes("상시판매") || d.includes("현장판매")) {
                             uniqueDates.add(targetPickupDate);
@@ -7274,6 +7400,9 @@
                     
                     allItems.forEach(it => {
                         if (it.name === "배달비") return;
+                        const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                        if (isSadaItem) return;
+
                         // 공동구매 상품인지 검증 (date가 날짜 형식이거나 matchKey가 날짜 형식인 경우)
                         const d = String(it.date || "");
                         const m = String(it.matchKey || "");
@@ -7293,9 +7422,11 @@
                         }
                     });
 
-                    // 만약 공동구매 날짜가 존재한다면, 모든 상품(배달비 포함)의 날짜를 이 최대 날짜로 덮어씀
+                    // 만약 공동구매 날짜가 존재한다면, 모든 상품(배달비 포함, 사다드림 제외)의 날짜를 이 최대 날짜로 덮어씀
                     if (maxReserveDate) {
                         allItems.forEach(it => {
+                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                            if (isSadaItem || it.name === "배달비") return;
                             it.date = maxReserveDate;
                             it.isCategorized = false;
                         });
@@ -7309,6 +7440,9 @@
 
                     allItems.forEach(it => {
                         if (it.name === "배달비") return;
+                        const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                        if (isSadaItem) return;
+
                         const d = String(it.date || "");
                         const m = String(it.matchKey || "");
                         const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
@@ -7337,7 +7471,8 @@
                             const m = String(it.matchKey || "");
                             const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
                                                /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
-                            if (!isDateItem && it.name !== "배달비") {
+                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                            if (!isDateItem && it.name !== "배달비" && !isSadaItem) {
                                 it.date = minReserveDate;
                                 it.isCategorized = false;
                             }
@@ -7607,11 +7742,15 @@
                 
                 // 주문 전송 완료 후 배달비 주입 플래그 리셋
                 window.isDeliveryFeeAddedUnder15000 = false;
+                window.isSadaDeliveryFeeAdded = false;
+                window.isReserveDeliveryFeeAdded = false;
 
             } catch (err) {
                 console.error(err);
                 // 주문 전송 실패 시 배달비 주입 플래그 리셋
                 window.isDeliveryFeeAddedUnder15000 = false;
+                window.isSadaDeliveryFeeAdded = false;
+                window.isReserveDeliveryFeeAdded = false;
                 document.getElementById('system-modal').style.display = 'none';
                 showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
                 isHistoryProcessing = false;
