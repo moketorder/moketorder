@@ -5320,11 +5320,11 @@
                 const finalDates = ['전체상품_예약'];
                 if (hasSadaItems) finalDates.push('사다드림');
                 
-                // 공동구매 날짜 필터 최신순(내림차순) 정렬
+                // 공동구매 날짜 필터 빠른 날짜순(오름차순) 정렬
                 const sortedDateFilters = [...dateFilters].sort((a, b) => {
                     const dateA = new Date(String(a).replace(/\./g, '-')).getTime() || 0;
                     const dateB = new Date(String(b).replace(/\./g, '-')).getTime() || 0;
-                    return dateB - dateA;
+                    return dateA - dateB;
                 });
                 
                 finalDates.push(...reserveCategories, ...sortedDateFilters);
@@ -5862,7 +5862,7 @@
                     const rpB = getReservePriority(b);
                     if (rpA !== rpB) return rpA - rpB;
 
-                    // 날짜가 늦은 순서(내림차순) 정렬 (dateB - dateA)
+                    // 날짜가 빠른 순서(오름차순) 정렬 (dateA - dateB)
                     const dateRegex = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/;
                     const isDateA = dateRegex.test(String(a.matchKey));
                     const isDateB = dateRegex.test(String(b.matchKey));
@@ -5870,7 +5870,7 @@
                     if (isDateA && isDateB) {
                         const dateA = new Date(String(a.matchKey).replace(/\./g, '-')).getTime() || 0;
                         const dateB = new Date(String(b.matchKey).replace(/\./g, '-')).getTime() || 0;
-                        if (dateA !== dateB) return dateB - dateA;
+                        if (dateA !== dateB) return dateA - dateB;
                     }
 
                     // 날짜가 같거나 없는 경우 업로드 순서(originalIndex) 내림차순 정렬
