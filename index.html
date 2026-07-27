@@ -4503,7 +4503,146 @@
             currentHistoryLimit += 10;
             renderHistory();
         }
+        // 고객이 주문 취소(부분 취소)한 경우 배달비 조건 체크 및 부과 처리 함수
+        async function checkAndApplyDeliveryFeeAfterCustomerCancellation(cleanPhone, name) {
+            // 1. 해당 고객의 전체 history 중에서 취소되지 않은 active 주문들을 분류
+            // 이때 배달주문(shippingMethod === '배달주문')이고 아직 배달완료/픽업완료/취소완료되지 않은 날짜별로 그룹화
+            const activeOrdersByDate = {};
+            
+            fullHistoryData.forEach(o => {
+                const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
+                const isDelivered = o.delivered === true || o.delivered === "true" || String(o.delivered).toUpperCase() === "TRUE";
+                const isReceived = o.received === true || o.received === "true" || o.received === "픽업완료" || o.received === "취소완료";
+                
+                if (!isCanceled && !isDelivered && !isReceived && o.shippingMethod === '배달주문') {
+                    const pDate = o.pickupDate || "";
+                    if (pDate) {
+                        if (!activeOrdersByDate[pDate]) activeOrdersByDate[pDate] = [];
+                        activeOrdersByDate[pDate].push(o);
+                    }
+                }
+            });
 
+            // 2. 날짜별로 체크
+            for (const pDate in activeOrdersByDate) {
+                const items = activeOrdersByDate[pDate];
+                
+                // 이미 활성 배달비가 있는지 체크
+                const hasActiveDeliveryFee = items.some(o => o.item === '배달비');
+                if (hasActiveDeliveryFee) continue;
+
+                // 일반 상품들의 금액 합산
+                let activeTotal = 0;
+                let activeCount = 0;
+                items.forEach(o => {
+                    if (o.item !== '배달비') {
+                        activeTotal += parseInt(o.total || 0);
+                        activeCount++;
+                    }
+                });
+
+                if (activeCount === 0) continue;
+
+                // 30,000원 미만인 경우 배달비 부과!
+                if (activeTotal < 30000) {
+                    try {
+                        const baseOrder = items.find(o => o.item !== '배달비');
+                        if (!baseOrder) continue;
+
+                        const dFee = window.deliveryFee || 3000;
+
+                        // 새 배달비 주문 생성 및 Firebase PUT
+                        const tempTimestamp = Date.now();
+                        const formattedTimestamp = jsFormatDate(new Date(tempTimestamp));
+                        const orderKey = fSafeKey(formattedTimestamp) + "_배달비";
+                        const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+
+                        const deliveryFeePayload = {
+                            header: 'order',
+                            name: baseOrder.name,
+                            phone: baseOrder.phone,
+                            address: baseOrder.address || "",
+                            addressDetail: baseOrder.addressDetail || "",
+                            entrance: baseOrder.entrance || "",
+                            shippingMethod: baseOrder.shippingMethod,
+                            cashReceipt: baseOrder.cashReceipt || "미발행",
+                            cashReceiptType: baseOrder.cashReceiptType || "",
+                            cashReceiptPhone: baseOrder.cashReceiptPhone || "",
+                            kakaoName: baseOrder.kakaoName || "",
+                            kakaoRealName: baseOrder.kakaoRealName || "",
+                            kakaoPhone: baseOrder.kakaoPhone || "",
+                            gender: baseOrder.gender || "미선택",
+                            ageGroup: baseOrder.ageGroup || "미선택",
+                            timestamp: formattedTimestamp,
+                            item: "배달비",
+                            qty: 1,
+                            price: dFee,
+                            total: dFee,
+                            pickupDate: pDate,
+                            received: false,
+                            delivered: false,
+                            canceled: false,
+                            rawTimestamp: tempTimestamp,
+                            matchKey: pDate
+                        };
+
+                        const res = await fetch(url, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(deliveryFeePayload)
+                        });
+
+                        if (!res.ok) throw new Error("배달비 Firebase 저장 실패");
+
+                        // 구글 시트 동기화
+                        const gasPayload = {
+                            header: 'order',
+                            timestamp: formattedTimestamp,
+                            name: baseOrder.name,
+                            phone: cleanPhone,
+                            shippingMethod: baseOrder.shippingMethod,
+                            cashReceipt: baseOrder.cashReceipt || "미발행",
+                            cashReceiptType: baseOrder.cashReceiptType || "",
+                            cashReceiptPhone: baseOrder.cashReceiptPhone || "",
+                            kakaoName: baseOrder.kakaoName || "",
+                            kakaoRealName: baseOrder.kakaoRealName || "",
+                            kakaoPhone: baseOrder.kakaoPhone || "",
+                            gender: baseOrder.gender || "미선택",
+                            ageGroup: baseOrder.ageGroup || "미선택",
+                            items: [{
+                                name: "배달비",
+                                qty: 1,
+                                price: dFee,
+                                subtotal: dFee,
+                                date: pDate,
+                                matchKey: pDate,
+                                isCategorized: false,
+                                isFV: false,
+                                isOnSite: false,
+                                isPushedByCutoff: false
+                            }],
+                            rawTimestamp: tempTimestamp
+                        };
+
+                        fetch(API_URL, {
+                            method: 'POST',
+                            body: JSON.stringify(gasPayload)
+                        }).catch(e => console.error("GAS 배달비 전송 실패:", e));
+
+                        // 로컬 메모리 및 캐시 갱신
+                        fullHistoryData.push(deliveryFeePayload);
+                        localStorage.setItem(`history_cache_${name}_${cleanPhone}`, JSON.stringify(fullHistoryData));
+                        
+                        // 화면 리렌더링
+                        renderHistory();
+
+                        showSystemModal(`⚠️ 부분 취소로 인해 무료배송 기준(3만원) 미만이 되어 배달비 ${dFee.toLocaleString()}원이 자동으로 추가 청구되었습니다.`, 'alert');
+                    } catch (e) {
+                        console.error("배달비 부과 실패:", e);
+                    }
+                }
+            }
+        }
         async function deleteOrderCard(timestamp) {
             if (isHistoryProcessing) {
                 showSystemModal("이전 주문 취소 처리중입니다.\n잠시만 기다려 주세요.", 'alert');
@@ -4555,7 +4694,54 @@
                 return;
             }
 
-            showSystemModal("정말로 이 주문을 취소하시겠습니까?", 'confirm', async () => {
+            // 배달비 조건 사전 계산
+            let willTriggerDeliveryFee = false;
+            let deliveryFeeToCharge = window.deliveryFee || 3000;
+            const targetDates = [...new Set(targetOrders.map(o => o.pickupDate).filter(Boolean))];
+            
+            for (const pDate of targetDates) {
+                const dayOrders = fullHistoryData.filter(o => o.pickupDate === pDate);
+                const isDelivery = dayOrders.some(o => o.shippingMethod === '배달주문' || o.item === '배달비');
+                if (!isDelivery) continue;
+                
+                const hasActiveDeliveryFee = dayOrders.some(o => 
+                    o.item === '배달비' && 
+                    !(o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")
+                );
+                if (hasActiveDeliveryFee) continue;
+                
+                let currentActiveTotal = 0;
+                dayOrders.forEach(o => {
+                    const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
+                    if (!isCanceled && o.item !== '배달비') {
+                        currentActiveTotal += parseInt(o.total || 0);
+                    }
+                });
+                
+                let amountToCancel = 0;
+                targetOrders.forEach(o => {
+                    if (o.pickupDate === pDate && o.item !== '배달비') {
+                        amountToCancel += parseInt(o.total || 0);
+                    }
+                });
+                
+                const remainingTotal = currentActiveTotal - amountToCancel;
+                const remainingActiveCount = dayOrders.filter(o => {
+                    const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
+                    const isGoingToBeCanceled = targetOrders.some(to => to.orderKey === o.orderKey);
+                    return !isCanceled && !isGoingToBeCanceled && o.item !== '배달비';
+                }).length;
+                
+                if (remainingActiveCount > 0 && remainingTotal < 30000) {
+                    willTriggerDeliveryFee = true;
+                }
+            }
+            
+            const confirmMsg = willTriggerDeliveryFee 
+                ? `정말로 이 주문을 취소하시겠습니까?<br><br><span style="color:#d32f2f; font-weight:800;">⚠️ 부분 취소로 인해 무료배송 기준(3만원) 미만이 되어 배달비 ${deliveryFeeToCharge.toLocaleString()}원이 자동으로 부과됩니다.</span>`
+                : "정말로 이 주문을 취소하시겠습니까?";
+
+            showSystemModal(confirmMsg, 'confirm', async () => {
                 if (isHistoryProcessing) {
                     showSystemModal("이전 주문 취소 처리중입니다.\n잠시만 기다려 주세요.", 'alert');
                     return;
@@ -4637,6 +4823,9 @@
                     });
 
                     await Promise.all(promises);
+
+                    // 배달비 조건 검사 및 추가 처리
+                    await checkAndApplyDeliveryFeeAfterCustomerCancellation(cleanPhone, name);
 
                     // 전체 로컬 캐시 영구 저장
                     localStorage.setItem(`history_cache_${name}_${cleanPhone}`, JSON.stringify(fullHistoryData));
@@ -6873,6 +7062,52 @@
 
                 const allItems = [];
 
+                // 날짜 강제 정규화 헬퍼 함수 (한국어 및 단축 표기 모두 지원)
+                const normalizeDateString = (str) => {
+                    if (!str) return "";
+                    let s = String(str).trim();
+                    
+                    // 1. 한국어 포맷 (연도 포함): 2026년 7월 27일 (월) 또는 26년 7월 27일
+                    let match = s.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+                    if (match) {
+                        let y = match[1];
+                        if (y.length === 2) y = "20" + y;
+                        const m = match[2].padStart(2, '0');
+                        const d = match[3].padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+
+                    // 1-2. 한국어 포맷 (연도 미포함): 7월 27일 또는 07월 27일
+                    match = s.match(/(\d+)월\s*(\d+)일/);
+                    if (match) {
+                        const y = new Date().getFullYear();
+                        const m = match[1].padStart(2, '0');
+                        const d = match[2].padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+                    
+                    // 2. 표준 및 마침표/슬래시 포맷: 26-07-27, 2026.7.27, 2026/07/27
+                    match = s.match(/(\d+)[./-](\d+)[./-](\d+)/);
+                    if (match) {
+                        let y = match[1];
+                        if (y.length === 2) y = "20" + y;
+                        const m = match[2].padStart(2, '0');
+                        const d = match[3].padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+                    
+                    // 3. 월.일 단축 포맷: 7.27, 7-27, 7/27
+                    match = s.match(/(\d+)[./-](\d+)/);
+                    if (match) {
+                        const y = new Date().getFullYear();
+                        const m = match[1].padStart(2, '0');
+                        const d = match[2].padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+                    
+                    return s;
+                };
+
                 // 공통 날짜 판별용 기초 변수 정의 (todayStr은 함수 상단에 정의됨)
                 const nextDay = new Date(now); nextDay.setDate(now.getDate() + 1);
                 const tomorrowStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
@@ -6891,14 +7126,11 @@
                         const p = productsData.find(pd => pd.name === name);
                         if (p) {
                             const mk = String(p.matchKey || "").trim();
-                            const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
+                            const normalizedMk = normalizeDateString(mk);
+                            const isDate = /^\d{4}-\d{2}-\d{2}$/.test(normalizedMk);
                             if (isDate) {
-                                let dStr = mk.replace(/\./g, '-').trim();
-                                if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
-                                const pt = dStr.split('-');
-                                if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
-                                if (!maxReserveDate || dStr > maxReserveDate) {
-                                    maxReserveDate = dStr;
+                                if (!maxReserveDate || normalizedMk > maxReserveDate) {
+                                    maxReserveDate = normalizedMk;
                                 }
                             }
                         }
@@ -6920,14 +7152,15 @@
                     const pData = productsData.find(p => p.name === itemName);
                     if (q > 0 && pData) {
                         const mKey = pData.matchKey || "";
-                        let finalDate = mKey;
+                        const normalizedMk = normalizeDateString(mKey);
+                        let finalDate = normalizedMk;
 
                         const isFV = /과일|야채|채소|기타/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]/.test(itemName);
                         const isCostco = mKey.includes("코스트코");
                         const isCutoffTarget = (shippingMethod === '배달주문') || (shippingMethod === '매장픽업' && (isFV || isCostco));
                         let isPushedByCutoff = false;
 
-                        const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
+                        const isDateItem = /^\d{4}-\d{2}-\d{2}$/.test(normalizedMk);
                         const isDaily = !isDateItem && (["과일", "야채", "기타"].includes(mKey) || isFV);
                         const isOnSite = !isDateItem && (['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || !isDaily);
 
