@@ -4830,6 +4830,63 @@
             });
         }
 
+        // 매주 노출 상품 자동 날짜 갱신 헬퍼 함수
+        function checkAndRunWeeklyProductsAutoUpdate(data) {
+            if (!data) return false;
+            
+            const now = new Date();
+            let isUpdated = false;
+            
+            const keys = Object.keys(data);
+            keys.forEach(key => {
+                const p = data[key];
+                if (p && (p.showWeekly === true || p.showWeekly === 'true')) {
+                    const s = String(p.date || p.matchKey || "").trim();
+                    const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
+                    if (dm) {
+                        let y, m, d;
+                        if (dm[1]) {
+                            y = parseInt(dm[1]); if (y < 100) y += 2000;
+                            m = parseInt(dm[2]); d = parseInt(dm[3]);
+                        } else {
+                            y = now.getFullYear();
+                            m = parseInt(dm[4]); d = parseInt(dm[5]);
+                        }
+                        
+                        let targetDate = new Date(y, m - 1, d, 15, 0, 0, 0); // 오후 3시 기준
+                        if (!isNaN(targetDate.getTime()) && now >= targetDate) {
+                            while (now >= targetDate) {
+                                targetDate.setDate(targetDate.getDate() + 7);
+                            }
+                            
+                            const newYear = targetDate.getFullYear();
+                            const newMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
+                            const newDay = String(targetDate.getDate()).padStart(2, '0');
+                            const newDateStr = `${newYear}-${newMonth}-${newDay}`;
+                            
+                            p.date = newDateStr;
+                            p.matchKey = newDateStr;
+                            p.updatedAt = Date.now();
+                            isUpdated = true;
+                            
+                            // Firebase 개별 PATCH 호출
+                            fetch(`${FIREBASE_DB_URL}published_products/${key}.json`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    date: newDateStr,
+                                    matchKey: newDateStr,
+                                    updatedAt: Date.now()
+                                })
+                            }).catch(err => console.error("매주 자동 갱신 실패:", err));
+                        }
+                    }
+                }
+            });
+            
+            return isUpdated;
+        }
+
         // [추가] 자동 새로고침 간격 제한 (1분)
         let lastAutoLoadTime = 0;
         const AUTO_LOAD_INTERVAL = 60000;
@@ -4901,7 +4958,11 @@
                 // 상품업로드 도구에서 Firebase에 저장한 최신 기본 재고 목록 수신
                 let publishedProducts = [];
                 if (pubRes && pubRes.ok) {
-                    publishedProducts = await pubRes.json() || [];
+                    const pubData = await pubRes.json();
+                    if (pubData) {
+                        checkAndRunWeeklyProductsAutoUpdate(pubData);
+                    }
+                    publishedProducts = pubData || [];
                 }
 
                 // [디버깅] 서버 수신 데이터 확인
@@ -4913,7 +4974,7 @@
                 rawData
                     .filter(p => p && (p.name || "").trim() !== "" && p.hidden !== true && p.hidden !== "true") // 이름 없는 행 및 숨김 상품 차단
                     .forEach((p, idx) => {
-                        const mKey = (p.matchKey || p.date || "").trim();
+                        let mKey = (p.matchKey || p.date || "").trim();
                         const pName = (p.name || "").trim();
                         
                         // 중복 판정 (상품명 + 매치키 조합)
@@ -4931,12 +4992,22 @@
                             if (pub.name !== pName) return false;
                             const isReserve = pub.date && pub.date.trim() !== "" && (pub.date.includes("월") || pub.date.includes("일") || pub.date.includes("-"));
                             if (isReserve) {
+                                if (pub.showWeekly === true || pub.showWeekly === 'true') {
+                                    return true;
+                                }
                                 return (pub.matchKey || pub.date || "").trim() === mKey;
                             }
                             return true; // 당일구매는 이름만 일치하면 매칭 성공
                         });
-                        if (pubMatch && pubMatch.stock !== undefined) {
-                            baseStock = pubMatch.stock;
+                        if (pubMatch) {
+                            if (pubMatch.stock !== undefined) {
+                                baseStock = pubMatch.stock;
+                            }
+                            if (pubMatch.showWeekly === true || pubMatch.showWeekly === 'true') {
+                                p.date = pubMatch.date;
+                                p.matchKey = pubMatch.matchKey;
+                                mKey = pubMatch.matchKey;
+                            }
                         }
 
                         const adjKey = fGetAdjKey(mKey, pName);
