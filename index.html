@@ -5157,6 +5157,18 @@
                 // [디버깅] 서버 수신 데이터 확인
                 console.log("[Data Sync] 병렬 로드 완료", { rawData, globalAdjustments, publishedProductsCount: publishedProducts.length });
 
+                // 헬퍼: 정규화 및 매칭 유틸리티
+                const normName = (str) => String(str || "").replace(/\s+/g, "").toLowerCase();
+                const normKey = (str) => {
+                    const s = String(str || "").trim();
+                    const m = s.match(/(\d{2,4})[./-]?(\d{1,2})[./-]?(\d{1,2})/);
+                    if (m) {
+                        let y = m[1]; if (y.length === 2) y = "20" + y;
+                        return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                    }
+                    return s;
+                };
+
                 // 매핑 처리 (중복 행 방어 차단 및 유효성 검사 강화)
                 const seenKeys = new Set();
                 let freshData = [];
@@ -5176,31 +5188,49 @@
 
                         // [신규] Firebase published_products 로부터 상품업로드 도구가 편집한 최신 기본재고(stock) 값을 동적 동기화
                         let baseStock = p.stock;
-                        // [개선] 당일구매(상시판매) 상품은 이름만으로 매칭하고, 예약구매 상품은 이름과 날짜를 대조하여 최신 재고(stock) 연동 결함 완벽 해결
+                        let matchedPrice = p.price;
+                        let matchedImages = p.images;
+
+                        // [개선] 스마트 매칭 (공백 정규화 및 날짜 형식을 완벽 대조하여 재고 연동 실패 방지)
                         const pubMatch = publishedProducts.find(pub => {
-                            if (pub.name !== pName) return false;
+                            if (!pub || !pub.name) return false;
+                            if (normName(pub.name) !== normName(pName)) return false;
+                            const pubMKey = (pub.matchKey || pub.date || "").trim();
+                            if (normKey(pubMKey) === normKey(mKey)) return true;
+                            if (pubMKey === mKey) return true;
+                            if (pub.showWeekly === true || pub.showWeekly === 'true') return true;
                             const isReserve = pub.date && pub.date.trim() !== "" && (pub.date.includes("월") || pub.date.includes("일") || pub.date.includes("-"));
-                            if (isReserve) {
-                                if (pub.showWeekly === true || pub.showWeekly === 'true') {
-                                    return true;
-                                }
-                                return (pub.matchKey || pub.date || "").trim() === mKey;
-                            }
-                            return true; // 당일구매는 이름만 일치하면 매칭 성공
+                            if (!isReserve) return true;
+                            return false;
                         });
+
                         if (pubMatch) {
-                            if (pubMatch.stock !== undefined) {
+                            if (pubMatch.stock !== undefined && pubMatch.stock !== null) {
                                 baseStock = pubMatch.stock;
                             }
-                            if (pubMatch.showWeekly === true || pubMatch.showWeekly === 'true') {
-                                p.date = pubMatch.date;
-                                p.matchKey = pubMatch.matchKey;
+                            if (pubMatch.price !== undefined && pubMatch.price !== null && pubMatch.price !== "") {
+                                matchedPrice = pubMatch.price;
+                            }
+                            if (pubMatch.images && Array.isArray(pubMatch.images) && pubMatch.images.length > 0) {
+                                matchedImages = pubMatch.images;
+                            }
+                            if (pubMatch.matchKey) {
                                 mKey = pubMatch.matchKey;
+                            }
+                            if (pubMatch.date) {
+                                p.date = pubMatch.date;
                             }
                         }
 
-                        const adjKey = fGetAdjKey(mKey, pName);
-                        const adj = globalAdjustments[encodeURIComponent(adjKey)] || globalAdjustments[adjKey];
+                        // 다중 키 지원으로 global_stock 연동 완벽 보장
+                        const adjKey1 = fGetAdjKey(mKey, pName);
+                        const adjKey2 = pubMatch ? fGetAdjKey(pubMatch.matchKey || pubMatch.date, pubMatch.name) : adjKey1;
+                        const adjKey3 = fGetAdjKey(normKey(mKey), pName);
+
+                        const adj = globalAdjustments[encodeURIComponent(adjKey1)] || globalAdjustments[adjKey1]
+                                 || globalAdjustments[encodeURIComponent(adjKey2)] || globalAdjustments[adjKey2]
+                                 || globalAdjustments[encodeURIComponent(adjKey3)] || globalAdjustments[adjKey3];
+
                         let currentStock = baseStock;
                         const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
                         const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited"));
@@ -5215,15 +5245,55 @@
                         freshData.push({
                             ...p,
                             name: pName,
-                            price: parseInt(p.price || 0),
+                            price: parseInt(matchedPrice || 0),
                             matchKey: mKey,
                             stock: currentStock,
                             originalStock: baseStock, // originalStock도 최신 기본재고로 동적 갱신
                             displayDate: p.date ? formatDateWithDay(p.date) : "",
-                            images: Array.isArray(p.images) ? p.images : [],
+                            images: Array.isArray(matchedImages) ? matchedImages : [],
                             originalIndex: idx
                         });
                     });
+
+                // [신규] 주문관리(published_products)에서 추가 등록되었으나 GAS 목록에 아직 반영되지 않은 신규 상품 보완
+                publishedProducts.forEach((pub, pIdx) => {
+                    if (!pub || !pub.name || (pub.name || "").trim() === "") return;
+                    const pubName = (pub.name || "").trim();
+                    const pubKey = (pub.matchKey || pub.date || "").trim();
+                    const dupKey = pubName + "||" + pubKey;
+                    if (seenKeys.has(dupKey)) return;
+                    seenKeys.add(dupKey);
+
+                    const baseStock = pub.stock;
+                    const adjKey1 = fGetAdjKey(pubKey, pubName);
+                    const adjKey2 = fGetAdjKey(normKey(pubKey), pubName);
+
+                    const adj = globalAdjustments[encodeURIComponent(adjKey1)] || globalAdjustments[adjKey1]
+                             || globalAdjustments[encodeURIComponent(adjKey2)] || globalAdjustments[adjKey2];
+
+                    let currentStock = baseStock;
+                    const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
+                    const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited"));
+                    if (isUnlimited) {
+                        currentStock = "";
+                    } else if (adj !== undefined) {
+                        const intBaseStock = parseInt(baseStock || 0);
+                        const parsedAdj = parseInt(adj);
+                        currentStock = isNaN(parsedAdj) ? intBaseStock : Math.max(0, intBaseStock + parsedAdj);
+                    }
+
+                    freshData.push({
+                        ...pub,
+                        name: pubName,
+                        price: parseInt(pub.price || 0),
+                        matchKey: pubKey,
+                        stock: currentStock,
+                        originalStock: baseStock,
+                        displayDate: pub.date ? formatDateWithDay(pub.date) : "",
+                        images: Array.isArray(pub.images) ? pub.images : [],
+                        originalIndex: 9000 + pIdx
+                    });
+                });
 
                 console.log("[Data Sync] 최종 유효 데이터:", freshData);
 
