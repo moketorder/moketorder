@@ -1416,6 +1416,8 @@
                 transform: translateY(-20px);
             }
         }
+
+
     </style>
 </head>
 
@@ -2032,7 +2034,6 @@
 
                 let html = `
                     <button class="main-tab-btn ${currentMainTab === 'reserve' ? 'active' : ''}" data-tab="reserve" onclick="switchMainTab('reserve')">공동구매</button>
-                    <button class="main-tab-btn ${currentMainTab === 'fruit-veg' ? 'active' : ''}" data-tab="fruit-veg" onclick="switchMainTab('fruit-veg')">${fruitLabel}</button>
                     <button class="main-tab-btn ${currentMainTab === 'onsite-frozen' ? 'active' : ''}" data-tab="onsite-frozen" onclick="switchMainTab('onsite-frozen')">냉동</button>
                     <button class="main-tab-btn ${currentMainTab === 'onsite-refrigerated' ? 'active' : ''}" data-tab="onsite-refrigerated" onclick="switchMainTab('onsite-refrigerated')">냉장</button>
                     <button class="main-tab-btn ${currentMainTab === 'onsite-room' ? 'active' : ''}" data-tab="onsite-room" onclick="switchMainTab('onsite-room')">상온</button>
@@ -3209,12 +3210,30 @@
 
         // [신규] 공휴일/휴무일 관리 로직
         let publicHolidays = [];
+        try {
+            const cachedHolidays = localStorage.getItem('moket_public_holidays');
+            if (cachedHolidays) {
+                publicHolidays = JSON.parse(cachedHolidays) || [];
+            }
+        } catch (e) {
+            console.error("로컬 휴무일 캐시 읽기 실패:", e);
+        }
 
         async function fetchHolidays() {
             try {
                 const res = await fetch(FIREBASE_DB_URL + "public_holidays.json?t=" + Date.now());
                 const data = await res.json();
-                if (data) publicHolidays = Array.isArray(data) ? data : data.split(',').map(s => s.trim());
+                if (data) {
+                    const newHolidays = Array.isArray(data) ? data : data.split(',').map(s => s.trim());
+                    const hasChanged = JSON.stringify(publicHolidays) !== JSON.stringify(newHolidays);
+                    publicHolidays = newHolidays;
+                    localStorage.setItem('moket_public_holidays', JSON.stringify(publicHolidays));
+                    if (hasChanged) {
+                        console.log("휴무일 정보 변경 감지 - 화면 및 탭 재정렬");
+                        initMainTabs();
+                        processAndRender(cachedProducts || productsData);
+                    }
+                }
             } catch (e) { console.error("휴무일 로드 실패:", e); }
         }
 
@@ -5198,7 +5217,12 @@
                             const pubMKey = (pub.matchKey || pub.date || "").trim();
                             if (normKey(pubMKey) === normKey(mKey)) return true;
                             if (pubMKey === mKey) return true;
-                            if (pub.showWeekly === true || pub.showWeekly === 'true') return true;
+                            if (pub.showWeekly === true || pub.showWeekly === 'true') {
+                                const localDateRegex = /(\d{2,4})[./-]?(\d{1,2})[./-]?(\d{1,2})|(\d{1,2})[./-](\d{1,2})/;
+                                const isDateMKey = localDateRegex.test(mKey);
+                                const isDatePubMKey = localDateRegex.test(pubMKey);
+                                if (isDateMKey === isDatePubMKey) return true;
+                            }
                             const isReserve = pub.date && pub.date.trim() !== "" && (pub.date.includes("월") || pub.date.includes("일") || pub.date.includes("-"));
                             if (!isReserve) return true;
                             return false;
@@ -7760,12 +7784,10 @@
             const todayStr = `${nowForDate.getFullYear()}-${String(nowForDate.getMonth() + 1).padStart(2, '0')}-${String(nowForDate.getDate()).padStart(2, '0')}`;
 
             if (currentDeliveryType === 'today') {
-                // 1. 당일배송 모드: 모든 상품(배달비 제외)의 기록 날짜를 무조건 주문 당일 날짜(오늘)로 통일 (진입 시점에 13시 마감 및 주말 여부가 이미 차단 통제되므로 단순 고정)
+                // 1. 당일배송 모드: 모든 상품(배달비 포함)의 기록 날짜를 무조건 주문 당일 날짜(오늘)로 통일
                 allItems.forEach(it => {
-                    if (it.name !== "배달비") {
-                        it.date = todayStr;
-                        it.isCategorized = false; // 날짜 포맷이므로 범주형 해제
-                    }
+                    it.date = todayStr;
+                    it.isCategorized = false; // 날짜 포맷이므로 범주형 해제
                 });
             } else if (currentDeliveryType === 'reserve') {
                 if (shippingMethod === '배달주문') {
@@ -7800,7 +7822,7 @@
                     if (maxReserveDate) {
                         allItems.forEach(it => {
                             const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
-                            if (isSadaItem || it.name === "배달비") return;
+                            if (isSadaItem) return;
                             it.date = maxReserveDate;
                             it.isCategorized = false;
                         });
@@ -7853,6 +7875,17 @@
                         });
                     }
                 }
+            }
+
+            // [안전장치] 배달비 항목의 날짜를 일반 상품의 날짜와 일치시킴
+            const mainItem = allItems.find(it => it.name !== "배달비" && !it.name.includes("사다드림") && it.matchKey !== "사다드림");
+            if (mainItem && mainItem.date) {
+                allItems.forEach(it => {
+                    if (it.name === "배달비") {
+                        it.date = mainItem.date;
+                        it.isCategorized = false;
+                    }
+                });
             }
 
             // 픽업일(date)별로 아이템 그룹화
@@ -8137,7 +8170,7 @@
         }
 
         // window.onload 대신 DOMContentLoaded 사용 (훨씬 빠름)
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             // [마이그레이션] 구버전 카카오 키 이동
             const oldNick = localStorage.getItem('kakao_nickname');
             if (oldNick && !localStorage.getItem('kakao_original_name')) {
@@ -8146,6 +8179,9 @@
 
             // 주문내역은 배경에서 삭제 (UI 안막음)
             setTimeout(() => localStorage.removeItem('moket_order_history'), 100);
+
+            // [추가] 공휴일/휴무일 목록을 동기적으로 로드하거나 비동기 패치를 완료 대기하여 레이스 컨디션 완벽 차단
+            await fetchHolidays();
 
             // [추가] 시간 기반 카테고리 순서 동적 설정 및 기본 탭 설정
             initMainTabs(true);
