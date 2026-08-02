@@ -1597,23 +1597,23 @@
             </div>
             <div style="display:flex; justify-content:center; margin:20px 0;">
                 <div
-                    style="text-align:center; line-height:1.8; font-weight:700; font-size:17px; color:var(--item-black);">
+                    style="text-align:center; line-height:1.8; font-weight:700; font-size:17px; color:var(--item-black); width:100%;">
                     <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px;">
                         <span>카카오뱅크</span>
                     </div>
-                    <span
-                        style="font-size:25px; color:var(--nego-orange); letter-spacing:0.5px; font-weight:900;">3333-37-3410268</span><br>
+                    <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
+                        <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
+                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#fff; color:#666; cursor:pointer;">복사</button>
+                    </div>
                     <span style="font-size:15px; color:#666; letter-spacing:-0.5px;">예금주 : 강*민(모켓(MOKET))</span>
-                    <!-- [추가] 사다드림 전용 안내 문구 영역 -->
+                    <!-- [수정] 사다드림 전용 안내 문구 영역 -->
                     <div id="bank-modal-notice"
                         style="display:none; margin-top:15px; padding:12px; background:#fff0f0; border-radius:10px; color:#ff4d4d; font-size:14px; line-height:1.5; border:1.5px solid #ffcccc; word-break:keep-all;">
                         📢 <b>사다드림 안내</b> 📢<br>
-                        [사다드림]은 입금 확인까지 되어야 최종 주문 확정이 됩니다.(이외 상품은 현장 결제 가능)<br>(입금자명을 닉네임과 동일하게 해주세요!)
+                        [사다드림]은 입금확인까지 되어야 주문확정이 됩니다.<br>(입금자명을 닉네임과 동일하게 해주세요.)
                     </div>
                 </div>
             </div>
-            <button class="btn-common btn-primary" onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')">계좌번호
-                복사</button>
             <button class="btn-common btn-close" onclick="closeModal('bank-modal')">닫기</button>
         </div>
     </div>
@@ -6440,12 +6440,12 @@
 
                     // [추가] 관리자 모드일 때는 남은 수량을 정확하게 표시
                     if (isAdminMode) {
-                        stockText = (isSoldOut ? "품절" : "잔여") + `: ${stock}개 ✏️`;
+                        stockText = (isSoldOut ? "품절" : "잔여") + `: ${stock}개`;
                         stockColor = isSoldOut ? "#ff0000" : "#2196F3"; // 관리자용 파란색 (품절시는 빨간색 유지)
                     }
                 } else if (isAdminMode) {
                     // 무제한 재고인 경우 관리자 모드에서 별도 표시
-                    stockText = "재고: 무제한 ✏️";
+                    stockText = "재고: 무제한";
                     stockColor = "#2196F3";
                 }
 
@@ -6464,20 +6464,12 @@
                     `<div class="item-controls-bottom-v">` +
                     `<button class="btn-detail" onclick="openDetail('${escapeArg(p.name)}')">상세보기</button>` +
                     `<div class="qty-group">` +
-                    `<div class="stock-status" style="color:${stockColor}; font-weight:800; ${isAdminMode ? 'cursor:pointer; text-decoration:underline; text-underline-offset:3px;' : ''}" ${isAdminMode ? `onclick="adminEditStock('${escapeArg(p.name)}', '${escapeArg(p.matchKey)}', '${escapeArg(p.originalStock || "")}', ${isFinite(stock) ? stock : 'Infinity'})"` : ''}>${stockText}</div>` +
-                    (isAdminMode ? 
-                    `<div class="qty-controls admin-stock-edit selected">` +
-                    `<button class="qty-btn" onclick="adminChangeStock(this, '${escapeArg(p.name)}', '${escapeArg(p.matchKey)}', '${escapeArg(p.originalStock || "")}', -1)">-</button>` +
-                    `<input class="qty-num admin-stock-input" type="number" min="0" value="${isFinite(stock) ? stock : ''}" placeholder="무제한" data-name="${escapeArg(p.name)}" data-matchkey="${escapeArg(p.matchKey)}" data-original-stock="${escapeArg(p.originalStock || "")}" onchange="adminUpdateStockInput(this)">` +
-                    `<button class="qty-btn" onclick="adminChangeStock(this, '${escapeArg(p.name)}', '${escapeArg(p.matchKey)}', '${escapeArg(p.originalStock || "")}', 1)">+</button>` +
-                    `</div>`
-                    :
+                    `<div class="stock-status" style="color:${stockColor}; font-weight:800;">${stockText}</div>` +
                     `<div class="qty-controls ${currentQty > 0 ? 'selected' : ''}" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
                     `<button class="qty-btn" onclick="qty(this, -1)">-</button>` +
                     `<input class="qty-num" value="${currentQty}" readonly data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
                     `<button class="qty-btn" onclick="qty(this, 1)">+</button>` +
-                    `</div>`
-                    ) +
+                    `</div>` +
                     `</div></div>`;
 
                 // [수정] 박스 래퍼가 있으면 그 안에 넣고, 없으면 기본 컨테이너에 넣음
@@ -7076,56 +7068,14 @@
                     publishedProducts = await pubRes.json() || [];
                 }
 
-                let globalAdjustments = {};
                 if (stockRes && stockRes.ok) {
                     globalAdjustments = await stockRes.json() || {};
                 }
 
-                if (productsData.length > 0 && publishedProducts.length > 0) {
-                    const normName = (str) => String(str || "").replace(/\s+/g, "").toLowerCase();
-                    const normKey = (str) => {
-                        const s = String(str || "").trim();
-                        const m = s.match(/(\d{2,4})[./-]?(\d{1,2})[./-]?(\d{1,2})/);
-                        if (m) {
-                            let y = m[1]; if (y.length === 2) y = "20" + y;
-                            return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-                        }
-                        return s;
-                    };
-
-                    productsData.forEach(p => {
-                        const pName = (p.name || "").trim();
-                        let mKey = (p.matchKey || p.date || "").trim();
-
-                        const pubMatch = publishedProducts.find(pub => {
-                            if (!pub || !pub.name) return false;
-                            if (normName(pub.name) !== normName(pName)) return false;
-                            const pubMKey = (pub.matchKey || pub.date || "").trim();
-                            if (normKey(pubMKey) === normKey(mKey)) return true;
-                            return pubMKey === mKey;
-                        });
-
-                        if (pubMatch) {
-                            p.stock = pubMatch.stock;
-                            p.price = pubMatch.price;
-                            p.status = pubMatch.status || p.status;
-
-                            const targetKey = p.matchKey || p.date;
-                            const adjKey = fGetAdjKey(targetKey, p.name);
-                            const adj = globalAdjustments[adjKey] || 0;
-                            
-                            const isUnlimited = (p.stock === "" || p.stock === null || p.stock === undefined || String(p.stock).trim() === "무제한" || adj === "unlimited" || String(adj).startsWith("unlimited"));
-                            if (isUnlimited) {
-                                p.stock = "무제한";
-                            } else {
-                                p.stock = (parseInt(p.stock) || 0) + adj;
-                            }
-                        } else {
-                            // 파이어베이스에 존재하지 않는 상품은 비공개/삭제로 처리해 검증에서 걸러냄
-                            p.stock = 0;
-                            p.status = "비공개";
-                        }
-                    });
+                // [중요 수정] productsData 원본을 파괴적으로 변형(in-place mutation)하지 않고
+                // 최신 publishedProducts 및 globalAdjustments 데이터로 안전하게 화면 수량을 갱신
+                if (productsData && productsData.length > 0) {
+                    processAndRender(productsData, false);
                 }
             } catch (e) {
                 console.error("Firebase 전용 실시간 검증 실패:", e);
