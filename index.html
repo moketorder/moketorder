@@ -4395,11 +4395,14 @@
                         }
                     });
                 });
-                const showDeliveredBadge = (nonCanceledCount > 0 && allDelivered);
+                const isDeliveryCard = (group.shippingMethod === '배달주문');
+                const cardBorderColor = isDeliveryCard ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)';
+                const cardLeftBorder = isDeliveryCard ? '4px solid #10b981' : '4px solid #3b82f6';
+                const cardHeaderBg = isDeliveryCard ? '#f0fdf4' : '#eff6ff';
 
                 htmlBuffer += `
-                    <div style="background:var(--white); border: 1.5px solid #eee; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
-                        <div onclick="toggleHistoryGroup('${group.key}', this)" style="background:#f1f3f5; padding:12px 15px; cursor:pointer; position:relative; transition: background 0.2s;">
+                    <div style="background:var(--white); border: 1.5px solid ${cardBorderColor}; border-left: ${cardLeftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+                        <div onclick="toggleHistoryGroup('${group.key}', this)" style="background:${cardHeaderBg}; padding:12px 15px; cursor:pointer; position:relative; transition: background 0.2s;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                                 <div>
                                     <div style="font-size:11px; color:#999; margin-bottom:2px;">주문일시</div>
@@ -4412,9 +4415,9 @@
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div style="font-size:16px; font-weight:800; color:var(--item-black); flex:1; padding-right:10px; display:flex; align-items:center; overflow:hidden;">
-                                    ${group.shippingMethod === '배달주문' 
-                                        ? '<span style="background:var(--sub-blue); color:var(--main-blue); font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">배달</span>' 
-                                        : '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">픽업</span>'}
+                                    ${isDeliveryCard 
+                                        ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">배달</span>' 
+                                        : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">픽업</span>'}
                                     <span style="display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">${displaySummary}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:6px;">
@@ -4493,17 +4496,19 @@
                         else if (isDelivered) { statusText = '배달완료'; statusColor = '#4CAF50'; }
                         else if (isReceived) { statusText = '픽업완료'; statusColor = '#4CAF50'; }
                         else if (isStocked) { statusText = '입고완료'; statusColor = 'var(--nego-orange)'; }
+                        else { statusText = '미입고'; statusColor = '#AAA'; }
+
                         const isSadaItem = order.item && (order.item.includes('사다드림') || order.matchKey === '사다드림');
                         const isDeliveryItem = order.shippingMethod === '배달주문';
-                        const isBadgeTarget = (isDeliveryItem || isSadaItem) && order.item !== '배달비';
+                        const isBadgeTarget = isDeliveryItem || isSadaItem || order.item === '배달비';
                         const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
 
                         let payBadgeHtml = '';
                         if (isBadgeTarget && !isCancelled && !isCombined) {
                             if (isPaid) {
-                                payBadgeHtml = `<span style="padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c5e0b4; border-radius: 4px; font-size: 11px; font-weight: 800; margin-left: 4px; display: inline-flex; align-items: center; vertical-align: middle;">입금완료</span>`;
+                                payBadgeHtml = `<span style="padding: 2px 7px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c5e0b4; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">입금완료</span>`;
                             } else {
-                                payBadgeHtml = `<span style="padding: 2px 6px; background: #ffd8d8; color: #d32f2f; border: 1px solid #ffb8b8; border-radius: 4px; font-size: 11px; font-weight: 800; margin-left: 4px; display: inline-flex; align-items: center; vertical-align: middle;">미입금</span>`;
+                                payBadgeHtml = `<span style="padding: 2px 7px; background: #ffd8d8; color: #d32f2f; border: 1px solid #ffb8b8; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">미입금</span>`;
                             }
                         }
 
@@ -4511,20 +4516,17 @@
                             <div style="padding: 10px 0; ${idx !== items.length - 1 ? 'border-bottom: 1px dashed #eee;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <div style="flex:1;">
-                                        <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px; display:flex; align-items:center; flex-wrap:wrap;">
-                                            ${order.shippingMethod === '배달주문' && order.item !== '배달비' 
-                                                ? '<span style="color:var(--main-blue); font-size:12px; margin-right:4px;">[배달]</span>' 
-                                                : (order.item !== '배달비' ? '<span style="color:#2e7d32; font-size:12px; margin-right:4px;">[픽업]</span>' : '')}
+                                        <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px;">
                                             <span>${order.item}</span>
-                                            ${payBadgeHtml}
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px;">
                                             <div style="font-size:13px; font-weight:700; color:#455464;">${order.qty}개</div>
                                             <div style="font-size:13px; font-weight:700; color:var(--item-black);">${parseInt(order.total || 0).toLocaleString()}원</div>
                                         </div>
                                     </div>
-                                    <div style="text-align:right; min-width:80px;">
-                                        ${statusText !== '배달완료' ? `<div style="font-size:13px; font-weight:800; color:${statusColor}; margin-bottom:4px;">${order.onSite ? '상시판매' : statusText}</div>` : ''}
+                                    <div style="text-align:right; min-width:80px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px;">
+                                        ${payBadgeHtml}
+                                        ${statusText !== '배달완료' ? `<div style="font-size:12px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>` : ''}
                                         ${isProcessing ? `<div style="width:70px; height:26px; display:flex; align-items:center; justify-content:center; background:#f5f5f5; color:#999; border-radius:4px; font-size:12px; font-weight:700;">대기중</div>` : ''}
                                     </div>
                                 </div>
@@ -6826,31 +6828,57 @@
             const phone = document.getElementById('input-phone').value || "입력되지 않음";
             const address = document.getElementById('input-address').value;
             const addressDetail = document.getElementById('input-address-detail').value;
-            const fullAddress = address ? `${address} ${addressDetail}`.trim() : "입력되지 않음";
             const entrance = document.getElementById('input-entrance').value || "정보없음";
 
-            const header = document.getElementById('confirm-header-area');
-            const displayAddress = fullAddress.replace("경기 하남시", "").trim();
+            let shortAddress = "";
+            if (address) {
+                let cleanAddr = address.replace(/^(?:경기도\s*|경기\s*)?(?:하남시\s*)?/, '').trim();
+                const matchParen = cleanAddr.match(/\(([^)]+)\)/);
+                if (matchParen && matchParen[1]) {
+                    cleanAddr = matchParen[1].trim();
+                }
+                shortAddress = `${cleanAddr} ${addressDetail || ''}`.trim();
+            } else {
+                shortAddress = addressDetail || "입력되지 않음";
+            }
 
-            header.innerHTML = `
-                <div style="font-size:18px; font-weight:900; color:var(--item-black); margin-bottom:10px;">주문 내용을 확인해 주세요</div>
-                <div style="text-align:left; background:#edf2f7; padding: 12px; border-radius:var(--common-radius); margin-bottom:10px; font-size:14px; line-height:1.6;">
-                    <div style="font-size:15px; font-weight:800; color:var(--item-black); margin-bottom:4px;">주문자 정보</div>
-                    <div>수령방법 : <span style="font-weight:700; color:var(--nego-orange);">${selectedShippingMethod}</span></div>
-                    <div>주문자명 : <span style="font-weight:700; color:var(--nego-orange);">${name}</span></div>
-                    <div>연락처 : <span style="font-weight:700; color:var(--nego-orange);">${phone}</span></div>
-                    <div style="word-break: keep-all;">주소 : <span style="font-weight:700; color:var(--nego-orange);">${displayAddress}</span></div>
-                    <div>공동현관 : <span style="font-weight:700; color:var(--nego-orange);">${entrance}</span></div>
-                </div>
-            `;
+            const header = document.getElementById('confirm-header-area');
+            if (selectedShippingMethod === '배달주문') {
+                header.innerHTML = `
+                    <div style="font-size:18px; font-weight:900; color:var(--item-black); margin-bottom:10px;">주문 내용을 확인해 주세요</div>
+                    <div style="text-align:left; background:#edf2f7; padding: 12px; border-radius:var(--common-radius); margin-bottom:10px; font-size:14px; line-height:1.6;">
+                        <div style="font-size:15px; font-weight:800; color:var(--item-black); margin-bottom:4px;">주문자 정보</div>
+                        <div>수령방법 : <span style="font-weight:700; color:var(--nego-orange);">${selectedShippingMethod}</span></div>
+                        <div>주문자명 : <span style="font-weight:700; color:var(--nego-orange);">${name}</span></div>
+                        <div>연락처 : <span style="font-weight:700; color:var(--nego-orange);">${phone}</span></div>
+                        <div style="word-break: keep-all;">주소 : <span style="font-weight:700; color:var(--nego-orange);">${shortAddress}</span></div>
+                        <div>공동현관 : <span style="font-weight:700; color:var(--nego-orange);">${entrance}</span></div>
+                    </div>
+                `;
+            } else {
+                header.innerHTML = `
+                    <div style="font-size:18px; font-weight:900; color:var(--item-black); margin-bottom:10px;">주문 내용을 확인해 주세요</div>
+                    <div style="text-align:left; background:#edf2f7; padding: 12px; border-radius:var(--common-radius); margin-bottom:10px; font-size:14px; line-height:1.6;">
+                        <div style="font-size:15px; font-weight:800; color:var(--item-black); margin-bottom:4px;">주문자 정보</div>
+                        <div>수령방법 : <span style="font-weight:700; color:var(--nego-orange);">${selectedShippingMethod}</span></div>
+                        <div>주문자명 : <span style="font-weight:700; color:var(--nego-orange);">${name}</span></div>
+                        <div>연락처 : <span style="font-weight:700; color:var(--nego-orange);">${phone}</span></div>
+                    </div>
+                `;
+            }
 
             const noticeArea = document.getElementById('confirm-notice-area');
             if (selectedShippingMethod === '배달주문') {
+                const depositNoticeLine = (currentDeliveryType === 'reserve')
+                    ? '<div>✅ 자정 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>'
+                    : '<div>✅ 오후3시 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>';
+
                 noticeArea.innerHTML = `
                     <div style="font-size: 12px; line-height: 1.5;">
                         <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
                             <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>✅ 냉장/냉동제품은 보냉백에 넣어드리나 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인 바랍니다.</div>
+                            <div>✅ 냉장/냉동제품은 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인바랍니다.</div>
+                            ${depositNoticeLine}
                             <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
                         </div>
                     </div>
