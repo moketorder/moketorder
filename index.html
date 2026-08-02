@@ -2657,14 +2657,26 @@
             const nameVal = document.getElementById('input-name')?.value || "";
             const phoneVal = document.getElementById('input-phone')?.value || "";
             if (nameVal && phoneVal) {
-                showSystemModal("주문 내역 확인 중입니다...", 'loading');
-                try {
-                    await openHistoryModal(true, true);
-                } catch (e) {
-                    console.error("History fetch error:", e);
+                const cleanPhone = phoneVal.replace(/\D/g, "");
+                const cacheKey = `history_cache_${nameVal}_${cleanPhone}`;
+                const cached = localStorage.getItem(cacheKey);
+
+                if (cached) {
+                    // 캐시가 존재하면 즉시 캐시데이터를 파싱하여 전역 변수 동기화 후 지연없이 통과
+                    fullHistoryData = JSON.parse(cached);
+                    // 백그라운드에서 조용히 최신 데이터 갱신 (배달비 계산 완료 후의 데이터 무결성을 위해)
+                    openHistoryModal(true, true).catch(e => console.error(e));
+                } else {
+                    // 캐시가 없거나 최초인 경우에만 로딩 모달을 띄우고 대기
+                    showSystemModal("주문 내역 확인 중입니다...", 'loading');
+                    try {
+                        await openHistoryModal(true, true);
+                    } catch (e) {
+                        console.error("History fetch error:", e);
+                    }
+                    document.getElementById('system-modal').style.display = 'none';
+                    checkScrollLock();
                 }
-                document.getElementById('system-modal').style.display = 'none';
-                checkScrollLock();
             }
 
             // 헬퍼: 기존 특정 배달비 삭제 처리 함수
@@ -3866,6 +3878,13 @@
             if (s instanceof Date) return s;
             try {
                 let str = String(s).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                
+                // ISO 8601 형식(T 포함)인 경우 하이픈 치환 없이 직접 파싱 (Safari/iOS 호환)
+                if (str.includes('T')) {
+                    const d = new Date(str);
+                    return isNaN(d.getTime()) ? null : d;
+                }
+
                 // "24년 2월 10일 (화)" 또는 "2024년 2월 10일 (화)" 또는 "2024-02-10"
                 const m = str.match(/(?:20)?(\d{2})년\s*(\d{1,2})월\s*(\d{1,2})일/);
                 if (m) {
@@ -4474,17 +4493,30 @@
                         else if (isDelivered) { statusText = '배달완료'; statusColor = '#4CAF50'; }
                         else if (isReceived) { statusText = '픽업완료'; statusColor = '#4CAF50'; }
                         else if (isStocked) { statusText = '입고완료'; statusColor = 'var(--nego-orange)'; }
-                        else { statusText = '미입고'; statusColor = '#AAA'; }
+                        const isSadaItem = order.item && (order.item.includes('사다드림') || order.matchKey === '사다드림');
+                        const isDeliveryItem = order.shippingMethod === '배달주문';
+                        const isBadgeTarget = (isDeliveryItem || isSadaItem) && order.item !== '배달비';
+                        const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
+
+                        let payBadgeHtml = '';
+                        if (isBadgeTarget && !isCancelled && !isCombined) {
+                            if (isPaid) {
+                                payBadgeHtml = `<span style="padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c5e0b4; border-radius: 4px; font-size: 11px; font-weight: 800; margin-left: 4px; display: inline-flex; align-items: center; vertical-align: middle;">입금완료</span>`;
+                            } else {
+                                payBadgeHtml = `<span style="padding: 2px 6px; background: #ffd8d8; color: #d32f2f; border: 1px solid #ffb8b8; border-radius: 4px; font-size: 11px; font-weight: 800; margin-left: 4px; display: inline-flex; align-items: center; vertical-align: middle;">미입금</span>`;
+                            }
+                        }
 
                         htmlBuffer += `
                             <div style="padding: 10px 0; ${idx !== items.length - 1 ? 'border-bottom: 1px dashed #eee;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <div style="flex:1;">
-                                        <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.2; margin-bottom:4px;">
+                                        <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px; display:flex; align-items:center; flex-wrap:wrap;">
                                             ${order.shippingMethod === '배달주문' && order.item !== '배달비' 
                                                 ? '<span style="color:var(--main-blue); font-size:12px; margin-right:4px;">[배달]</span>' 
                                                 : (order.item !== '배달비' ? '<span style="color:#2e7d32; font-size:12px; margin-right:4px;">[픽업]</span>' : '')}
-                                            ${order.item}
+                                            <span>${order.item}</span>
+                                            ${payBadgeHtml}
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px;">
                                             <div style="font-size:13px; font-weight:700; color:#455464;">${order.qty}개</div>
@@ -4643,10 +4675,7 @@
                             rawTimestamp: tempTimestamp
                         };
 
-                        fetch(API_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(gasPayload)
-                        }).catch(e => console.error("GAS 배달비 전송 실패:", e));
+                        // GAS 동기화 생략
 
                         // 로컬 메모리 및 캐시 갱신
                         fullHistoryData.push(deliveryFeePayload);
@@ -4820,10 +4849,7 @@
                             pickupDate: String(order.pickupDate).trim(),
                             matchKey: String(order.matchKey || "").trim()
                         };
-                        fetch(API_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(gasPayload)
-                        }).catch(e => console.error("GAS 취소 전송 실패:", e));
+                        // GAS 취소 동기화 생략
 
                         await Promise.all([fbPromise, stockPromise]);
 
@@ -4952,12 +4978,7 @@
                     matchKey: String(matchKey || "").trim()
                 };
 
-                fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
-                    .then(res => res.json())
-                    .then(gasResult => {
-                        console.log("GAS 취소 동기화 완료:", gasResult);
-                    })
-                    .catch(err => console.error("GAS 취소 동기화 네트워크 실패:", err));
+                // GAS 취소 동기화 생략
 
                 // 4. Firebase 완료 시 UI 즉시 갱신 (GAS를 기다리지 않음)
                 Promise.all([fbPromise, stockPromise]).then(() => {
@@ -5013,12 +5034,14 @@
         // [이미지 캐시] 브라우저 기본 캐시 활용 (Preloading)
         function getImgUrl(input, size = 1000, retry = false) {
             if (!input) return '';
-            let id = input.toString().trim();
+            const str = input.toString().trim();
+            if (str.startsWith("data:") || str.startsWith("http://") || str.startsWith("https://")) {
+                return str;
+            }
+            let id = str;
             const driveMatch = id.match(/[-\w]{25,}/);
             if (driveMatch) id = driveMatch[0];
 
-            // [수정] drive.google.com/thumbnail 대신 lh3.googleusercontent.com 주소를 사용하여 모바일/GitHub 호환성 개선
-            // thumbnail 주소는 특정 브라우저에서 Referrer 문제로 차단되는 경우가 많음
             let url = `https://lh3.googleusercontent.com/d/${id}=w${size}`;
             if (retry) url = `https://drive.google.com/thumbnail?id=${id}&sz=w${size}&t=${Date.now()}`;
             return url;
@@ -5129,19 +5152,42 @@
             }
 
             try {
-                // 2. [서버 호출] 배경에서 최신 데이터 가져오기 (Promise.all로 병렬 처리하여 속도 개선)
-                const fetchUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+                // [신규 0.008KB 최적화] 파이어베이스 published_products_last_updated 시각 먼저 확인
+                let isProductsCacheValid = false;
+                const cachedProductsStr = localStorage.getItem('moket_products_cache_v2');
+                const cachedTimestamp = localStorage.getItem('published_products_last_updated');
 
+                if (!force && cachedProductsStr && cachedTimestamp) {
+                    try {
+                        const tsRes = await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`).catch(() => null);
+                        if (tsRes && tsRes.ok) {
+                            const serverTs = await tsRes.json();
+                            if (serverTs && String(serverTs) === String(cachedTimestamp)) {
+                                isProductsCacheValid = true;
+                                console.log("[0.008KB 초고속 렌더링] 상품 데이터 변경 없음 -> 로컬 캐시 100% 사용 (트래픽 0B)");
+                            }
+                        }
+                    } catch(e) { console.error("타임스탬프 검증 실패:", e); }
+                }
+
+                // 2. [서버 호출] 배경에서 최신 데이터 가져오기 (Promise.all로 병렬 처리하여 속도 개선)
                 // 로딩 중 표시 (수동 새로고침일 때만 투명도 조절하여 배경 갱신 시 불쾌함 감소)
                 const header = document.querySelector('.header');
                 if (force && header) header.style.opacity = '0.7';
 
-                const [mainRes, stockRes, statusRes, pubRes] = await Promise.all([
-                    fetch(fetchUrl).catch(e => { console.error("GAS 로드 실패:", e); return { ok: false }; }),
+                const fetchPromises = [
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; })
-                ]);
+                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; })
+                ];
+
+                if (!isProductsCacheValid) {
+                    fetchPromises.push(fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; }));
+                }
+
+                const results = await Promise.all(fetchPromises);
+                const stockRes = results[0];
+                const statusRes = results[1];
+                const pubRes = isProductsCacheValid ? null : results[2];
 
                 // [추가] 공개 여부 설정을 즉시 확인하여 반영
                 const prevEnabled = isProductListEnabled;
@@ -5153,24 +5199,37 @@
 
                 if (header) header.style.opacity = '1';
 
-                // 메인 데이터 처리
-                if (!mainRes.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
-                const rawData = await mainRes.json();
-
-                // 실시간 전역 재고 변동분 처리
-                let globalAdjustments = {};
-                if (stockRes.ok) {
-                    globalAdjustments = await stockRes.json() || {};
-                }
-
-                // 상품업로드 도구에서 Firebase에 저장한 최신 기본 재고 목록 수신
+                let rawData = [];
                 let publishedProducts = [];
-                if (pubRes && pubRes.ok) {
-                    const pubData = await pubRes.json();
+
+                if (isProductsCacheValid) {
+                    rawData = JSON.parse(cachedProductsStr);
+                    publishedProducts = rawData;
+                } else if (pubRes && pubRes.ok) {
+                    const pubData = await pubRes.json() || [];
                     if (pubData) {
                         checkAndRunWeeklyProductsAutoUpdate(pubData);
                     }
                     publishedProducts = pubData || [];
+                    rawData = JSON.parse(JSON.stringify(publishedProducts));
+                    localStorage.setItem('moket_products_cache_v2', JSON.stringify(rawData));
+
+                    const serverTsRes = await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`).catch(() => null);
+                    if (serverTsRes && serverTsRes.ok) {
+                        const sTs = await serverTsRes.json();
+                        if (sTs) localStorage.setItem('published_products_last_updated', String(sTs));
+                    }
+                } else if (cachedProductsStr) {
+                    rawData = JSON.parse(cachedProductsStr);
+                    publishedProducts = rawData;
+                } else {
+                    throw new Error('네트워크 응답이 올바르지 않습니다.');
+                }
+
+                // 실시간 전역 재고 변동분 처리
+                let globalAdjustments = {};
+                if (stockRes && stockRes.ok) {
+                    globalAdjustments = await stockRes.json() || {};
                 }
 
                 // [디버깅] 서버 수신 데이터 확인
@@ -5410,41 +5469,8 @@
             for (const p of sortPriority) {
                 // [수정] 이미 로드되었다고 되어있어도 이미지가 없는 경우 또는 folderId가 있는 경우 재시도 허용
                 if (!p.isFullLoaded || (p.images && p.images.length === 0 && p.folderId)) {
-                    try {
-                        const res = await fetch(`${API_URL}?action=fetchProductImages&name=${encodeURIComponent(p.name)}&folderId=${p.folderId || ''}`);
-                        const allImages = await res.json();
-
-                        if (Array.isArray(allImages)) {
-                            const target = productsData.find(pd => pd.name === p.name && pd.matchKey === p.matchKey);
-                            if (target) {
-                                if (allImages.length > 0) target.images = allImages;
-                                target.isFullLoaded = true;
-                                localStorage.setItem('moket_products_cache_v2', JSON.stringify(productsData));
-
-                                // [핵심 수정] 한꺼번에 로드하지 않고 하나씩 간격을 두고 로드
-                                for (const id of allImages) {
-                                    await new Promise(resolve => {
-                                        const img = new Image();
-                                        img.onload = resolve;
-                                        img.onerror = () => {
-                                            // 실패 시 1회 재시도
-                                            setTimeout(() => {
-                                                const retryImg = new Image();
-                                                retryImg.src = getImgUrl(id, 1000, true);
-                                                resolve();
-                                            }, 1000);
-                                        };
-                                        img.src = getImgUrl(id, 1000);
-                                    });
-                                    await new Promise(r => setTimeout(r, 200)); // 이미지 한 장당 0.2초 휴식
-                                }
-                                console.log(`[프리로드 완료] ${p.name} (${allImages.length}장)`);
-                            }
-                        }
-                    } catch (e) {
-                        console.error(`[프리로드 실패] ${p.name}:`, e);
-                    }
-                    await new Promise(r => setTimeout(r, 800)); // 상품 하나당 0.8초 휴식 (안정성 확보)
+                    // GAS 사용 중단으로 드라이브 폴더 연동 백그라운드 이미지 로드 생략
+                    p.isFullLoaded = true;
                 }
             }
             isPreloading = false;
@@ -6739,20 +6765,8 @@
             if (detailScrollArea) detailScrollArea.scrollTop = 0;
 
             if (!p.isFullLoaded || (p.images && p.images.length <= 1 && p.folderId)) {
-                try {
-                    const res = await fetch(`${API_URL}?action=fetchProductImages&name=${encodeURIComponent(p.name)}&folderId=${p.folderId || ''}`);
-                    const allImages = await res.json();
-                    if (Array.isArray(allImages) && allImages.length > 0) {
-                        p.images = allImages;
-                        p.isFullLoaded = true;
-                        localStorage.setItem('moket_products_cache_v2', JSON.stringify(productsData));
-                        renderImgs();
-                    } else if (Array.isArray(allImages)) {
-                        p.isFullLoaded = true;
-                    }
-                } catch (e) {
-                    console.error("상세 이미지 로드 실패:", e);
-                }
+                // GAS 사용 중단으로 인해 상세 이미지 동적 페치 생략
+                p.isFullLoaded = true;
             }
         }
 
@@ -7010,6 +7024,82 @@
             checkScrollLock();
         }
 
+        // [신규] 주문 확정 단계에서 GAS 호출(3~5초 대기)을 건너뛰고 파이어베이스 실시간 재고/상태 정보로만 초고속 검증(0.1초)하는 함수
+        async function loadDataFirebaseOnly() {
+            try {
+                const [stockRes, statusRes, pubRes] = await Promise.all([
+                    fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 로드 실패:", e); return { ok: false }; }),
+                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; }),
+                    fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; })
+                ]);
+
+                if (statusRes && statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    isProductListEnabled = (statusData === null) ? true : !!statusData;
+                }
+
+                let publishedProducts = [];
+                if (pubRes && pubRes.ok) {
+                    publishedProducts = await pubRes.json() || [];
+                }
+
+                let globalAdjustments = {};
+                if (stockRes && stockRes.ok) {
+                    globalAdjustments = await stockRes.json() || {};
+                }
+
+                if (productsData.length > 0 && publishedProducts.length > 0) {
+                    const normName = (str) => String(str || "").replace(/\s+/g, "").toLowerCase();
+                    const normKey = (str) => {
+                        const s = String(str || "").trim();
+                        const m = s.match(/(\d{2,4})[./-]?(\d{1,2})[./-]?(\d{1,2})/);
+                        if (m) {
+                            let y = m[1]; if (y.length === 2) y = "20" + y;
+                            return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                        }
+                        return s;
+                    };
+
+                    productsData.forEach(p => {
+                        const pName = (p.name || "").trim();
+                        let mKey = (p.matchKey || p.date || "").trim();
+
+                        const pubMatch = publishedProducts.find(pub => {
+                            if (!pub || !pub.name) return false;
+                            if (normName(pub.name) !== normName(pName)) return false;
+                            const pubMKey = (pub.matchKey || pub.date || "").trim();
+                            if (normKey(pubMKey) === normKey(mKey)) return true;
+                            return pubMKey === mKey;
+                        });
+
+                        if (pubMatch) {
+                            p.stock = pubMatch.stock;
+                            p.price = pubMatch.price;
+                            p.status = pubMatch.status || p.status;
+
+                            const targetKey = p.matchKey || p.date;
+                            const adjKey = fGetAdjKey(targetKey, p.name);
+                            const adj = globalAdjustments[adjKey] || 0;
+                            
+                            const isUnlimited = (p.stock === "" || p.stock === null || p.stock === undefined || String(p.stock).trim() === "무제한" || adj === "unlimited" || String(adj).startsWith("unlimited"));
+                            if (isUnlimited) {
+                                p.stock = "무제한";
+                            } else {
+                                p.stock = (parseInt(p.stock) || 0) + adj;
+                            }
+                        } else {
+                            // 파이어베이스에 존재하지 않는 상품은 비공개/삭제로 처리해 검증에서 걸러냄
+                            p.stock = 0;
+                            p.status = "비공개";
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Firebase 전용 실시간 검증 실패:", e);
+                throw e;
+            }
+        }
+
         async function completeOrder(shippingMethod, extraItems = [], cutoffConfirmed = false, holidayConfirmed = false) {
             const now = new Date();
             const currentHour = now.getHours();
@@ -7065,8 +7155,8 @@
             }
 
             try {
-                // 최신 데이터를 서버에서 강제로 새로고침하여 검증
-                await loadData(true);
+                // 최신 데이터를 파이어베이스에서 직접 고속 검증하여 네트워크 딜레이(GAS 병목) 해소
+                await loadDataFirebaseOnly();
             } catch (e) {
                 console.error("실시간 상품 정보 확인 실패:", e);
                 showSystemModal("실시간 상품 정보를 불러오지 못했습니다.<br>네트워크 연결을 확인해주세요.", 'alert');
@@ -7929,12 +8019,30 @@
                     return `${y}년 ${m}월 ${day}일 (${w})`;
                 };
 
+                const getNextBusinessDate = (ts) => {
+                    let d = new Date(ts);
+                    // 15시 이후 주문이거나 주말/휴무일인 경우 다음 날짜로 이동
+                    if (d.getHours() >= 15) {
+                        d.setDate(d.getDate() + 1);
+                    }
+                    while (true) {
+                        const chkDay = d.getDay();
+                        const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                        const isOff = (chkDay === 0 || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
+                        if (isOff) {
+                            d.setDate(d.getDate() + 1);
+                        } else {
+                            break;
+                        }
+                    }
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                };
+
                 const getDisplayDate = (it) => {
                     let d = it.date;
                     if (it.isOnSite || it.isCategorized) {
                         if (!/^(\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(String(d).trim())) {
-                            const today = new Date(tempTimestamp);
-                            d = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                            d = getNextBusinessDate(tempTimestamp);
                         }
                     }
                     return d;
@@ -8072,12 +8180,6 @@
                 allItems.forEach(async it => {
                     if (it.isExtra && it.originalData) {
                         try {
-                            // 1. GAS 스프레드시트 서버 합산 처리
-                            fetch(API_URL, {
-                                method: 'POST',
-                                body: JSON.stringify({ header: 'combine', ...it.originalData })
-                            }).catch(e => console.error("GAS 합산 처리 실패:", e));
-
                             // 2. Firebase 실시간 데이터베이스에서 기존 개별 주문 삭제
                             const origPhone = String(it.originalData.phone || phone).replace(/\D/g, "");
                             const origOrderKey = fSafeKey(it.originalData.timestamp) + "_" + fSafeKey(it.originalData.item);
@@ -8096,15 +8198,6 @@
                         } catch (e) { console.error("합산 실패:", e); }
                     }
                 });
-
-                // 3. GAS 스프레드시트 동기화 (배경에서 실행)
-                fetch(API_URL, {
-                    method: 'POST',
-                    redirect: 'follow',
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(gasResult => {
-                    console.log("GAS 동기화 완료:", gasResult);
-                }).catch(err => console.error("GAS 동기화 네트워크 실패:", err));
 
                 // 4. 로컬 상태 업데이트 및 완료 안내 (Firebase 기록 완료 시 바로 표시)
                 isHistoryProcessing = false;
