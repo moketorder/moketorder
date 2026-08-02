@@ -1603,14 +1603,14 @@
                     </div>
                     <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
                         <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
-                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#fff; color:#666; cursor:pointer;">복사</button>
+                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
                     </div>
                     <span style="font-size:15px; color:#666; letter-spacing:-0.5px;">예금주 : 강*민(모켓(MOKET))</span>
                     <!-- [수정] 사다드림 전용 안내 문구 영역 -->
                     <div id="bank-modal-notice"
                         style="display:none; margin-top:15px; padding:12px; background:#fff0f0; border-radius:10px; color:#ff4d4d; font-size:14px; line-height:1.5; border:1.5px solid #ffcccc; word-break:keep-all;">
                         📢 <b>사다드림 안내</b> 📢<br>
-                        [사다드림]은 입금확인까지 되어야 주문확정이 됩니다.<br>(입금자명을 닉네임과 동일하게 해주세요.)
+                        [사다드림]은 입금 확인까지 되어야 최종 주문 확정이 됩니다.(이외 상품은 현장 결제 가능)<br>(입금자명을 닉네임과 동일하게 해주세요!)
                     </div>
                 </div>
             </div>
@@ -3507,6 +3507,11 @@
 
                 // [신규] 주소 입력 방식 자동 감지 (오프라인 모드 시 수동 입력 개방)
                 checkAddressInputMode();
+            if (id === 'bank-modal') {
+                const notice = document.getElementById('bank-modal-notice');
+                if (notice && !window.isSadaOrderFinished) {
+                    notice.style.display = 'none';
+                }
             }
             document.getElementById(id).style.display = 'flex';
             checkScrollLock();
@@ -7711,7 +7716,7 @@
                             <span style="color:var(--item-black);">카카오뱅크</span><br>
                             <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
                                 <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
-                                <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#fff; color:#666; cursor:pointer;">복사</button>
+                                <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
                             </div>
                         </div>
                         <div style="font-size:15px; font-weight:600; color:#888;">예금주 : 강*민(모켓(MOKET))</div>
@@ -8203,7 +8208,7 @@
 
                 // 최종 완료 처리 (GAS 완료를 기다리지 않고 바로 표시)
                 document.getElementById('system-modal').style.display = 'none';
-                const hasSadaDream = allItems.some(it => String(it.name).includes('[사다드림]'));
+                const hasSadaDream = allItems.some(it => it.name !== "배달비" && (String(it.name).includes('사다드림') || it.matchKey === '사다드림' || it.date === '사다드림'));
 
                 if (hasSadaDream) {
                     showSystemModal("주문이 완료되었습니다!", 'alert', () => {
