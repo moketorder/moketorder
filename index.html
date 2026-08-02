@@ -4395,6 +4395,7 @@
                         }
                     });
                 });
+                const showDeliveredBadge = (nonCanceledCount > 0 && allDelivered);
                 const isDeliveryCard = (group.shippingMethod === '배달주문');
                 const cardBorderColor = isDeliveryCard ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)';
                 const cardLeftBorder = isDeliveryCard ? '4px solid #10b981' : '4px solid #3b82f6';
@@ -6845,24 +6846,28 @@
             const header = document.getElementById('confirm-header-area');
             if (selectedShippingMethod === '배달주문') {
                 header.innerHTML = `
-                    <div style="font-size:18px; font-weight:900; color:var(--item-black); margin-bottom:10px;">주문 내용을 확인해 주세요</div>
-                    <div style="text-align:left; background:#edf2f7; padding: 12px; border-radius:var(--common-radius); margin-bottom:10px; font-size:14px; line-height:1.6;">
-                        <div style="font-size:15px; font-weight:800; color:var(--item-black); margin-bottom:4px;">주문자 정보</div>
-                        <div>수령방법 : <span style="font-weight:700; color:var(--nego-orange);">${selectedShippingMethod}</span></div>
-                        <div>주문자명 : <span style="font-weight:700; color:var(--nego-orange);">${name}</span></div>
-                        <div>연락처 : <span style="font-weight:700; color:var(--nego-orange);">${phone}</span></div>
-                        <div style="word-break: keep-all;">주소 : <span style="font-weight:700; color:var(--nego-orange);">${shortAddress}</span></div>
-                        <div>공동현관 : <span style="font-weight:700; color:var(--nego-orange);">${entrance}</span></div>
+                    <div style="font-size:16px; font-weight:900; color:var(--item-black); margin-bottom:8px;">주문 내용을 확인해 주세요</div>
+                    <div style="text-align:left; background:#f8fafc; border:1.5px solid #e2e8f0; padding: 8px 12px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.4;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; white-space:nowrap; overflow:hidden;">
+                            <span style="background:#e8f5e9; color:#2e7d32; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:800; flex-shrink:0;">🚚 배달주문</span>
+                            <span style="font-weight:800; color:#1e293b; font-size:13.5px; flex-shrink:0;">${name}</span>
+                            <span style="color:#64748b; font-weight:700; font-size:12.5px; flex-shrink:0;">(${phone})</span>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; color:#334155; font-weight:700; font-size:12.5px; white-space:nowrap; overflow:hidden;">
+                            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📍 ${shortAddress}</span>
+                            ${entrance && entrance !== "정보없음" ? `<span style="color:#64748b; font-size:11.5px; flex-shrink:0; background:#edf2f7; padding:1px 5px; border-radius:4px;">🚪 ${entrance}</span>` : ''}
+                        </div>
                     </div>
                 `;
             } else {
                 header.innerHTML = `
-                    <div style="font-size:18px; font-weight:900; color:var(--item-black); margin-bottom:10px;">주문 내용을 확인해 주세요</div>
-                    <div style="text-align:left; background:#edf2f7; padding: 12px; border-radius:var(--common-radius); margin-bottom:10px; font-size:14px; line-height:1.6;">
-                        <div style="font-size:15px; font-weight:800; color:var(--item-black); margin-bottom:4px;">주문자 정보</div>
-                        <div>수령방법 : <span style="font-weight:700; color:var(--nego-orange);">${selectedShippingMethod}</span></div>
-                        <div>주문자명 : <span style="font-weight:700; color:var(--nego-orange);">${name}</span></div>
-                        <div>연락처 : <span style="font-weight:700; color:var(--nego-orange);">${phone}</span></div>
+                    <div style="font-size:16px; font-weight:900; color:var(--item-black); margin-bottom:8px;">주문 내용을 확인해 주세요</div>
+                    <div style="text-align:left; background:#f8fafc; border:1.5px solid #e2e8f0; padding: 10px 12px; border-radius:10px; margin-bottom:10px; font-size:13px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="background:#eff6ff; color:#1d4ed8; font-size:11px; padding:2px 7px; border-radius:5px; font-weight:800;">🛍️ 매장픽업</span>
+                            <span style="font-weight:800; color:#1e293b; font-size:14px;">${name}</span>
+                            <span style="color:#64748b; font-weight:700;">(${phone})</span>
+                        </div>
                     </div>
                 `;
             }
@@ -6877,7 +6882,7 @@
                     <div style="font-size: 12px; line-height: 1.5;">
                         <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
                             <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>✅ 냉장/냉동제품은 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인바랍니다.</div>
+                            <div>✅ 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인바랍니다.</div>
                             ${depositNoticeLine}
                             <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
                         </div>
