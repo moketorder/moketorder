@@ -4562,7 +4562,7 @@
                                     </div>
                                     <div style="text-align:right; min-width:80px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px;">
                                         ${payBadgeHtml}
-                                        ${statusText !== '배달완료' ? `<div style="font-size:12px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>` : ''}
+                                        ${statusText !== '배달완료' ? `<div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>` : ''}
                                         ${isProcessing ? `<div style="width:70px; height:26px; display:flex; align-items:center; justify-content:center; background:#f5f5f5; color:#999; border-radius:4px; font-size:12px; font-weight:700;">대기중</div>` : ''}
                                     </div>
                                 </div>
@@ -4756,23 +4756,11 @@
                 const isDelivered = isOrderDelivered(d);
                 
                 // 숨김처리된 상품 여부 확인
-                const pData = productsData.find(p => p.name === d.item);
-                let isHiddenProduct = false;
-                if (!pData) {
-                    isHiddenProduct = true;
-                } else {
-                    const status = (pData.status || "").trim();
-                    const mKey = (pData.matchKey || "").trim();
-                    const isPrivate = (status === "비공개" || mKey === "비공개");
-                    const showField = pData.show === false || pData.show === 'false';
-                    const showTodayField = pData.showToday !== undefined && (pData.showToday === false || pData.showToday === 'false');
-                    const showReserveField = pData.showReserve !== undefined && (pData.showReserve === false || pData.showReserve === 'false');
-                    if (isPrivate || showField || showTodayField || showReserveField) {
-                        isHiddenProduct = true;
-                    }
-                }
-
-                return !isCancelled && !isReceived && !isProcessing && !isStocked && !d.onSite && !isDelivered && !isCombined && !isHiddenProduct;
+                // [버그수정] 주문 취소는 상품목록의 노출/숨김 여부와 무관하게 그 주문(같은 타임스탬프)의
+                // 모든 항목을 취소해야 함. 예전엔 상품목록에 없거나 숨김인 항목(배달비, 날짜가 다른 상품,
+                // 중복명 상품 등)을 'isHiddenProduct'로 제외해서, 날짜가 다른 상품을 함께 담아 주문하면
+                // 하나만 취소되고 하나는 안 되는 문제가 있었음.
+                return !isCancelled && !isReceived && !isProcessing && !isStocked && !d.onSite && !isDelivered && !isCombined;
             });
 
             if (targetOrders.length === 0) {
@@ -4867,7 +4855,9 @@
                         const adjKey = safeDate + "_" + safeName;
                         const diff = parseInt(order.qty) || 1;
 
-                        const stockPromise = fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`)
+                        const stockPromise = (rawItemName === '배달비')
+                            ? Promise.resolve() // 배달비는 재고 항목이 아니므로 재고 복구 생략
+                            : fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`)
                             .then(r => r.json())
                             .then(currentAdj => {
                                 const newAdj = (currentAdj || 0) + diff;
@@ -8159,8 +8149,14 @@
 
                 const cleanPhone = normP(phone);
 
+                // [버그수정] 연락처가 비었거나 유효하지 않으면 주문이 엉뚱한 경로에 기록돼
+                // 주문내역/주문관리에서 사라짐 → 기록을 시도하지 않고 명확히 실패 처리
+                if (!cleanPhone || String(cleanPhone).replace(/\D/g, "").length < 8) {
+                    throw new Error("연락처 정보가 올바르지 않아 주문을 기록할 수 없습니다. 연락처를 다시 확인해 주세요.");
+                }
+
                 // 1. Firebase 주문 데이터 전송 (병렬 실행 및 대기)
-                const fbPromises = allItems.map(it => {
+                const fbPromises = allItems.map(async it => {
                     const formattedTimestamp = jsFormatDate(new Date(tempTimestamp));
                     const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(it.name);
                     const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
@@ -8187,10 +8183,26 @@
                     }
                     delete itemPayload.items;
 
-                    return fetch(fbItemUrl, {
-                        method: 'PUT',
-                        body: JSON.stringify(itemPayload)
-                    });
+                    // [버그수정] fetch는 HTTP 4xx/5xx에도 reject되지 않으므로 response.ok를 반드시 확인.
+                    // 저장이 실제로 성공할 때까지 자동 재시도(최대 25회, 점진 대기)하고, 성공한 뒤에만 진행.
+                    // 이렇게 해야 '계좌 안내 모달은 봤는데 주문은 저장 안 됨'을 막고, 손님에게 에러를 보이지 않음.
+                    let saved = false, lastErr = null;
+                    for (let attempt = 1; attempt <= 25 && !saved; attempt++) {
+                        try {
+                            const resp = await fetch(fbItemUrl, {
+                                method: 'PUT',
+                                body: JSON.stringify(itemPayload)
+                            });
+                            if (!resp.ok) throw new Error(`서버 응답 ${resp.status}`);
+                            saved = true;
+                        } catch (e) {
+                            lastErr = e;
+                            console.warn(`주문 기록 재시도 ${attempt}/25 (${it.name}):`, e.message);
+                            await new Promise(r => setTimeout(r, Math.min(3000, 400 * attempt)));
+                        }
+                    }
+                    if (!saved) throw new Error(`주문 기록 실패 (${it.name}): ${lastErr ? lastErr.message : ''}`);
+                    return true;
                 });
                 await Promise.all(fbPromises);
 
