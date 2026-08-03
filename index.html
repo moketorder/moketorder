@@ -1603,14 +1603,14 @@
                     </div>
                     <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
                         <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
-                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#fff; color:#666; cursor:pointer;">복사</button>
+                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
                     </div>
                     <span style="font-size:15px; color:#666; letter-spacing:-0.5px;">예금주 : 강*민(모켓(MOKET))</span>
                     <!-- [수정] 사다드림 전용 안내 문구 영역 -->
                     <div id="bank-modal-notice"
                         style="display:none; margin-top:15px; padding:12px; background:#fff0f0; border-radius:10px; color:#ff4d4d; font-size:14px; line-height:1.5; border:1.5px solid #ffcccc; word-break:keep-all;">
                         📢 <b>사다드림 안내</b> 📢<br>
-                        [사다드림]은 입금확인까지 되어야 주문확정이 됩니다.<br>(입금자명을 닉네임과 동일하게 해주세요.)
+                        [사다드림]은 입금 확인까지 되어야 최종 주문 확정이 됩니다.(이외 상품은 현장 결제 가능)<br>(입금자명을 닉네임과 동일하게 해주세요!)
                     </div>
                 </div>
             </div>
@@ -2877,7 +2877,7 @@
                 let hasOnlyFruit = true;
                 for (const name in cart) {
                     if (cart[name] > 0) {
-                        const p = productsData.find(pd => pd.name === name);
+                        const p = gFindCartProduct(name);
                         if (p) {
                             const mk = String(p.matchKey || "").trim();
                             const nameStr = String(p.name || "").trim();
@@ -3013,7 +3013,7 @@
                 
                 for (const itemName in cart) {
                     if (cart[itemName] > 0) {
-                        const pData = productsData.find(p => p.name === itemName);
+                        const pData = gFindCartProduct(itemName);
                         if (pData && pData.matchKey) {
                             const mKey = pData.matchKey;
                             if (/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey)) {
@@ -3140,6 +3140,12 @@
 
             return fullHistoryData.filter(item => {
                 const isDeliveryFee = (item.item === "배달비");
+
+                // [수정] 사다드림(신선식품)은 사다드림 전용 합배송에서만 묶여야 함.
+                // 사다드림 주문은 pickupDate가 실제 배달일로 기록되어 일반 상품 배달일과 겹칠 수 있는데,
+                // 그 경우 일반 날짜 합배송에 사다드림이 딸려 들어가면 안 되므로 여기서 제외한다.
+                const isSadaItem = String(item.item || "").includes("사다드림") || item.matchKey === "사다드림";
+                if (targetDate !== "사다드림" && isSadaItem) return false;
 
                 // parseKRDate를 사용하여 한글 날짜 형식(예: 2026년 7월 14일 (화))을 YYYY-MM-DD로 안전하게 파싱하여 비교
                 let itemDate = "";
@@ -3284,6 +3290,29 @@
         function fGetAdjKey(mKey, name) {
             const s = String(mKey || "").trim();
             return fSafeKey(s) + "_" + fSafeKey(name);
+        }
+
+        // [버그수정] 같은 이름의 상품이 당일용/예약용으로 2개 이상 등록된 경우, 장바구니 이름만으로
+        // 첫 항목을 집으면 엉뚱한 항목(카테고리)을 골라 배달 날짜가 틀어짐.
+        // 담을 때 박제한 배송 모드(cartDeliveryType)에 맞는 항목을 선택한다.
+        // - 예약(reserve): matchKey/date가 실제 날짜인 항목 우선
+        // - 당일(today): 날짜가 아닌(카테고리) 항목 우선
+        function gFindCartProduct(itemName) {
+            const matches = productsData.filter(p => p.name === itemName);
+            if (matches.length <= 1) return matches[0] || null;
+            const mode = (typeof cartDeliveryType !== 'undefined' && cartDeliveryType[itemName])
+                ? cartDeliveryType[itemName] : currentDeliveryType;
+            const isDateMk = (p) => {
+                const s = String(p.matchKey || "").trim();
+                const d = String(p.date || "").trim();
+                const sep = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/;
+                const kor = /\d{1,2}\s*월\s*\d{1,2}\s*일/;
+                return sep.test(s) || kor.test(s) || sep.test(d) || kor.test(d);
+            };
+            if (mode === 'reserve') {
+                return matches.find(isDateMk) || matches[0];
+            }
+            return matches.find(p => !isDateMk(p)) || matches[0];
         }
 
         // [추가] 클립보드 복사 유틸리티 (토스트 사용으로 모달 충돌 방지)
@@ -3507,6 +3536,12 @@
 
                 // [신규] 주소 입력 방식 자동 감지 (오프라인 모드 시 수동 입력 개방)
                 checkAddressInputMode();
+            }
+            if (id === 'bank-modal') {
+                const notice = document.getElementById('bank-modal-notice');
+                if (notice && !window.isSadaOrderFinished) {
+                    notice.style.display = 'none';
+                }
             }
             document.getElementById(id).style.display = 'flex';
             checkScrollLock();
@@ -5137,7 +5172,7 @@
 
             // 1. [로컬 캐시] 메모리에 데이터가 없을 때만 즉시 렌더링 (깜빡임 최소화)
             if (productsData.length === 0) {
-                const cachedData = localStorage.getItem('moket_products_cache_v2');
+                const cachedData = localStorage.getItem('moket_products_cache_v3');
                 if (cachedData) {
                     try {
                         productsData = JSON.parse(cachedData);
@@ -5157,7 +5192,7 @@
             try {
                 // [신규 0.008KB 최적화] 파이어베이스 published_products_last_updated 시각 먼저 확인
                 let isProductsCacheValid = false;
-                const cachedProductsStr = localStorage.getItem('moket_products_cache_v2');
+                const cachedProductsStr = localStorage.getItem('moket_products_cache_v3');
                 const cachedTimestamp = localStorage.getItem('published_products_last_updated');
 
                 if (!force && cachedProductsStr && cachedTimestamp) {
@@ -5215,7 +5250,7 @@
                     }
                     publishedProducts = pubData || [];
                     rawData = JSON.parse(JSON.stringify(publishedProducts));
-                    localStorage.setItem('moket_products_cache_v2', JSON.stringify(rawData));
+                    localStorage.setItem('moket_products_cache_v3', JSON.stringify(rawData));
 
                     const serverTsRes = await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`).catch(() => null);
                     if (serverTsRes && serverTsRes.ok) {
@@ -5234,6 +5269,21 @@
                 if (stockRes && stockRes.ok) {
                     globalAdjustments = await stockRes.json() || {};
                 }
+
+                // [버그수정] 재고 조정값(adj) 조회 헬퍼.
+                // 기존 '||' 방식은 정상값 0(주문관리에서 수량 변경 시 리셋되는 값)을 falsy로 오인해
+                // 뒷순위 키(같은 이름의 다른 회차 상품 키)로 넘어가 그 상품의 차감값을 잘못 끌어와
+                // 주문이 없는데도 품절로 표시되는 문제가 있었음. '정의된 첫 값'을 선택하도록 교체.
+                const pickAdj = (...keys) => {
+                    for (const k of keys) {
+                        if (k === undefined || k === null || k === "") continue;
+                        const encV = globalAdjustments[encodeURIComponent(k)];
+                        if (encV !== undefined && encV !== null) return encV;
+                        const rawV = globalAdjustments[k];
+                        if (rawV !== undefined && rawV !== null) return rawV;
+                    }
+                    return undefined;
+                };
 
                 // [디버깅] 서버 수신 데이터 확인
                 console.log("[Data Sync] 병렬 로드 완료", { rawData, globalAdjustments, publishedProductsCount: publishedProducts.length });
@@ -5268,7 +5318,9 @@
                         seenKeys.add(dupKey);
 
                         // [신규] Firebase published_products 로부터 상품업로드 도구가 편집한 최신 기본재고(stock) 값을 동적 동기화
-                        let baseStock = p.stock;
+                        // [버그수정] 캐시(moket_products_cache_v3)에는 조정 반영된 stock(=기본+adj)이 저장되므로,
+                        // 참 기본재고인 originalStock이 있으면 그것을 우선 사용해야 새로고침마다 adj가 이중 누적(수량 1씩 감소)되지 않음.
+                        let baseStock = (p.originalStock !== undefined && p.originalStock !== null && p.originalStock !== "") ? p.originalStock : p.stock;
                         let matchedPrice = p.price;
                         let matchedImages = p.images;
 
@@ -5291,7 +5343,10 @@
                         });
 
                         if (pubMatch) {
-                            if (pubMatch.stock !== undefined && pubMatch.stock !== null) {
+                            // [버그수정] 캐시 경로에서는 pubMatch도 캐시 항목이라 stock이 조정 반영값임 → originalStock 우선.
+                            if (pubMatch.originalStock !== undefined && pubMatch.originalStock !== null && pubMatch.originalStock !== "") {
+                                baseStock = pubMatch.originalStock;
+                            } else if (pubMatch.stock !== undefined && pubMatch.stock !== null) {
                                 baseStock = pubMatch.stock;
                             }
                             if (pubMatch.price !== undefined && pubMatch.price !== null && pubMatch.price !== "") {
@@ -5313,9 +5368,7 @@
                         const adjKey2 = pubMatch ? fGetAdjKey(pubMatch.matchKey || pubMatch.date, pubMatch.name) : adjKey1;
                         const adjKey3 = fGetAdjKey(normKey(mKey), pName);
 
-                        const adj = globalAdjustments[encodeURIComponent(adjKey1)] || globalAdjustments[adjKey1]
-                                 || globalAdjustments[encodeURIComponent(adjKey2)] || globalAdjustments[adjKey2]
-                                 || globalAdjustments[encodeURIComponent(adjKey3)] || globalAdjustments[adjKey3];
+                        const adj = pickAdj(adjKey1, adjKey2, adjKey3);
 
                         let currentStock = baseStock;
                         const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
@@ -5350,12 +5403,12 @@
                     if (seenKeys.has(dupKey)) return;
                     seenKeys.add(dupKey);
 
-                    const baseStock = pub.stock;
+                    // [버그수정] 캐시 항목이면 stock에 adj가 반영돼 있으므로 참 기본재고 originalStock 우선.
+                    const baseStock = (pub.originalStock !== undefined && pub.originalStock !== null && pub.originalStock !== "") ? pub.originalStock : pub.stock;
                     const adjKey1 = fGetAdjKey(pubKey, pubName);
                     const adjKey2 = fGetAdjKey(normKey(pubKey), pubName);
 
-                    const adj = globalAdjustments[encodeURIComponent(adjKey1)] || globalAdjustments[adjKey1]
-                             || globalAdjustments[encodeURIComponent(adjKey2)] || globalAdjustments[adjKey2];
+                    const adj = pickAdj(adjKey1, adjKey2);
 
                     let currentStock = baseStock;
                     const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
@@ -5420,7 +5473,7 @@
 
                     if (isDataChanged || force) {
                         productsData = freshData;
-                        localStorage.setItem('moket_products_cache_v2', JSON.stringify(productsData));
+                        localStorage.setItem('moket_products_cache_v3', JSON.stringify(productsData));
                         console.log(isDataChanged ? "데이터 변경됨: 화면 업데이트" : "강제 새로고침: 화면 업데이트");
                         processAndRender(productsData, false);
                         startImageCaching(productsData);
@@ -7188,7 +7241,7 @@
                 let hasAnyRegular = false;
                 for (const name in cart) {
                     if (cart[name] > 0) {
-                        const p = productsData.find(pd => pd.name === name);
+                        const p = gFindCartProduct(name);
                         if (p) {
                             const mk = String(p.matchKey || "").trim();
                             const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
@@ -7290,7 +7343,7 @@
                 let maxReserveDate = null;
                 for (const name in cart) {
                     if (cart[name] > 0) {
-                        const p = productsData.find(pd => pd.name === name);
+                        const p = gFindCartProduct(name);
                         if (p) {
                             const mk = String(p.matchKey || "").trim();
                             const normalizedMk = normalizeDateString(mk);
@@ -7316,11 +7369,17 @@
                 for (const itemName in cart) {
                     if (!itemName || itemName === "undefined" || itemName === "null") continue;
                     const q = cart[itemName];
-                    const pData = productsData.find(p => p.name === itemName);
+                    const pData = gFindCartProduct(itemName);
                     if (q > 0 && pData) {
                         const mKey = pData.matchKey || "";
                         const normalizedMk = normalizeDateString(mKey);
                         let finalDate = normalizedMk;
+
+                        // [수정] 사다드림 상품의 배달일은 matchKey("사다드림")가 아니라 상품 date(예: 8월 7일)에 담겨 있음.
+                        // 선택한 날짜를 그대로 기록하도록 별도 처리 (다음영업일 강제 이월/덮어쓰기 방지).
+                        const _isSada = itemName.includes('사다드림') || mKey === '사다드림';
+                        const _sadaDate = _isSada ? normalizeDateString(pData.date) : "";
+                        const isSadaWithDate = _isSada && /^\d{4}-\d{2}-\d{2}$/.test(_sadaDate);
 
                         const isFV = /과일|야채|채소|기타/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]/.test(itemName);
                         const isCostco = mKey.includes("코스트코");
@@ -7332,7 +7391,10 @@
                         const isOnSite = !isDateItem && (['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || !isDaily);
 
                         // 1. & 2. (상시판매/과채류/배달 등 일반 상품)은 시간에 관계없이 무조건 다음날(tomorrowStr)로 기록
-                        if (!isDateItem) {
+                        if (isSadaWithDate) {
+                            // 사다드림: 선택한 배달일 그대로 기록
+                            finalDate = _sadaDate;
+                        } else if (!isDateItem) {
                             finalDate = tomorrowStr;
                             
                             // [예외] 오늘 날짜인 공동구매 상품과 같이 주문하는 경우에는 오후 3시까지 당일(todayStr)로 기록
@@ -7353,7 +7415,7 @@
 
                         // [공통] 휴일/주말 연속 건너뛰기 (while 루프 적용)
                         // 일반 상품(1, 2번) 또는 다음날로 이월된 오늘날짜 공동구매 상품이 대상
-                        const needsHolidaySkip = !isDateItem || (isDateItem && finalDate === tomorrowStr);
+                        const needsHolidaySkip = !isSadaWithDate && (!isDateItem || (isDateItem && finalDate === tomorrowStr));
                         if (needsHolidaySkip) {
                             let dObj = new Date(finalDate.includes('-') ? finalDate : now);
                             while (true) {
@@ -7392,14 +7454,18 @@
                 // 각각의 배달비 부과 로직에 따라 배달비 품목 주입
                 if (shippingMethod === '배달주문') {
                     if (window.isSadaDeliveryFeeAdded) {
+                        // [수정] 사다드림 배달비 날짜를 사다드림 상품의 실제 배달일(예: 8월 7일)에 맞춤
+                        const sadaProd = allItems.find(it => it.name !== "배달비" && (it.name.includes("사다드림") || it.matchKey === "사다드림"));
+                        const sadaFeeDate = (sadaProd && sadaProd.date) ? sadaProd.date : "사다드림";
+                        const sadaFeeCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(String(sadaFeeDate));
                         allItems.push({
                             name: "배달비",
                             qty: 1,
                             price: deliveryFee,
                             subtotal: deliveryFee,
-                            date: "사다드림",
+                            date: sadaFeeDate,
                             matchKey: "사다드림",
-                            isCategorized: true,
+                            isCategorized: sadaFeeCategorized,
                             isFV: false,
                             isOnSite: false,
                             isPushedByCutoff: false
@@ -7711,7 +7777,7 @@
                             <span style="color:var(--item-black);">카카오뱅크</span><br>
                             <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
                                 <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
-                                <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#fff; color:#666; cursor:pointer;">복사</button>
+                                <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
                             </div>
                         </div>
                         <div style="font-size:15px; font-weight:600; color:#888;">예금주 : 강*민(모켓(MOKET))</div>
@@ -7950,11 +8016,11 @@
                 }
             }
 
-            // [안전장치] 배달비 항목의 날짜를 일반 상품의 날짜와 일치시킴
+            // [안전장치] 배달비 항목의 날짜를 일반 상품의 날짜와 일치시킴 (단, 사다드림 배달비는 사다드림 날짜 유지)
             const mainItem = allItems.find(it => it.name !== "배달비" && !it.name.includes("사다드림") && it.matchKey !== "사다드림");
             if (mainItem && mainItem.date) {
                 allItems.forEach(it => {
-                    if (it.name === "배달비") {
+                    if (it.name === "배달비" && it.matchKey !== "사다드림") {
                         it.date = mainItem.date;
                         it.isCategorized = false;
                     }
@@ -8203,7 +8269,7 @@
 
                 // 최종 완료 처리 (GAS 완료를 기다리지 않고 바로 표시)
                 document.getElementById('system-modal').style.display = 'none';
-                const hasSadaDream = allItems.some(it => String(it.name).includes('[사다드림]'));
+                const hasSadaDream = allItems.some(it => it.name !== "배달비" && (String(it.name).includes('사다드림') || it.matchKey === '사다드림' || it.date === '사다드림'));
 
                 if (hasSadaDream) {
                     showSystemModal("주문이 완료되었습니다!", 'alert', () => {
@@ -8380,3 +8446,4 @@
 </body>
 
 </html>
+
