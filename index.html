@@ -1922,8 +1922,8 @@
                 
                 // 2. 평일 15시 이후 및 06시 이전 당일구매 마감 차단
                 if (hour < 6 || hour >= 15) {
-                    const daysStr = isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일';
-                    showSystemModal(`당일구매 주문은<br><b>${daysStr} 06:00 ~ 15:00</b>에만 가능합니다.`, 'alert');
+                    const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
+                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>06:00 - 15:00</b>`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -2939,7 +2939,7 @@
 
             // [추가] 공동구매 상품과 일반(상시/과일) 상품 혼합 주문 시 안내 (최우선순위)
             if (hasReserve && hasAnyRegular) {
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매상품중 가장 늦은 입고일에 맞춰 합배송 됩니다.${maxDateStr ? `<br>[배달예정일 : ${maxDateStr}]` : ''}`;
+                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span><span style="display:block; white-space:nowrap; font-size:0.9em;">구매상품중 가장늦은 입고일에 합배송 됩니다.</span>${maxDateStr ? `<span style="display:block; white-space:nowrap; margin-top:2px;">[배달예정일 : ${maxDateStr}]</span>` : ''}`;
                 showSystemModal(msg + "<br><br>주문하시겠습니까?", 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
@@ -2974,7 +2974,7 @@
             // [신규] 예약배송 모드일 때는 마감 시각 조건 없이 예약배송용 배달안내 팝업을 우선 활성화
             if (currentDeliveryType === 'reserve') {
                 showModal = true;
-                msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매상품중 가장 늦은 입고일에 맞춰 합배송 됩니다.${maxDateStr ? `<br>[배달예정일 : ${maxDateStr}]` : ''}`;
+                msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span><span style="display:block; white-space:nowrap; font-size:0.9em;">구매상품중 가장늦은 입고일에 합배송 됩니다.</span>${maxDateStr ? `<span style="display:block; white-space:nowrap; margin-top:2px;">[배달예정일 : ${maxDateStr}]</span>` : ''}`;
             } else if (currentHour >= 15) {
                 if (hasAnyRegular) {
                     showModal = true;
@@ -5959,7 +5959,7 @@
                 activeFilter = '상온';
             } else if (currentMainTab === 'fruit-veg') {
                 const fvCats = [
-                    { key: '과일_예약', label: '과일' }
+                    { key: '과일', label: '과일' }
                 ];
 
                 // 예약배송(reserve) 모드일 때만 야채 및 기타 소분류 노출
@@ -5969,7 +5969,7 @@
                         return /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name) || /야채|야채구매|채소|채소구매/.test(s);
                     });
                     if (hasVeg) {
-                        fvCats.push({ key: '야채_예약', label: '야채' });
+                        fvCats.push({ key: '야채', label: '야채' });
                     }
 
                     const hasEtc = futureData.some(p => {
@@ -5977,7 +5977,7 @@
                         return /\[기타\]|\[기타구매\]/.test(p.name) || /기타|기타구매/.test(s);
                     });
                     if (hasEtc) {
-                        fvCats.push({ key: '기타_예약', label: '기타' });
+                        fvCats.push({ key: '기타', label: '기타' });
                     }
                 }
 
@@ -6001,7 +6001,7 @@
                     };
                     filterAreaCategories.appendChild(btn);
                 });
-                activeFilter = '과일_예약';
+                activeFilter = '과일';
             } else if (currentMainTab === 'costco') {
                 filterAreaCategories.style.display = 'flex';
                 if (costcoFilters.length <= 3) filterAreaCategories.classList.add('compact-view');
@@ -6327,7 +6327,7 @@
                     }
                     return true;
                 })
-                : targetKey === '과일_예약'
+                : targetKey === '과일'
                     ? visibleProducts.filter(p => {
                         const s = String(p.matchKey).trim();
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
@@ -6342,7 +6342,7 @@
                         }
                         return p.name.includes('[과일]') || p.name.includes('[과일구매]') || /과일|과일구매/.test(s);
                     })
-                    : targetKey === '야채_예약'
+                    : targetKey === '야채'
                         ? visibleProducts.filter(p => {
                             const s = String(p.matchKey).trim();
                             const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
@@ -6360,7 +6360,7 @@
                             }
                             return /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name) || /야채|야채구매|채소|채소구매/.test(s);
                         })
-                    : targetKey === '기타_예약'
+                    : targetKey === '기타'
                         ? visibleProducts.filter(p => {
                             const s = String(p.matchKey).trim();
                             const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
@@ -6513,7 +6513,7 @@
                         subText = "과일은 평일 오전에 올라옵니다.";
                     }
                     emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:16px; font-weight:normal; color:#bbb; display:block; margin-top:8px;">(${subText})</span>`;
-                } else if (targetKey === '과일_예약') {
+                } else if (targetKey === '과일') {
                     emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#bbb; display:block; margin-top:8px;">(평일 오전에 상품이 올라옵니다.)</span>`;
                 } else {
                     emptyMsg.innerHTML = "현재 주문 가능한 상품이 없습니다.";
@@ -6524,7 +6524,7 @@
 
             filteredData.forEach(p => {
                 // [추가] '전체보기'일 때 날짜별/카테고리별 박스 생성 (특정 날짜 선택시에도 박스 생성)
-                if ((currentMainTab === 'reserve' || targetKey === '전체상품_현장') && p.matchKey !== lastGroupKey) {
+                if ((currentMainTab === 'reserve' || targetKey === '전체상품_현장' || _searchQ) && p.matchKey !== lastGroupKey) {
                     // 새 그룹 박스 생성
                     currentGroupBox = document.createElement('div');
                     currentGroupBox.className = "product-group-box";
@@ -6533,13 +6533,13 @@
                     const header = document.createElement('div');
                     header.style = "padding:15px 18px; font-size:16px; font-weight:900; color:var(--item-black); border-bottom:1px solid #f0f0f0; background:#fcfdfe; display:flex; align-items:center;";
 
-                    const iconSvg = currentMainTab === 'reserve'
+                    const iconSvg = (currentMainTab === 'reserve' || _searchQ)
                         ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px; color:var(--moket-green);"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`
                         : ``;
 
                     let prefix = '';
                     let dateHtml = p.displayDate || p.matchKey;
-                    if (currentMainTab === 'reserve') {
+                    if (currentMainTab === 'reserve' || _searchQ) {
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(p.matchKey);
                         if (isDate) {
                             prefix = '픽업/배달 예정일 : ';
@@ -7260,8 +7260,8 @@
                     return;
                 }
                 if (currentHour < 6 || currentHour >= 15) {
-                    const daysStr = isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일';
-                    showSystemModal(`당일구매 주문은<br><b>${daysStr} 06:00 ~ 15:00</b>에만 가능합니다.`, 'alert');
+                    const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
+                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>06:00 - 15:00</b>`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
