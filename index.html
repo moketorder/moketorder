@@ -4880,9 +4880,12 @@
                         })();
 
                         // 1-2. Firebase 전역 재고 복구 (+ 처리)
-                        const safeDate = fSafeKey(order.matchKey || order.pickupDate || "");
-                        const safeName = fSafeKey(rawItemName);
-                        const adjKey = safeDate + "_" + safeName;
+                        // [수정] 재고 키는 '상품의 실제 matchKey' 기준으로 계산해야 실재고에 반영됨.
+                        // 당일/과일 주문은 저장 시 matchKey가 없어 pickupDate로 잘못 복구되던 문제(재고 안 늘어남) 해결.
+                        const _pForKey = (typeof productsData !== 'undefined' ? productsData : []).find(pd => pd && (pd.name === rawItemName || String(pd.name).replace(/['"]/g, '') === rawItemName));
+                        const keyMatchKey = order.matchKey || (_pForKey && _pForKey.matchKey) || order.date || order.pickupDate || "";
+                        const keyName = (_pForKey && _pForKey.name) ? _pForKey.name : rawItemName;
+                        const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey, keyName) : (fSafeKey(keyMatchKey) + "_" + fSafeKey(keyName));
                         const diff = parseInt(order.qty) || 1;
 
                         // [개선] 취소 시 재고 복구도 최대 5회 재시도(쓰기 성공 확인). 취소 자체(PATCH)는 이미
@@ -5025,9 +5028,11 @@
                 });
 
                 // 2. Firebase 전역 재고 복구 (+ 처리)
-                const safeDate = fSafeKey(matchKey || pickupDate || "");
-                const safeName = fSafeKey(rawItemName);
-                const adjKey = safeDate + "_" + safeName;
+                // [수정] 재고 키를 상품 실제 matchKey 기준으로 — 당일/과일 주문(matchKey 없음)이 pickupDate로 잘못 복구되던 문제 해결
+                const _pForKey2 = (typeof productsData !== 'undefined' ? productsData : []).find(pd => pd && (pd.name === rawItemName || String(pd.name).replace(/['"]/g, '') === rawItemName));
+                const keyMatchKey2 = matchKey || (_pForKey2 && _pForKey2.matchKey) || pickupDate || "";
+                const keyName2 = (_pForKey2 && _pForKey2.name) ? _pForKey2.name : rawItemName;
+                const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey2, keyName2) : (fSafeKey(keyMatchKey2) + "_" + fSafeKey(keyName2));
                 const diff = parseInt(fullHistoryData[targetIdx].qty) || 1;
 
                 const stockPromise = fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`)
