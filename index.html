@@ -1995,10 +1995,44 @@
                     });
                     if (hasTodayVeg) todayFruitLabel = '과일 / 야채';
                 }
-                
+
+                // [신규] 오늘 날짜 공동구매 상품이 있는지 확인 (당일 탭 '공동구매' 버튼 노출용)
+                let hasTodayGroupBuy = false;
+                {
+                    const _src = (typeof cachedProducts !== 'undefined' && cachedProducts.length > 0)
+                        ? cachedProducts : (typeof productsData !== 'undefined' ? productsData : []);
+                    hasTodayGroupBuy = _src.some(p => {
+                        const status = (p.status || "").trim();
+                        const mk = (p.matchKey || "").trim();
+                        if ((status === "비공개" || mk === "비공개") && !isAdminMode) return false;
+                        if (!isAdminMode) {
+                            const isShowToday = p.showToday !== undefined
+                                ? (p.showToday === true || p.showToday === 'true')
+                                : (p.show !== false && p.show !== 'false');
+                            if (!isShowToday) return false;
+                        }
+                        if (!/(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(mk)) return false;
+                        if (mk.includes("상시판매") || mk.includes("현장판매") || mk.includes("코스트코")) return false;
+                        const isFV = /과일|야채|채소|기타/.test(mk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
+                        if (isFV) return false;
+                        // [수정] 오늘 날짜 사다드림도 당일 탭 '공동구매'에 포함 (배달일이 오늘로 동일)
+                        const cd = mk.replace(/[.\/]/g, '-');
+                        const pt = cd.split('-');
+                        let y, m, d;
+                        if (pt.length === 3) { y = parseInt(pt[0]); if (y < 100) y += 2000; m = parseInt(pt[1]); d = parseInt(pt[2]); }
+                        else if (pt.length === 2) { y = new Date().getFullYear(); m = parseInt(pt[0]); d = parseInt(pt[1]); }
+                        if (!y) return false;
+                        const pD = new Date(y, m - 1, d); pD.setHours(0, 0, 0, 0);
+                        return pD.getTime() === today.getTime();
+                    });
+                }
+                // 현재 당일 공동구매 탭인데 노출 대상이 없으면 과일 탭으로 되돌림
+                if (currentMainTab === 'today-reserve' && !hasTodayGroupBuy) currentMainTab = 'today-fruit';
+
                 // 당일배송 모드 탭 목록
                 tabContainer.innerHTML = `
                     <button class="main-tab-btn ${currentMainTab === 'today-fruit' ? 'active' : ''}" data-tab="today-fruit" onclick="switchMainTab('today-fruit')">${todayFruitLabel}</button>
+                    ${hasTodayGroupBuy ? `<button class="main-tab-btn ${currentMainTab === 'today-reserve' ? 'active' : ''}" data-tab="today-reserve" onclick="switchMainTab('today-reserve')">공동구매</button>` : ``}
                     <button class="main-tab-btn ${currentMainTab === 'today-frozen' ? 'active' : ''}" data-tab="today-frozen" onclick="switchMainTab('today-frozen')">냉동</button>
                     <button class="main-tab-btn ${currentMainTab === 'today-refrigerated' ? 'active' : ''}" data-tab="today-refrigerated" onclick="switchMainTab('today-refrigerated')">냉장</button>
                     <button class="main-tab-btn ${currentMainTab === 'today-room' ? 'active' : ''}" data-tab="today-room" onclick="switchMainTab('today-room')">상온</button>
@@ -2065,7 +2099,7 @@
             // 2. 제목 변경
             const title = document.getElementById('main-section-title');
             if (title) {
-                if (type === 'reserve' || type === 'fruit-veg') {
+                if (type === 'reserve' || type === 'fruit-veg' || type === 'today-reserve') {
                     title.style.display = 'none';
                 } else if (type === 'on-site' || type.startsWith('onsite-')) {
                     title.style.display = 'block';
@@ -2712,6 +2746,16 @@
             let reserveTotal = 0;
             let hasSadaInCart = false;
             let hasReserveInCart = false;
+            // [신규] 배달비 합산 판단용: 사다드림/일반 상품의 실제 배달일
+            let sadaDeliveryDate = "";
+            let generalDeliveryDate = "";
+            const _normFeeDate = (v) => {
+                let s = String(v || "").replace(/\./g, '-').trim();
+                if (!/^(?:\d{4}|\d{2})-\d{1,2}-\d{1,2}$/.test(s)) return "";
+                if (/^\d{2}-\d{1,2}-\d{1,2}$/.test(s)) s = "20" + s;
+                const pt = s.split('-');
+                return `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+            };
 
             for (const name in cart) {
                 if (cart[name] > 0) {
@@ -2719,19 +2763,41 @@
                     if (p) {
                         const isSada = name.includes("사다드림") || p.matchKey === "사다드림";
                         const price = (parseInt(p.price) || 0) * cart[name];
+                        const pDate = _normFeeDate(p.matchKey) || _normFeeDate(p.date);
                         if (isSada) {
                             sadaTotal += price;
                             hasSadaInCart = true;
+                            if (pDate && (!sadaDeliveryDate || pDate > sadaDeliveryDate)) sadaDeliveryDate = pDate;
                         } else {
                             reserveTotal += price;
                             hasReserveInCart = true;
+                            // 날짜 없는 상시판매/과일 등은 기준 배달일(targetPickupDate)에 나감
+                            const gd = pDate || targetPickupDate;
+                            if (!generalDeliveryDate || gd > generalDeliveryDate) generalDeliveryDate = gd;
                         }
                     }
                 }
             }
 
+            // [신규] 사다드림과 일반 상품의 배달일이 같으면 같은 차로 나가므로 배달비를 한 건으로 합산한다.
+            //  - 당일구매 탭: 담긴 상품이 모두 오늘 배달이므로 항상 합산
+            //  - 예약구매 탭: 사다드림 배달일과 예약 상품 배달일이 같은 날일 때만 합산
+            if (currentDeliveryType === 'today') {
+                sadaDeliveryDate = generalDeliveryDate = todayStr;
+            }
+            const mergeSadaFee = hasSadaInCart && hasReserveInCart &&
+                                 !!sadaDeliveryDate && !!generalDeliveryDate &&
+                                 sadaDeliveryDate === generalDeliveryDate;
+            if (mergeSadaFee) {
+                // 사다드림 금액을 일반 묶음에 합쳐 15,000원 기준을 함께 판정 → 배달비 1건만 부과
+                reserveTotal += sadaTotal;
+                sadaTotal = 0;
+                hasSadaInCart = false;
+                deliveryDate = generalDeliveryDate;
+            }
+
             // 1. 사다드림 기존 주문 내역 및 배달비 조회
-            const pendingSadaItems = getPendingItemsByDate("사다드림");
+            const pendingSadaItems = mergeSadaFee ? [] : getPendingItemsByDate("사다드림");
             let existingSadaTotal = 0;
             let hasExistingSadaFee = false;
             let existingSadaFeeItem = null;
@@ -2744,8 +2810,8 @@
                 }
             });
 
-            // 2. 예약구매 기존 주문 내역 및 배달비 조회
-            const pendingReserveItems = getPendingItemsByDate(deliveryDate);
+            // 2. 예약구매 기존 주문 내역 및 배달비 조회 (합산 시 같은 날 사다드림 주문도 포함)
+            const pendingReserveItems = getPendingItemsByDate(deliveryDate, mergeSadaFee);
             let existingReserveTotal = 0;
             let hasExistingReserveFee = false;
             let existingReserveFeeItem = null;
@@ -3141,7 +3207,8 @@
         }
 
         // [수정] 특정 날짜의 픽업/예약 예정 상품 필터링 유틸
-        function getPendingItemsByDate(targetDate) {
+        // [신규] includeSada=true 이면 사다드림 상품도 해당 날짜 묶음에 포함 (배달일이 같아 배달비를 합산하는 경우)
+        function getPendingItemsByDate(targetDate, includeSada = false) {
             if (!fullHistoryData || fullHistoryData.length === 0) return [];
 
             const now = new Date();
@@ -3154,7 +3221,7 @@
                 // 사다드림 주문은 pickupDate가 실제 배달일로 기록되어 일반 상품 배달일과 겹칠 수 있는데,
                 // 그 경우 일반 날짜 합배송에 사다드림이 딸려 들어가면 안 되므로 여기서 제외한다.
                 const isSadaItem = String(item.item || "").includes("사다드림") || item.matchKey === "사다드림";
-                if (targetDate !== "사다드림" && isSadaItem) return false;
+                if (targetDate !== "사다드림" && isSadaItem && !includeSada) return false;
 
                 // parseKRDate를 사용하여 한글 날짜 형식(예: 2026년 7월 14일 (화))을 YYYY-MM-DD로 안전하게 파싱하여 비교
                 let itemDate = "";
@@ -5605,6 +5672,11 @@
             if (!data || data.length === 0) return;
             productsData = data; // 최신 데이터 유지
 
+            // [신규] 상품 데이터가 반영된 뒤 대분류 탭을 다시 그린다.
+            // (loadData는 fetch 이전에 initMainTabs를 호출하므로, 데이터 기반 탭인
+            //  당일 '공동구매' 버튼이 첫 로드에서 누락되는 문제 방지)
+            initMainTabs(false);
+
             // 야채 또는 기타 상품의 등록 여부에 따라 대분류 탭 텍스트 동적 설정
             const btnFruitVeg = document.querySelector('.main-tab-btn[data-tab="fruit-veg"]');
             if (btnFruitVeg) {
@@ -5648,16 +5720,33 @@
                             (p.show !== false && p.show !== 'false');
                         if (!isShowToday) return false;
                     } else {
-                        const isShowReserve = p.showReserve !== undefined ? 
-                            (p.showReserve === true || p.showReserve === 'true') : 
+                        const isShowReserve = p.showReserve !== undefined ?
+                            (p.showReserve === true || p.showReserve === 'true') :
                             (p.show !== false && p.show !== 'false');
                         if (!isShowReserve) return false;
+
+                        // [신규] '오늘 날짜' 공동구매 상품은 예약 탭에서 제외 → 당일 탭 '공동구매'에서만 노출
+                        // (사다드림도 오늘 날짜면 동일하게 당일 탭에서만 노출. 미래 날짜 사다드림은 예약 탭 유지)
+                        const rmk = (p.matchKey || "").trim();
+                        const rIsDate = dateRegex.test(rmk) && !rmk.includes("상시판매") && !rmk.includes("현장판매") && !rmk.includes("코스트코");
+                        const rIsFV = /과일|야채|채소|기타/.test(rmk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
+                        if (rIsDate && !rIsFV) {
+                            const rcd = rmk.replace(/[.\/]/g, '-');
+                            const rpt = rcd.split('-');
+                            let ry, rm, rd;
+                            if (rpt.length === 3) { ry = parseInt(rpt[0]); if (ry < 100) ry += 2000; rm = parseInt(rpt[1]); rd = parseInt(rpt[2]); }
+                            else if (rpt.length === 2) { ry = new Date().getFullYear(); rm = parseInt(rpt[0]); rd = parseInt(rpt[1]); }
+                            if (ry) {
+                                const rpD = new Date(ry, rm - 1, rd); rpD.setHours(0, 0, 0, 0);
+                                if (rpD.getTime() === today.getTime()) return false;
+                            }
+                        }
                     }
                 }
 
                 const s = String(p.matchKey || "").trim();
                 const isFruitVeg = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
-                
+
                 // [개선] 문자열 어디든 날짜 패턴(M/D 또는 YMD)이 있으면 추출
                 const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
                 
@@ -6143,16 +6232,33 @@
                             return false;
                         }
                     } else {
-                        const isShowReserve = p.showReserve !== undefined ? 
-                            (p.showReserve === true || p.showReserve === 'true') : 
+                        const isShowReserve = p.showReserve !== undefined ?
+                            (p.showReserve === true || p.showReserve === 'true') :
                             (p.show !== false && p.show !== 'false');
                         if (!isShowReserve) return false;
+
+                        // [신규] '오늘 날짜' 공동구매 상품은 예약 탭에서 제외 → 당일 탭 '공동구매'에서만 노출
+                        // (사다드림도 오늘 날짜면 동일하게 당일 탭에서만 노출. 미래 날짜 사다드림은 예약 탭 유지)
+                        const rmk = (p.matchKey || "").trim();
+                        const rIsDate = dateRegex.test(rmk) && !rmk.includes("상시판매") && !rmk.includes("현장판매") && !rmk.includes("코스트코");
+                        const rIsFV = /과일|야채|채소|기타/.test(rmk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
+                        if (rIsDate && !rIsFV) {
+                            const rcd = rmk.replace(/[.\/]/g, '-');
+                            const rpt = rcd.split('-');
+                            let ry, rm, rd;
+                            if (rpt.length === 3) { ry = parseInt(rpt[0]); if (ry < 100) ry += 2000; rm = parseInt(rpt[1]); rd = parseInt(rpt[2]); }
+                            else if (rpt.length === 2) { ry = new Date().getFullYear(); rm = parseInt(rpt[0]); rd = parseInt(rpt[1]); }
+                            if (ry) {
+                                const rpD = new Date(ry, rm - 1, rd); rpD.setHours(0, 0, 0, 0);
+                                if (rpD.getTime() === today.getTime()) return false;
+                            }
+                        }
                     }
                 }
 
                 const s = String(p.matchKey || "").trim();
                 const isFruitVeg = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
-                
+
                 // [개선] 문자열 어디든 날짜 패턴(M/D 또는 YMD)이 있으면 추출
                 const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
                 
@@ -6280,6 +6386,19 @@
                     
                     const isVeg = /\[야채\]|\[야채구매\]|\[채소\]|\[채소구매\]/.test(p.name);
                     return isVeg;
+                });
+            } else if (targetKey === 'today-reserve') {
+                // [신규] 당일배송 - 공동구매: 오늘 날짜의 공동구매(날짜 matchKey) 상품만 노출.
+                //        (당일 모드 visibleProducts는 이미 '오늘 날짜' 외 날짜 상품을 제외함)
+                filteredData = visibleProducts.filter(p => {
+                    const s = String(p.matchKey).trim();
+                    const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
+                    if (!isDate) return false;
+                    if (s.includes("상시판매") || s.includes("현장판매") || s.includes("코스트코")) return false;
+                    const isFV = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
+                    if (isFV) return false;
+                    // [수정] 오늘 날짜 사다드림도 여기에 함께 노출 (예약 탭에서는 숨김 처리됨)
+                    return true;
                 });
             } else if (targetKey === 'today-frozen') {
                 // 당일배송 - 냉동: matchKey나 storage 등에 "냉동"이 들어간 상품
@@ -7630,14 +7749,35 @@
 
                 // [신규] 배송 유형 대분류에 따른 주문 기록 날짜(픽업일/배송일) 일괄 보정 및 통폐합 (검증 전 선 반영)
 
-                if (currentDeliveryType === 'today') {
+                // [수정] 당일 탭 상태로 결제하더라도 장바구니에 예약(날짜) 공동구매 상품이 섞여 있으면
+                //        예약구매와 동일하게 처리(배달=가장 늦은 날짜로 통합 / 픽업=각자 날짜 유지)해야 한다.
+                //        과거엔 'today'이면 무조건 오늘로 덮어써서, 함께 담긴 예약 상품이 오늘로 잘못 기록됐다.
+                // [수정] '오늘 날짜' 공동구매 상품은 당일구매로 취급하므로 예약 통합 대상에서 제외.
+                //        미래(오늘 이후) 예약 날짜 상품이 섞였을 때만 예약 로직으로 처리한다.
+                const hasReserveDateItem = allItems.some(it => {
+                    if (it.name === "배달비") return false;
+                    const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                    if (isSadaItem) return false;
+                    const d = String(it.date || "");
+                    const m = String(it.matchKey || "");
+                    let cand = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) ? d
+                             : /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m) ? m : "";
+                    if (!cand) return false;
+                    let ds = cand.replace(/\./g, '-').trim();
+                    if (ds.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) ds = "20" + ds;
+                    const pt = ds.split('-');
+                    if (pt.length === 3) ds = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                    return ds > todayStr; // 미래 예약 날짜만
+                });
+
+                if (currentDeliveryType === 'today' && !hasReserveDateItem) {
                     allItems.forEach(it => {
                         if (it.name !== "배달비") {
                             it.date = todayStr;
                             it.isCategorized = false;
                         }
                     });
-                } else if (currentDeliveryType === 'reserve') {
+                } else if (currentDeliveryType === 'reserve' || hasReserveDateItem) {
                     if (shippingMethod === '배달주문') {
                         let maxReserveDate = null;
                         allItems.forEach(it => {
