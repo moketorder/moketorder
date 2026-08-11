@@ -2779,9 +2779,11 @@
                 }
             }
 
-            // [신규] 사다드림과 일반 상품의 배달일이 같으면 같은 차로 나가므로 배달비를 한 건으로 합산한다.
-            //  - 당일구매 탭: 담긴 상품이 모두 오늘 배달이므로 항상 합산
-            //  - 예약구매 탭: 사다드림 배달일과 예약 상품 배달일이 같은 날일 때만 합산
+            // [수정] 사다드림 금액은 배달 최소금액(15,000원) 계산에서 완전히 제외한다. (USER 요청)
+            //  배달일이 같으면 같은 차로 나가므로 배달비는 한 건만 부과하되, 금액은 합산하지 않는다.
+            //  - 당일구매 탭: 담긴 상품이 모두 오늘 배달이므로 항상 한 건
+            //  - 예약구매 탭: 사다드림 배달일과 예약 상품 배달일이 같은 날일 때만 한 건
+            const cartHasSada = hasSadaInCart; // 안내 문구용 (아래에서 플래그가 꺼지기 전 값 보관)
             if (currentDeliveryType === 'today') {
                 sadaDeliveryDate = generalDeliveryDate = todayStr;
             }
@@ -2789,25 +2791,18 @@
                                  !!sadaDeliveryDate && !!generalDeliveryDate &&
                                  sadaDeliveryDate === generalDeliveryDate;
             if (mergeSadaFee) {
-                // 사다드림 금액을 일반 묶음에 합쳐 15,000원 기준을 함께 판정 → 배달비 1건만 부과
-                reserveTotal += sadaTotal;
+                // 배달비는 1건만 부과. 이때 사다드림 금액은 더하지 않고 버린다(일반 상품 금액만으로 기준 판정).
                 sadaTotal = 0;
                 hasSadaInCart = false;
                 deliveryDate = generalDeliveryDate;
             }
 
             // 1. 사다드림 기존 주문 내역 및 배달비 조회
+            //    (사다드림 금액은 기준 계산에서 빠지므로 기존 주문 금액은 합산하지 않고 배달비 부과 여부만 확인)
             const pendingSadaItems = mergeSadaFee ? [] : getPendingItemsByDate("사다드림");
-            let existingSadaTotal = 0;
             let hasExistingSadaFee = false;
-            let existingSadaFeeItem = null;
             pendingSadaItems.forEach(item => {
-                if (item.item === "배달비") {
-                    hasExistingSadaFee = true;
-                    existingSadaFeeItem = item;
-                } else {
-                    existingSadaTotal += parseInt(item.price || 0) * parseInt(item.qty || 0);
-                }
+                if (item.item === "배달비") hasExistingSadaFee = true;
             });
 
             // 2. 예약구매 기존 주문 내역 및 배달비 조회 (합산 시 같은 날 사다드림 주문도 포함)
@@ -2820,22 +2815,21 @@
                     hasExistingReserveFee = true;
                     existingReserveFeeItem = item;
                 } else {
+                    // [수정] 기존 주문 중 사다드림 상품 금액도 최소금액 계산에서 제외
+                    const isSadaItem = String(item.item || "").includes("사다드림") || item.matchKey === "사다드림";
+                    if (isSadaItem) return;
                     existingReserveTotal += parseInt(item.price || 0) * parseInt(item.qty || 0);
                 }
             });
 
             // 3. 사다드림 배달비 부과 여부 판별
+            //    [수정] 사다드림 금액은 최소금액 계산에 포함되지 않으므로 항상 기준 미달로 본다.
             let needSadaFeePrompt = false;
             if (hasSadaInCart) {
-                if (existingSadaTotal >= 15000) {
+                if (hasExistingSadaFee) {
+                    // 같은 배달 건에 이미 배달비가 부과되어 있으면 중복 부과하지 않음
                     window.isSadaDeliveryFeeAdded = false;
-                } else if (hasExistingSadaFee) {
-                    const combined = existingSadaTotal + sadaTotal;
-                    if (combined >= 15000 && existingSadaFeeItem) {
-                        await deleteExistingFee(existingSadaFeeItem, nameVal, phoneVal);
-                    }
-                    window.isSadaDeliveryFeeAdded = false;
-                } else if (sadaTotal < 15000 && !window.isSadaDeliveryFeeAdded && pendingSadaItems.length === 0) {
+                } else if (!window.isSadaDeliveryFeeAdded && pendingSadaItems.length === 0) {
                     needSadaFeePrompt = true;
                 }
             } else {
@@ -2863,7 +2857,8 @@
             // 5. 종합 안내 또는 개별 안내 팝업
             if (needSadaFeePrompt && needReserveFeePrompt) {
                 showSystemModal(
-                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br><br>` +
+                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br>` +
+                    `<span style="color:#ff4d4d; font-weight:800;">사다드림 상품 금액은 최소금액에 포함되지 않습니다.</span><br><br>` +
                     `• <b>사다드림 주문 금액:</b> ${sadaTotal.toLocaleString()}원<br>` +
                     `• <b>예약구매 주문 금액:</b> ${reserveTotal.toLocaleString()}원<br><br>` +
                     `사다드림과 예약구매 상품은 배송일이 다르므로 <b>각각 배달비 ${deliveryFee.toLocaleString()}원(총 ${(deliveryFee * 2).toLocaleString()}원)</b>이 추가됩니다.<br><br>` +
@@ -2884,7 +2879,7 @@
 
             if (needSadaFeePrompt) {
                 showSystemModal(
-                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br><br>` +
+                    `<span style="color:#ff4d4d; font-weight:800;">사다드림 상품 금액은 배달 최소주문금액(15,000원)에 포함되지 않습니다.</span><br><br>` +
                     `• <b>사다드림 주문 금액:</b> ${sadaTotal.toLocaleString()}원<br><br>` +
                     `배달비 ${deliveryFee.toLocaleString()}원을 추가하여 주문하시겠습니까?`,
                     'confirm',
@@ -2901,8 +2896,9 @@
 
             if (needReserveFeePrompt) {
                 showSystemModal(
-                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br><br>` +
-                    `• <b>예약구매 주문 금액:</b> ${reserveTotal.toLocaleString()}원<br><br>` +
+                    `배달 최소주문금액(15,000원)이 미달되었습니다.<br>` +
+                    (cartHasSada ? `<span style="color:#ff4d4d; font-weight:800;">사다드림 상품 금액은 최소금액에 포함되지 않습니다.</span><br>` : ``) +
+                    `<br>• <b>예약구매 주문 금액:</b> ${reserveTotal.toLocaleString()}원<br><br>` +
                     `배달비 ${deliveryFee.toLocaleString()}원을 추가하여 주문하시겠습니까?`,
                     'confirm',
                     async () => {
@@ -3392,6 +3388,65 @@
                 return matches.find(isDateMk) || matches[0];
             }
             return matches.find(p => !isDateMk(p)) || matches[0];
+        }
+
+        // [공통] '미래(오늘 이후) 예약 상품이 섞였는지' 판별 — 날짜 기록과 안내 문구가 항상 같은 기준을 쓰도록 단일화.
+        // 오늘 날짜 공동구매 상품은 당일구매로 취급하므로 미래 날짜만 예약으로 본다.
+        function gNormReserveDate(dateLike, matchKeyLike) {
+            const d = String(dateLike || "");
+            const m = String(matchKeyLike || "");
+            const dateFmt = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/;
+            let cand = dateFmt.test(d) ? d : (dateFmt.test(m) ? m : "");
+            if (!cand) return "";
+            let ds = cand.replace(/\./g, '-').trim();
+            if (ds.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) ds = "20" + ds;
+            const pt = ds.split('-');
+            if (pt.length === 3) ds = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+            return ds;
+        }
+
+        // 주문 항목 배열(allItems 형태: {name, date, matchKey}) 기준 판별
+        function gHasFutureReserveItem(items) {
+            if (!items || !items.length) return false;
+            const n = new Date();
+            const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+            return items.some(it => {
+                const nm = String(it.name || "");
+                if (nm === "배달비") return false;
+                if (nm.includes('사다드림') || it.matchKey === '사다드림') return false; // 사다드림은 선택한 배달일을 따로 기록
+                const ds = gNormReserveDate(it.date, it.matchKey);
+                return !!ds && ds > todayStr;
+            });
+        }
+
+        // 장바구니(cart) 기준 판별 — allItems가 만들어지기 전(주문 확인 단계)에 사용
+        function gHasFutureReserveInCart() {
+            const items = [];
+            for (const nm in cart) {
+                if (!cart[nm] || cart[nm] <= 0) continue;
+                const p = gFindCartProduct(nm);
+                if (p) items.push({ name: nm, date: p.date, matchKey: p.matchKey });
+            }
+            return gHasFutureReserveItem(items);
+        }
+
+        // 장바구니가 '전부' 미래 예약(공동구매) 상품인지 판별.
+        // 당일구매 탭이 열려 있어도 예약 상품만 담겼다면 당일 주문 가능시간 제한을 적용하면 안 되므로 사용.
+        // (사다드림은 선택한 배달일을 따로 기록하므로 섞여 있으면 '예약만'으로 보지 않는다)
+        function gIsCartAllFutureReserve() {
+            const n = new Date();
+            const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+            let total = 0, reserveCnt = 0;
+            for (const nm in cart) {
+                if (!cart[nm] || cart[nm] <= 0) continue;
+                total++;
+                const p = gFindCartProduct(nm);
+                if (!p) continue;
+                if (String(nm).includes('사다드림') || p.matchKey === '사다드림') continue;
+                const ds = gNormReserveDate(p.date, p.matchKey);
+                if (ds && ds > todayStr) reserveCnt++;
+            }
+            return total > 0 && reserveCnt === total;
         }
 
         // [추가] 클립보드 복사 유틸리티 (토스트 사용으로 모달 충돌 방지)
@@ -4701,19 +4756,21 @@
                 if (hasActiveDeliveryFee) continue;
 
                 // 일반 상품들의 금액 합산
+                // [수정] 사다드림 상품 금액은 배달비 기준 계산에서 제외 (USER 요청)
                 let activeTotal = 0;
                 let activeCount = 0;
                 items.forEach(o => {
                     if (o.item !== '배달비') {
-                        activeTotal += parseInt(o.total || 0);
+                        const isSadaItem = String(o.item || "").includes("사다드림") || o.matchKey === "사다드림";
+                        if (!isSadaItem) activeTotal += parseInt(o.total || 0);
                         activeCount++;
                     }
                 });
 
                 if (activeCount === 0) continue;
 
-                // 30,000원 미만인 경우 배달비 부과!
-                if (activeTotal < 30000) {
+                // [수정] 주문 시 기준과 동일하게 15,000원 미만인 경우 배달비 부과 (USER 요청)
+                if (activeTotal < 15000) {
                     try {
                         const baseOrder = items.find(o => o.item !== '배달비');
                         if (!baseOrder) continue;
@@ -4802,7 +4859,7 @@
                         // 화면 리렌더링
                         renderHistory();
 
-                        showSystemModal(`⚠️ 부분 취소로 인해 무료배송 기준(3만원) 미만이 되어 배달비 ${dFee.toLocaleString()}원이 자동으로 추가 청구되었습니다.`, 'alert');
+                        showSystemModal(`⚠️ 부분 취소로 인해 무료배송 기준(15,000원) 미만이 되어 배달비 ${dFee.toLocaleString()}원이 자동으로 추가 청구되었습니다.`, 'alert');
                     } catch (e) {
                         console.error("배달비 부과 실패:", e);
                     }
@@ -4864,17 +4921,20 @@
                 );
                 if (hasActiveDeliveryFee) continue;
                 
+                // [수정] 사다드림 상품 금액은 배달비 기준 계산에서 제외 (USER 요청)
+                const isSadaOrder = (o) => String(o.item || "").includes("사다드림") || o.matchKey === "사다드림";
+
                 let currentActiveTotal = 0;
                 dayOrders.forEach(o => {
                     const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
-                    if (!isCanceled && o.item !== '배달비') {
+                    if (!isCanceled && o.item !== '배달비' && !isSadaOrder(o)) {
                         currentActiveTotal += parseInt(o.total || 0);
                     }
                 });
-                
+
                 let amountToCancel = 0;
                 targetOrders.forEach(o => {
-                    if (o.pickupDate === pDate && o.item !== '배달비') {
+                    if (o.pickupDate === pDate && o.item !== '배달비' && !isSadaOrder(o)) {
                         amountToCancel += parseInt(o.total || 0);
                     }
                 });
@@ -4886,13 +4946,13 @@
                     return !isCanceled && !isGoingToBeCanceled && o.item !== '배달비';
                 }).length;
                 
-                if (remainingActiveCount > 0 && remainingTotal < 30000) {
+                if (remainingActiveCount > 0 && remainingTotal < 15000) {
                     willTriggerDeliveryFee = true;
                 }
             }
             
             const confirmMsg = willTriggerDeliveryFee 
-                ? `정말로 이 주문을 취소하시겠습니까?<br><br><span style="color:#d32f2f; font-weight:800;">⚠️ 부분 취소로 인해 무료배송 기준(3만원) 미만이 되어 배달비 ${deliveryFeeToCharge.toLocaleString()}원이 자동으로 부과됩니다.</span>`
+                ? `정말로 이 주문을 취소하시겠습니까?<br><br><span style="color:#d32f2f; font-weight:800;">⚠️ 부분 취소로 인해 무료배송 기준(15,000원) 미만이 되어 배달비 ${deliveryFeeToCharge.toLocaleString()}원이 자동으로 부과됩니다.</span>`
                 : "정말로 이 주문을 취소하시겠습니까?";
 
             showSystemModal(confirmMsg, 'confirm', async () => {
@@ -6539,6 +6599,29 @@
                                     });
             }
 
+            // [신규] 사다드림 안내 문구 노출 (USER 요청)
+            //  - 예약구매: '사다드림' 탭을 눌렀을 때
+            //  - 당일구매: 사다드림 상품이 섞여 노출되는 탭(공동구매 등)일 때
+            {
+                const sadaTitle = document.getElementById('main-section-title');
+                if (sadaTitle) {
+                    const isSadaTab = !_searchQ && String(targetKey || "").trim() === '사다드림';
+                    const hasSadaInTodayList = currentDeliveryType === 'today'
+                        && filteredData.some(p => String(p.name || "").includes("사다드림"));
+
+                    if (isSadaTab || hasSadaInTodayList) {
+                        sadaTitle.style.display = 'block';
+                        sadaTitle.innerHTML = `
+                            <div style="font-size: 18px; font-weight: 800; color: #ff4d4d; letter-spacing: -0.5px; line-height: 1.4;">사다드림 상품은 배달 최소금액에 포함되지 않습니다.</div>
+                        `;
+                    } else if (sadaTitle.innerHTML.includes('배달 최소금액')) {
+                        // 다른 탭으로 이동하면 사다드림 안내만 제거 (다른 안내 문구는 건드리지 않음)
+                        sadaTitle.innerHTML = '';
+                        sadaTitle.style.display = 'none';
+                    }
+                }
+            }
+
             const nowHour = new Date().getHours();
 
             // [정렬 적용] 재고 유무(품절 무조건 최하단) > 머릿말 > 일반 > 맺음말 > 날짜 > 이름 순
@@ -7140,7 +7223,8 @@
 
             const noticeArea = document.getElementById('confirm-notice-area');
             if (selectedShippingMethod === '배달주문') {
-                const depositNoticeLine = (currentDeliveryType === 'reserve')
+                // [수정] 당일구매 탭이 열려 있어도 장바구니에 예약(공동구매) 상품이 섞였으면 예약 기준 안내로 표시
+                const depositNoticeLine = (currentDeliveryType === 'reserve' || gHasFutureReserveInCart())
                     ? '<div>✅ 자정 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>'
                     : '<div>✅ 오후3시 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>';
 
@@ -7367,6 +7451,17 @@
             const submitBtn = document.getElementById('btn-submit-order');
 
 
+
+            // [수정] 당일구매 탭을 열어둔 채 주문확정하더라도 장바구니가 전부 예약(공동구매) 상품이면
+            //        당일 주문 가능시간·휴무일 제한을 적용하면 안 된다. 예약구매로 전환해 정상 주문되게 한다.
+            //        (탭 UI도 함께 예약구매로 돌려 사용자가 보는 상태와 실제 처리 기준을 일치시킴)
+            if (currentDeliveryType === 'today' && gIsCartAllFutureReserve()) {
+                currentDeliveryType = 'reserve';
+                currentMainTab = 'reserve';
+                initMainTabs(false);
+                processAndRender(productsData, true);
+                updateFooter();
+            }
 
             // [신규] 당일배송 주말/공휴일 및 평일 13시 마감 및 06시 시작 제한 시간 차단
             if (currentDeliveryType === 'today') {
@@ -7758,21 +7853,7 @@
                 //        과거엔 'today'이면 무조건 오늘로 덮어써서, 함께 담긴 예약 상품이 오늘로 잘못 기록됐다.
                 // [수정] '오늘 날짜' 공동구매 상품은 당일구매로 취급하므로 예약 통합 대상에서 제외.
                 //        미래(오늘 이후) 예약 날짜 상품이 섞였을 때만 예약 로직으로 처리한다.
-                const hasReserveDateItem = allItems.some(it => {
-                    if (it.name === "배달비") return false;
-                    const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
-                    if (isSadaItem) return false;
-                    const d = String(it.date || "");
-                    const m = String(it.matchKey || "");
-                    let cand = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) ? d
-                             : /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m) ? m : "";
-                    if (!cand) return false;
-                    let ds = cand.replace(/\./g, '-').trim();
-                    if (ds.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) ds = "20" + ds;
-                    const pt = ds.split('-');
-                    if (pt.length === 3) ds = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
-                    return ds > todayStr; // 미래 예약 날짜만
-                });
+                const hasReserveDateItem = gHasFutureReserveItem(allItems);
 
                 if (currentDeliveryType === 'today' && !hasReserveDateItem) {
                     allItems.forEach(it => {
@@ -8040,7 +8121,7 @@
                         ` : ''}
                         
                         <div style="font-size:16px; font-weight:800; color:var(--nego-orange); margin-bottom:4px;">
-                            ${currentDeliveryType === 'today' ? '오후 1시까지 입금 부탁드립니다.' : '당일 24시까지 입금 부탁드립니다.'}
+                            ${(currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? '오후 3시까지 입금 부탁드립니다.' : '당일 24시까지 입금 부탁드립니다.'}
                         </div>
                         <div style="font-size:16px; font-weight:800; color:#d32f2f; margin-top:6px; margin-bottom:10px;">
                             🚨 미입금시 주문이 자동으로 취소됩니다.
@@ -8165,13 +8246,19 @@
             const nowForDate = new Date(tempTimestamp);
             const todayStr = `${nowForDate.getFullYear()}-${String(nowForDate.getMonth() + 1).padStart(2, '0')}-${String(nowForDate.getDate()).padStart(2, '0')}`;
 
-            if (currentDeliveryType === 'today') {
+            // [수정] 예약구매 탭에서 담은 뒤 당일구매 탭을 열어둔 채로 주문확정하면
+            //        아래 'today' 분기가 예약(공동구매) 상품까지 오늘 날짜로 덮어쓰던 버그 수정.
+            //        completeOrder()에서 이미 적용한 것과 동일한 판별을 여기서도 적용한다.
+            //        (오늘 날짜 공동구매 상품은 당일구매로 취급하므로 미래 날짜만 예약으로 본다)
+            const hasReserveDateItem = gHasFutureReserveItem(allItems);
+
+            if (currentDeliveryType === 'today' && !hasReserveDateItem) {
                 // 1. 당일배송 모드: 모든 상품(배달비 포함)의 기록 날짜를 무조건 주문 당일 날짜(오늘)로 통일
                 allItems.forEach(it => {
                     it.date = todayStr;
                     it.isCategorized = false; // 날짜 포맷이므로 범주형 해제
                 });
-            } else if (currentDeliveryType === 'reserve') {
+            } else if (currentDeliveryType === 'reserve' || hasReserveDateItem) {
                 if (shippingMethod === '배달주문') {
                     // 2. 예약배송 모드 (배달): 공동구매 상품 중 가장 늦은 날짜(최대 날짜)를 추출
                     let maxReserveDate = null;
