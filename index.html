@@ -6427,6 +6427,10 @@
                 filteredData = targetKey === '전체상품_예약'
                 ? visibleProducts.filter(p => {
                     const s = String(p.matchKey).trim();
+                    // [버그수정] 분류(matchKey)가 비어 있는 상품은 어떤 카테고리도 아니므로 제외한다.
+                    //  빈 문자열은 아래 includes 검사를 모두 통과해 버려서, 공동구매 전체상품에
+                    //  '날짜 없는 빈 그룹'으로 섞여 보이던 문제 방지.
+                    if (!s) return false;
                     // [수정] 온사이트 및 과채류를 명확히 제외하고 나머지는 모두 공동구매 전체보기에 포함
                     const onSiteKeywords = ["냉동", "냉장", "상온", "실온", "현장판매", "상시판매"];
                     const fvKeywords = ["야채", "과일"];
