@@ -1920,10 +1920,10 @@
                     return;
                 }
                 
-                // 2. 평일 15시 이후 및 06시 이전 당일구매 마감 차단
-                if (hour < 6 || hour >= 15) {
+                // 2. 평일 15시 이후 당일구매 마감 차단 (오픈은 자정 0시)
+                if (hour >= 15) {
                     const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
-                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>06:00 - 15:00</b>`, 'alert');
+                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>00:00 - 15:00</b>`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -1956,13 +1956,13 @@
             const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
             const isAfterCutoffOrHoliday = isHoliday || (hour >= 15);
-            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour >= 6 && hour < 15);
+            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour < 15);
 
             // 1. 첫 페이지 로드 시에만 기본 탭 설정
             if (isInitialPageLoad) {
-                if (hour < 6 || hour >= 15 || isHoliday) {
+                if (hour >= 15 || isHoliday) {
                     currentDeliveryType = 'reserve';
-                    currentMainTab = 'reserve'; // 15시 이후, 6시 이전, 휴무일에는 예약배송으로 유도
+                    currentMainTab = 'reserve'; // 15시 이후, 휴무일에는 예약배송으로 유도
                 } else {
                     currentDeliveryType = 'today';
                     currentMainTab = 'today-fruit'; // 평일 6시 ~ 15시 사이에는 당일배송으로 기본 시작
@@ -5850,12 +5850,12 @@
                                     return false;
                                 }
 
-                                // 과일/야채 상품의 경우 해당 날짜 오전 6시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
-                                const startDate = new Date(y, m - 1, d, 6, 0, 0, 0);
+                                // 과일/야채 상품은 해당 날짜 자정(0시)부터 노출, 오후 3시(15시) 이후에는 미노출 처리
+                                const startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
                                 const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                 const nowTime = new Date();
                                 if (nowTime < startDate || nowTime >= cutoffDate) {
-                                    return false; // 6시 이전 또는 15시 이후이므로 제외
+                                    return false; // 15시 이후이므로 제외
                                 }
                             } else {
                                 // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
@@ -6364,12 +6364,12 @@
                                         return false;
                                     }
 
-                                    // 과일/야채 상품의 경우 해당 날짜 오전 6시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
-                                    const startDate = new Date(y, m - 1, d, 6, 0, 0, 0);
+                                    // 과일/야채 상품은 해당 날짜 자정(0시)부터 노출, 오후 3시(15시) 이후에는 미노출 처리
+                                    const startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
                                     const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                     const nowTime = new Date();
                                     if (nowTime < startDate || nowTime >= cutoffDate) {
-                                        return false; // 6시 이전 또는 15시 이후이므로 제외
+                                        return false; // 15시 이후이므로 제외
                                     }
                                 }
                             } else {
@@ -7482,9 +7482,9 @@
                     }
                     return;
                 }
-                if (currentHour < 6 || currentHour >= 15) {
+                if (currentHour >= 15) {
                     const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
-                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>06:00 - 15:00</b>`, 'alert');
+                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>00:00 - 15:00</b>`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
@@ -7712,9 +7712,16 @@
                             finalDate = _sadaDate;
                         } else if (!isDateItem) {
                             finalDate = tomorrowStr;
-                            
+
                             // [예외] 오늘 날짜인 공동구매 상품과 같이 주문하는 경우에는 오후 3시까지 당일(todayStr)로 기록
                             if (unifiedReserveDate === todayStr && !isTodayOffOrAfterCutoff) {
+                                finalDate = todayStr;
+                            }
+
+                            // [수정] '당일구매' 탭에서 담은 상품은 마감(15시) 전이고 휴무일이 아니면 당일로 기록.
+                            //  기존에는 날짜 없는 상품을 무조건 다음날로 기록해서, 당일구매 과일만 주문하면
+                            //  주문서에 내일 날짜로 올라가던 문제가 있었다.
+                            if (cartDeliveryType[itemName] === 'today' && !isTodayOffOrAfterCutoff) {
                                 finalDate = todayStr;
                             }
                         } else {
