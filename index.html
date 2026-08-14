@@ -1641,7 +1641,7 @@
             <div class="input-group" style="margin-bottom: 20px;">
                 <strong>환불계좌 <span style="color:#999; font-weight:700; font-size:0.85em;">(선택)</span></strong>
                 <input id="input-refund-account" type="text" class="modal-input" placeholder="예: 카카오뱅크 3333-00-0000000 홍길동">
-                <div class="input-hint">환불이 필요할 때 사용됩니다. 입력하지 않아도 주문할 수 있습니다.</div>
+                <div class="input-hint">입력하지 않아도 주문할 수 있습니다.</div>
             </div>
 
             <button id="btn-kakao-login" class="btn-common btn-kakao" onclick="loginWithKakao()">
@@ -2007,18 +2007,21 @@
                     <button class="date-btn" id="status-cancel" onclick="filterStatus('cancel')"
                         style="height:32px; font-size:17px; padding:0; font-weight:900;">취소</button>
                 </div>
-                <!-- [수정] 기간은 왼쪽 작은 버튼 하나로 바꾸고(1주일→1달→전체 순환),
-                     남은 자리에 주문순 / 픽업날짜순 탭을 둔다. -->
-                <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: stretch;">
+                <!-- [수정] 기간은 왼쪽 버튼 하나로 바꾸고(1주일→1달→전체 순환),
+                     남은 자리에 주문순 / 날짜순 탭을 둔다.
+                     [수정] 위 '전체/입고/픽업/취소' 줄과 칸·글자 크기를 똑같이 맞추려고 같은 4칸 그리드를 쓴다.
+                     마지막 칸('취소' 버튼 자리)에는 정렬방향·새로고침 아이콘 두 개를 나눠 넣는다. -->
+                <div
+                    style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; align-items: stretch;">
                     <button class="date-btn" id="btn-period" onclick="cyclePeriodFilter()"
-                        style="height:32px; flex:0 0 54px; font-size:12px; padding:0; font-weight:800; white-space:nowrap;">1주일 ▾</button>
+                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">1주일 ▾</button>
                     <button class="date-btn active" id="btn-sort-order" onclick="changeSortMode('timestamp')"
-                        style="height:32px; flex:1 1 0; font-size:12px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
+                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
                     <button class="date-btn" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
-                        style="height:32px; flex:1 1 0; font-size:12px; padding:0; font-weight:900; white-space:nowrap;">픽업(배송)날짜순</button>
-                    <div style="display:flex; gap:4px; flex:0 0 66px;">
+                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">날짜순</button>
+                    <div style="display:flex; gap:6px; min-width:0;">
                         <button class="date-btn" id="btn-sort-dir" onclick="toggleSortDir()"
-                            style="height: 32px; flex:1; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
+                            style="height: 32px; flex:1 1 0; min-width:0; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="4" y1="6" x2="13" y2="6"></line>
@@ -2030,8 +2033,8 @@
                             </svg>
                         </button>
                         <button class="date-btn" id="btn-refresh-history" onclick="openHistoryModal(true)"
-                            style="height: 32px; flex:1; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            style="height: 32px; flex:1 1 0; min-width:0; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="23 4 23 10 17 10"></polyline>
                                 <polyline points="1 20 1 14 7 14"></polyline>
@@ -5262,9 +5265,9 @@
             const sortDirBtn = document.getElementById('btn-sort-dir');
             if (sortDirBtn) {
                 if (currentSortDir === 'desc') {
-                    sortDirBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="13" y2="6"></line><line x1="4" y1="10" x2="11" y2="10"></line><line x1="4" y1="14" x2="9" y2="14"></line><line x1="4" y1="18" x2="7" y2="18"></line><polyline points="15 15 18 18 21 15"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
+                    sortDirBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="13" y2="6"></line><line x1="4" y1="10" x2="11" y2="10"></line><line x1="4" y1="14" x2="9" y2="14"></line><line x1="4" y1="18" x2="7" y2="18"></line><polyline points="15 15 18 18 21 15"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
                 } else {
-                    sortDirBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="7" y2="6"></line><line x1="4" y1="10" x2="9" y2="10"></line><line x1="4" y1="14" x2="11" y2="14"></line><line x1="4" y1="18" x2="13" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
+                    sortDirBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="7" y2="6"></line><line x1="4" y1="10" x2="9" y2="10"></line><line x1="4" y1="14" x2="11" y2="14"></line><line x1="4" y1="18" x2="13" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
                 }
             }
 
@@ -7866,7 +7869,7 @@
                     `<div class="item-info-top">` +
                     `<div class="item-name">${p.name.replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
                     `<div class="item-price-row">` +
-                    `<div class="item-price-val">${gPriceLabel(p.price)}</div>` +
+                    `<div class="item-price-val">${gCardPriceLabel(p)}</div>` +
                     `</div>` +
                     // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
                     //  아래 버튼줄에 따로 한 줄을 차지하면 카드가 길어지고 썸네일이 작아 보인다.
@@ -7884,7 +7887,8 @@
                     `<div class="add-cart-wrap ${currentQty > 0 ? 'selected' : ''}" style="${isSoldOut ? 'pointer-events:none;' : ''}">` +
                     `<input type="hidden" class="qty-num" value="${currentQty}" data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
                     // [수정] 품절이면 이 버튼이 '품절'을 대신 알린다 (따로 글씨를 쓰지 않는다)
-                    `<button class="btn-add-cart${isSoldOut ? ' soldout' : ''}" onclick="addSelectedToCart(this)">${isSoldOut ? '품절' : (currentQty > 0 ? `🛒 담김 <b>${currentQty}</b>개` : '🛒 장바구니 담기')}</button>` +
+                    // [수정] 옵션 상품은 바로 담기지 않고 옵션 선택창이 뜨므로 버튼 글자도 '옵션 선택'으로 알려준다.
+                    `<button class="btn-add-cart${isSoldOut ? ' soldout' : ''}" onclick="addSelectedToCart(this)">${isSoldOut ? '품절' : (currentQty > 0 ? `🛒 담김 <b>${currentQty}</b>개` : (gHasChoiceOptions(p) ? '🛒 옵션 선택' : '🛒 장바구니 담기'))}</button>` +
                     `</div>` +
                     `</div></div>`;
 
@@ -7932,6 +7936,42 @@
         function gPriceLabel(price) {
             const v = parseInt(price) || 0;
             return v.toLocaleString() + '원' + (v === 0 ? '~' : '');
+        }
+
+        // [신규] 고를 수 있는 옵션(선택옵션)이 실제로 있는 상품인지.
+        //  금액제한·1인당제한만 켜진 상품은 고를 항목이 없으므로 여기서는 옵션 상품으로 보지 않는다.
+        function gHasChoiceOptions(p) {
+            if (!p || !gBool(p.useOptions, true)) return false;
+            if (!gBool(p.useChoiceOptions) || !Array.isArray(p.options)) return false;
+            return p.options.some(g => Array.isArray(g.items) && g.items.length > 0);
+        }
+
+        // [신규] 옵션을 골랐을 때 더해지는 '가장 적은 금액'.
+        //  단일선택 그룹은 반드시 하나를 골라야 하므로 그 그룹에서 가장 싼 항목 금액을 더한다.
+        //  중복선택 그룹은 안 골라도 되므로 더하지 않되, 필수 옵션이 하나도 없으면
+        //  전체 항목 중 가장 싼 값(0원 항목 제외)을 기준으로 잡아 '0원~'으로 보이지 않게 한다.
+        function gMinOptionAdd(p) {
+            const groups = (p && Array.isArray(p.options)) ? p.options : [];
+            let required = 0;
+            let cheapest = null;
+            groups.forEach(g => {
+                const items = Array.isArray(g.items) ? g.items : [];
+                if (items.length === 0) return;
+                const prices = items.map(it => parseInt(it.price) || 0);
+                const gMin = Math.min(...prices);
+                if (g.selectType !== 'multi') required += gMin;
+                prices.forEach(v => { if (v > 0 && (cheapest === null || v < cheapest)) cheapest = v; });
+            });
+            if (required > 0) return required;
+            return cheapest || 0;
+        }
+
+        // [신규] 상품카드·상세보기에 보여줄 금액.
+        //  옵션 상품은 고를 수 있는 가장 싼 조합 금액에 '~'를 붙여 '이 금액부터 시작한다'는 뜻을 드러낸다.
+        function gCardPriceLabel(p) {
+            const base = parseInt(p && p.price) || 0;
+            if (!gHasChoiceOptions(p)) return gPriceLabel(base);
+            return (base + gMinOptionAdd(p)).toLocaleString() + '원~';
         }
 
         // [신규] 수량 박스 너비를 '장바구니 담기' 버튼과 똑같이 맞춘다.
@@ -8336,8 +8376,9 @@
                 `<div class="modal-content" style="width:90%; max-width:460px; max-height:85vh; display:flex; flex-direction:column; padding:0; overflow-y:auto; -webkit-overflow-scrolling:touch;">` +
                 `<div style="padding:16px 20px; border-bottom:1px solid #f0f0f0; display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">` +
                 `<div style="min-width:0; text-align:left;">` +
+                // [수정] '기본 0원~' 표기는 뺐다. 아래에서 옵션을 고르면 합계가 바로 보이고,
+                //  상품카드에는 이미 최저 금액이 '1,000원~'처럼 적혀 있어 오히려 헷갈린다.
                 `<div style="font-size:15px; font-weight:900; color:var(--item-black); line-height:1.4; word-break:keep-all;">${p.name}</div>` +
-                `<div style="font-size:13px; font-weight:800; color:var(--nego-orange); margin-top:4px;">기본 ${gPriceLabel(p.price)}</div>` +
                 `</div>` +
                 `<span onclick="closeOptionModal()" style="flex:0 0 auto; font-size:24px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
                 `</div>` +
@@ -8721,7 +8762,7 @@
 
             // [신규] '담기' 버튼이면 담긴 수량을 버튼 글자에 표시
             if (btn.classList && btn.classList.contains('btn-add-cart')) {
-                btn.innerHTML = val > 0 ? `🛒 담김 <b>${val}</b>개` : '🛒 장바구니 담기';
+                btn.innerHTML = val > 0 ? `🛒 담김 <b>${val}</b>개` : (gHasChoiceOptions(p) ? '🛒 옵션 선택' : '🛒 장바구니 담기');
             }
 
             // 수량에 따라 배경색(클래스) 토글
@@ -8921,7 +8962,7 @@
             activeProductName = p.name;
 
             document.getElementById('detail-title').innerHTML = p.name.replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.85em;">[$1]</span>') + '<br>' : '');
-            document.getElementById('detail-price').innerText = gPriceLabel(p.price);
+            document.getElementById('detail-price').innerText = gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
             document.getElementById('detail-desc').innerText = p.desc || "상세 설명이 없습니다.";
             const slider = document.getElementById('slider-area');
