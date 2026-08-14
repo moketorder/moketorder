@@ -812,6 +812,22 @@
             letter-spacing: 1px;
             color: var(--item-black);
             text-align: center;
+            /* [신규] 스크롤을 내리면 접혀서 사라지고, 위로 올리면 다시 나온다.
+               이 줄은 sticky 헤더 안에 있어 예전에는 화면을 계속 차지했다. */
+            overflow: hidden;
+            max-height: 320px;
+            opacity: 1;
+            transition: max-height 0.28s ease, opacity 0.18s ease,
+                        padding 0.28s ease, transform 0.28s ease;
+            transform: translateY(0);
+        }
+
+        .date-section-title.notice-hidden {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            transform: translateY(-8px);
         }
 
         .date-filter-container {
@@ -2405,7 +2421,24 @@
 
             el.innerHTML = html;
             el.style.display = html ? 'block' : 'none';
+            el.classList.remove('notice-hidden'); // 목록을 새로 그리면 다시 펼친 상태로
         }
+
+        // [신규] 안내 줄은 스크롤을 내리면 접히고, 위로 올리면 다시 나온다.
+        //  sticky 헤더 안에 있어 가만두면 화면을 계속 차지한다. 상품을 볼 때는 비켜 주는 게 맞다.
+        let _noticeLastY = 0;
+        window.addEventListener('scroll', () => {
+            const el = document.getElementById('main-section-title');
+            if (!el || el.style.display === 'none') return;
+
+            const y = window.scrollY || document.documentElement.scrollTop || 0;
+            if (y > 60 && y > _noticeLastY + 2) {
+                el.classList.add('notice-hidden');       // 아래로 내리는 중
+            } else if (y < _noticeLastY - 2 || y <= 20) {
+                el.classList.remove('notice-hidden');    // 위로 올리는 중이거나 맨 위
+            }
+            _noticeLastY = y;
+        }, { passive: true });
 
         // [대분류 탭 전환]
         function switchMainTab(type) {
@@ -9339,10 +9372,12 @@
         // [신규] 주문 확정 단계에서 GAS 호출(3~5초 대기)을 건너뛰고 파이어베이스 실시간 재고/상태 정보로만 초고속 검증(0.1초)하는 함수
         async function loadDataFirebaseOnly() {
             try {
-                const [stockRes, statusRes, pubRes] = await Promise.all([
+                // [수정] 여기서 published_products(약 330KB)까지 받고 있었는데, 받아 놓고 쓰지 않았다.
+                //  아래에서 화면을 갱신할 때 쓰는 값은 globalAdjustments(재고)와 이미 갖고 있는 productsData뿐이다.
+                //  주문확정을 누를 때마다 330KB가 그냥 버려지고 있어서 뺐다. 재고 확인에는 영향이 없다.
+                const [stockRes, statusRes] = await Promise.all([
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; })
+                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; })
                 ]);
 
                 if (statusRes && statusRes.ok) {
@@ -9350,17 +9385,12 @@
                     isProductListEnabled = (statusData === null) ? true : !!statusData;
                 }
 
-                let publishedProducts = [];
-                if (pubRes && pubRes.ok) {
-                    publishedProducts = await pubRes.json() || [];
-                }
-
                 if (stockRes && stockRes.ok) {
                     globalAdjustments = await stockRes.json() || {};
                 }
 
                 // [중요 수정] productsData 원본을 파괴적으로 변형(in-place mutation)하지 않고
-                // 최신 publishedProducts 및 globalAdjustments 데이터로 안전하게 화면 수량을 갱신
+                // 최신 globalAdjustments(재고) 데이터로 안전하게 화면 수량을 갱신
                 if (productsData && productsData.length > 0) {
                     processAndRender(productsData, false);
                 }
