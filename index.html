@@ -1914,9 +1914,10 @@
         </div>
         <div class="date-filter-container" id="date-filters"></div>
         <div class="date-filter-container" id="date-filters-categories" style="display:none;"></div>
+        <!-- [수정] 안내문을 하위 탭(분류·날짜) 바로 아래로 올린다. 탭을 고르면 그 판매유형이
+             어떤 것인지 먼저 읽히는 자리가 맞다. 검색줄은 그 아래로 내려간다. -->
+        <div class="date-section-title" id="main-section-title" style="display:none;"></div>
         <!-- [신규] 상품 검색 바 (현재 배송유형 탭 안에서만 검색) -->
-        <!-- [수정] 안내문과 자리를 맞바꿨다. 검색은 탭을 고른 다음 바로 쓰는 것이라 탭 바로 밑이 맞고,
-             안내문은 읽고 나서 목록으로 넘어가는 것이라 맨 아래가 맞다. -->
         <div id="product-search-bar" style="display:flex; align-items:center; gap:8px; padding:8px 14px 10px;">
             <span id="search-scope-label" style="flex-shrink:0; font-size:13px; font-weight:800; padding:9px 12px; border-radius:10px; border:1.5px solid #ffcc80; background:#fff3e0; color:#e65100; white-space:nowrap;">당일판매</span>
             <div style="position:relative; flex:1; min-width:0;">
@@ -1925,8 +1926,6 @@
                 <span id="search-clear-btn" onclick="clearProductSearch()" style="display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); align-items:center; justify-content:center; width:26px; height:26px; cursor:pointer; color:#94a3b8; font-size:16px;">✕</span>
             </div>
         </div>
-        <!-- [수정] 안내문 — 탭 묶음의 가장 아래. 목록 바로 위에 붙는다. -->
-        <div class="date-section-title" id="main-section-title" style="display:none;"></div>
     </div>
     <div class="container" id="product-list"></div>
     <div id="detail-overlay" class="modal-overlay" onclick="if(event.target === this) closeModal('detail-overlay')">
@@ -2601,11 +2600,20 @@
 
         // [신규] 판매유형 안내 카드. 배송서비스 안내(메뉴)와 같은 모양·같은 색으로 맞춰,
         //  손님이 어느 화면에서 보든 같은 것으로 읽히게 한다.
+        // [신규] 강조색을 옅게 풀어 배경·테두리로 쓴다. 색을 따로 정해 두지 않아도 카드마다
+        //  같은 농도로 은은하게 깔린다.
+        function gRgba(hex, a) {
+            const h = String(hex).replace('#', '');
+            const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+            return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+        }
+
         function gTypeNoticeCard(icon, title, accent, tint, lines) {
             // [수정] 글씨가 작아 잘 안 읽힌다고 해서 제목·본문을 한 단계씩 키웠다. (13/12.5 → 14.5/13.5)
-            return `<div style="background:#fff; border:1px solid #edf1f5; border-radius:14px; padding:12px 14px; text-align:left; word-break:keep-all; box-shadow:0 1px 3px rgba(16,24,40,0.04);">` +
+            // [수정] 흰 바탕이라 목록과 구분이 잘 안 돼, 강조색을 아주 옅게(5%) 깔고 테두리도 같은 색으로 맞췄다.
+            return `<div style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; text-align:left; word-break:keep-all;">` +
                 `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
-                `<span style="flex:0 0 auto; width:26px; height:26px; border-radius:9px; background:${tint}; display:inline-flex; align-items:center; justify-content:center; font-size:14px; line-height:1;">${icon}</span>` +
+                `<span style="flex:0 0 auto; width:26px; height:26px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:14px; line-height:1;">${icon}</span>` +
                 `<span style="font-size:14.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
                 `</div>` +
                 lines.map(t =>
@@ -4469,9 +4477,9 @@
             // [수정] 네 카드가 모두 주황 테두리라 눈이 피로했다. 테두리는 연한 회색으로 낮추고,
             //  주제별 색은 아이콘 동그라미·제목·글머리 점에만 얹는다. (탭 색과 같은 계열로 맞춤)
             const card = (icon, title, accent, tint, lines) =>
-                `<div style="background:#fff; border:1px solid #edf1f5; border-radius:14px; padding:12px 14px; margin-top:10px; box-shadow:0 1px 3px rgba(16,24,40,0.04);">` +
+                `<div style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; margin-top:10px;">` +
                 `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
-                `<span style="flex:0 0 auto; width:27px; height:27px; border-radius:9px; background:${tint}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
+                `<span style="flex:0 0 auto; width:27px; height:27px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
                 `<span style="font-size:14.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
                 `</div>` +
                 lines.map(t =>
