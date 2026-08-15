@@ -152,6 +152,110 @@
             transform: translateY(-1px);
         }
 
+        /* [신규] 관리자(사장님) 설정 묶음 — 평소에는 감춰져 있고 관리자 모드에서만 보인다 */
+        #admin-panel {
+            display: none;
+            margin-top: 22px;
+            padding-top: 16px;
+            border-top: 1px dashed #ddd;
+            text-align: left;
+        }
+
+        .admin-panel-title {
+            font-size: 13px;
+            font-weight: 900;
+            color: #455464;
+            margin-bottom: 4px;
+        }
+
+        .admin-sec-title {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #94a3b8;
+            margin: 14px 0 6px;
+        }
+
+        .admin-grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .admin-btn {
+            width: 100%;
+            padding: 10px 6px;
+            font-size: 12.5px;
+            font-weight: 800;
+            line-height: 1.3;
+            border-radius: var(--btn-radius);
+            border: 1.5px solid #e2e8f0;
+            background: #fff;
+            color: #455464;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .admin-btn.wide {
+            margin-bottom: 6px;
+        }
+
+        /* [신규] 탭이 많은 상시판매용 — 한 줄에 다 못 넣으므로 가로로 밀어서 본다 */
+        .main-tabs.scroll-tabs {
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .main-tabs.scroll-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* [수정] 글자 길이에 따라 칸 너비가 들쭉날쭉해 보여서, 탭 하나하나를 같은 너비로 맞춘다.
+           가장 긴 이름(식재료·양념)이 한 줄에 다 들어가는 폭으로 잡았다. */
+        .main-tabs.scroll-tabs .main-tab-btn {
+            flex: 0 0 122px;
+            width: 122px;
+            padding: 7px 6px;
+            font-size: 14.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* [신규] 탭이 많은 상시판매용 두 줄 배치.
+           글씨는 한 줄로 두고(줄바꿈 없음) 두 줄에 나눠 담아, 한 화면에 보이는 분류 수를 늘린다.
+           위→아래→오른쪽 순으로 채워지고, 넘치는 만큼만 옆으로 밀린다. */
+        .main-tabs.grid-tabs {
+            display: grid;
+            grid-auto-flow: column;
+            grid-template-rows: repeat(2, auto);
+            grid-auto-columns: max-content;
+            gap: 5px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .main-tabs.grid-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .main-tabs.grid-tabs .main-tab-btn {
+            flex: none;
+            width: auto;
+            padding: 6px 9px;
+            font-size: 12.5px;
+            line-height: 1.3;
+            white-space: nowrap;
+        }
+
         body {
             font-family: var(--font-main);
             background: #f4f6f8;
@@ -1681,7 +1785,9 @@
                 원활한 서비스를 위해 전체 동의 부탁드립니다.
             </div>
             <div class="business-info">
-                상호 : 모켓(MOKET) | 대표자 : 강성민<br>
+                <!-- [신규] '강성민'을 10번 누르면 로그인 없이 둘러보기 (사장님 확인용 숨은 통로).
+                     숨긴 기능이므로 마우스 모양(cursor)도 바꾸지 않는다. 겉보기에는 그냥 사업자 정보. -->
+                상호 : 모켓(MOKET) | 대표자 : <span onclick="handleGuestEntry(event)">강성민</span><br>
                 사업자 등록번호 : 645-04-02100<br>
                 연락처 : 0507-1304-9279
             </div>
@@ -1694,46 +1800,39 @@
             <button id="btn-kakao-logout" onclick="logoutKakao()"
                 style="display:none; margin-top:25px; background:none; border:none; color:#999; font-size:13px; text-decoration:none; width:100%; cursor:pointer;">카카오
                 로그아웃</button>
-            <button id="ADMIN_DELIVERY_ON" onclick="adminToggleDelivery(true)"
-                style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🚚
-                배달 기능 활성화</button>
-            <button id="ADMIN_DELIVERY_OFF" onclick="adminToggleDelivery(false)"
-                style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🚫
-                배달 기능 비활성화</button>
-            <button id="ADMIN_DELIVERY_FEE_ON" onclick="adminManageDeliveryFee()"
-                style="display:none; margin-top:15px; background:white; border:1.5px solid #FF9800; color:#FF9800; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">💸
-                배달비 금액 설정</button>
+            <!-- [수정] 관리자 기능이 한 줄에 하나씩 길게 늘어서 있어 정신없던 것을,
+                 하는 일끼리 묶고 켜기/끄기는 좌우로 붙여 한눈에 보이게 정리했다.
+                 버튼 id·동작은 그대로라 기존 로직은 손대지 않는다. -->
+            <div id="admin-panel">
+                <div class="admin-panel-title">👨‍💻 사장님 설정</div>
 
+                <div class="admin-sec-title">배달</div>
+                <div class="admin-grid2">
+                    <button id="ADMIN_DELIVERY_ON" class="admin-btn" onclick="adminToggleDelivery(true)">🚚 배달 켜기</button>
+                    <button id="ADMIN_DELIVERY_OFF" class="admin-btn" onclick="adminToggleDelivery(false)">🚫 배달 끄기</button>
+                </div>
+                <button id="ADMIN_DELIVERY_FEE_ON" class="admin-btn wide" onclick="adminManageDeliveryFee()">💸 배달비 금액 설정</button>
 
-            <button id="ADMIN_HOLIDAY_MANAGE" onclick="adminManageHolidays()"
-                style="display:none; margin-top:15px; background:white; border:1.5px solid #9C27B0; color:#9C27B0; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🗓️
-                임시 휴무일(공휴일) 관리</button>
+                <div class="admin-sec-title">영업일</div>
+                <div class="admin-grid2">
+                    <button id="ADMIN_SATURDAY_WEEKDAY_ON" class="admin-btn" onclick="adminToggleSaturdayWeekday(true)">🗓️ 토요일 영업</button>
+                    <button id="ADMIN_SATURDAY_WEEKDAY_OFF" class="admin-btn" onclick="adminToggleSaturdayWeekday(false)">🗓️ 토요일 휴무</button>
+                </div>
+                <button id="ADMIN_HOLIDAY_MANAGE" class="admin-btn wide" onclick="adminManageHolidays()">📅 임시 휴무일 관리</button>
 
-            <button id="ADMIN_SATURDAY_WEEKDAY_ON" onclick="adminToggleSaturdayWeekday(true)"
-                style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🗓️
-                토요일 평일 작동 활성화 (주문 가동)</button>
-            <button id="ADMIN_SATURDAY_WEEKDAY_OFF" onclick="adminToggleSaturdayWeekday(false)"
-                style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🗓️
-                토요일 주말 작동 (배달 휴무)</button>
+                <div class="admin-sec-title">손님 화면</div>
+                <div class="admin-grid2">
+                    <button id="ADMIN_PRODUCT_LIST_ON" class="admin-btn" onclick="adminToggleProductList(true)">📦 상품목록 공개</button>
+                    <button id="ADMIN_PRODUCT_LIST_OFF" class="admin-btn" onclick="adminToggleProductList(false)">🌑 상품목록 숨김</button>
+                </div>
+                <div class="admin-grid2">
+                    <button id="ADMIN_LOGIN_ON" class="admin-btn" onclick="adminToggleLoginEntry(true)">🔒 로그인 강제</button>
+                    <button id="ADMIN_LOGIN_OFF" class="admin-btn" onclick="adminToggleLoginEntry(false)">🔓 로그인 끄기</button>
+                </div>
 
-            <button id="ADMIN_LOGIN_ON" onclick="adminToggleLoginEntry(true)"
-                style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🔒
-                전체 로그인 화면 강제하기</button>
-            <button id="ADMIN_LOGIN_OFF" onclick="adminToggleLoginEntry(false)"
-                style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🔓
-                로그인 화면 끄기 (수동입력 모드)</button>
-
-
-            <button id="btn-unlink-kakao" onclick="unlinkKakao()"
-                style="display:none; margin-top:10px; background:none; border:1px solid #ddd; color:#999; font-size:12px; padding:8px; border-radius:var(--btn-radius); width:100%; cursor:pointer;">카카오
-                탈퇴하기</button>
-            <hr id="ADMIN_HR" style="display:none; margin:20px 0; border:none; border-top:1px dashed #ddd;">
-            <button id="ADMIN_PRODUCT_LIST_ON" onclick="adminToggleProductList(true)"
-                style="display:none; background:white; border:1.5px solid #2196F3; color:#2196F3; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">📦
-                상품목록 전체 공개 (정상작동)</button>
-            <button id="ADMIN_PRODUCT_LIST_OFF" onclick="adminToggleProductList(false)"
-                style="display:none; margin-top:8px; background:white; border:1.5px solid #607D8B; color:#607D8B; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🌑
-                상품목록 전체 비공개 (숨김)</button>
+                <button id="btn-unlink-kakao" onclick="unlinkKakao()"
+                    style="margin-top:14px; background:none; border:1px solid #e2e8f0; color:#aaa; font-size:11.5px; padding:8px; border-radius:var(--btn-radius); width:100%; cursor:pointer;">카카오 탈퇴하기</button>
+            </div>
         </div>
     </div>
     <div id="save-confirm-modal" class="modal-overlay"
@@ -1794,9 +1893,9 @@
     <div class="sticky-header-group">
         <!-- [신규] 배송 유형 대분류 탭 영역 -->
         <div class="delivery-type-tabs">
-            <button class="delivery-type-btn active" data-type="today" onclick="switchDeliveryType('today')">🚚 당일구매</button>
+            <button class="delivery-type-btn active" data-type="today" onclick="switchDeliveryType('today')">🚚 당일판매</button>
             <button class="delivery-type-btn" data-type="onsite" onclick="switchDeliveryType('onsite')">🏪 상시판매</button>
-            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">🗓️ 예약구매</button>
+            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">🗓️ 예약판매</button>
         </div>
         <!-- [신규] 대분류 탭 영역 -->
         <div class="main-tabs" id="main-tabs-container">
@@ -2118,6 +2217,57 @@
         let today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // ===== [신규] 상시판매 상품 분류 =====
+        //  예전에는 보관방법(냉동·냉장·상온)으로 나눴는데, 손님은 '무엇을 먹을지'로 찾지
+        //  '어디에 보관하는지'로 찾지 않는다. 그래서 음식 종류로 나눈다.
+        //  key는 주문관리 '분류탭 설정'에 저장되는 값(displayTab)과 같아야 한다.
+        const ONSITE_CATS = [
+            { key: 'onsite-fruit', label: '🍎 과일' },
+            { key: 'onsite-soup', label: '🍲 국·탕·찌개' },
+            { key: 'onsite-meat', label: '🍖 고기·반찬' },
+            { key: 'onsite-noodle', label: '🍜 면류' },
+            { key: 'onsite-bunsik', label: '🌭 분식·야식' },
+            // 키(onsite-western)는 상품에 저장되는 값이라 그대로 두고 이름만 '간편식'으로 쓴다
+            { key: 'onsite-western', label: '🍕 간편식' },
+            { key: 'onsite-bakery', label: '🥐 빵·유제품' },
+            { key: 'onsite-snack', label: '🍪 스낵·과자' },
+            { key: 'onsite-drink', label: '🥤 음료' },
+            { key: 'onsite-grocery', label: '🧂 식재료·양념' },
+            { key: 'onsite-living', label: '🧴 생활용품' }
+        ];
+        // 분류를 아직 정하지 않은 상시판매 상품이 사라지지 않도록 받아 주는 탭.
+        //  해당 상품이 있을 때만 탭이 생긴다.
+        const ONSITE_ETC = { key: 'onsite-etc', label: '기타' };
+
+        // 상시판매(냉동·냉장·상온 등 보관분류) 상품인지
+        function gIsOnsiteProduct(p) {
+            const s = String((p && p.matchKey) || "").trim();
+            if (!s) return false;
+            return ["냉동", "냉장", "상온", "실온", "현장판매", "상시판매"].some(k => s.includes(k));
+        }
+
+        // 상품에 지정된 분류탭. 지금은 없는 옛 탭(보관방법 냉동·냉장·상온)은 '지정 없음'으로 본다.
+        function gDisplayTabOf(p) {
+            const t = String((p && p.displayTab) || "").trim();
+            if (t === 'onsite-frozen' || t === 'onsite-refrigerated' || t === 'onsite-room') return '';
+            return t;
+        }
+
+        // 이 상품이 들어갈 상시판매 분류. 지정이 없거나 모르는 값이면 '기타'.
+        function gOnsiteCatOf(p) {
+            const t = gDisplayTabOf(p);
+            return ONSITE_CATS.some(c => c.key === t) ? t : ONSITE_ETC.key;
+        }
+
+        // [신규] 상시판매 화면에서 이 상품이 들어갈 탭. 어디에도 안 들어가면 빈 값.
+        //  1) 분류를 직접 지정했으면 그 탭   2) 지정이 없는 상시판매(냉동·냉장·상온) 상품은 '기타' 탭
+        function gOnsiteTabCatOf(p) {
+            const t = gDisplayTabOf(p);
+            if (ONSITE_CATS.some(c => c.key === t)) return t;
+            if (t) return '';                                   // 다른 탭(사다드림 등)으로 지정된 상품
+            return gIsOnsiteProduct(p) ? ONSITE_ETC.key : '';
+        }
+
         // [신규] 배송유형 대분류 전환 함수
         // [신규] 장바구니에 담긴 상품들이 어떤 배송 유형인지 모아서 반환
         function getCartDeliveryTypes() {
@@ -2187,7 +2337,8 @@
             if (type === 'today') {
                 currentMainTab = 'today-fruit';
             } else if (type === 'onsite') {
-                currentMainTab = 'onsite-frozen';
+                // [수정] 상시판매 첫 탭은 분류 목록의 맨 앞 (없는 분류면 initMainTabs가 알아서 맞춰 준다)
+                currentMainTab = ONSITE_CATS[0].key;
             } else {
                 currentMainTab = 'reserve';
             }
@@ -2276,6 +2427,8 @@
             // 탭 컨테이너 동적 생성
             const tabContainer = document.getElementById('main-tabs-container');
             if (!tabContainer) return;
+            // 가로 스크롤은 탭이 많은 상시판매에서만 쓴다 (아래 상시판매 분기에서 다시 켠다)
+            tabContainer.classList.remove('scroll-tabs', 'grid-tabs');
 
             if (currentDeliveryType === 'today') {
                 // 당일배송 과일에 야채가 포함되어 있는지 체크
@@ -2335,15 +2488,47 @@
                     ${hasTodayGroupBuy ? `<button class="main-tab-btn ${currentMainTab === 'today-reserve' ? 'active' : ''}" data-tab="today-reserve" onclick="switchMainTab('today-reserve')">공동구매</button>` : ``}
                 `;
             } else if (currentDeliveryType === 'onsite') {
-                // [신규] 상시판매 모드 탭 목록 (냉동 / 냉장 / 상온)
-                if (currentMainTab === 'on-site' || !String(currentMainTab).startsWith('onsite-')) {
-                    currentMainTab = 'onsite-frozen';
+                // [수정] 상시판매 탭 목록을 보관방법(냉동·냉장·상온)에서 음식 종류로 바꿨다.
+                //  상품이 하나도 없는 분류는 탭을 만들지 않는다 (빈 탭을 눌러 보게 되는 것을 막는다).
+                const _onsiteVisible = (typeof productsData !== 'undefined' ? productsData : []).filter(p => {
+                    const status = (p.status || "").trim();
+                    const mKey = (p.matchKey || "").trim();
+                    if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
+                    if (!isAdminMode) {
+                        const isShow = p.showReserve !== undefined
+                            ? (p.showReserve === true || p.showReserve === 'true')
+                            : (p.show !== false && p.show !== 'false');
+                        if (!isShow) return false;
+                    }
+                    return !!gOnsiteTabCatOf(p);
+                });
+
+                const _usedCats = new Set(_onsiteVisible.map(gOnsiteTabCatOf));
+                const _tabs = ONSITE_CATS.filter(c => _usedCats.has(c.key));
+                // 분류를 아직 안 정한 상품이 있을 때만 '기타' 탭을 붙인다
+                if (_usedCats.has(ONSITE_ETC.key)) _tabs.push(ONSITE_ETC);
+
+                // 보고 있던 탭이 없어졌으면(분류 변경·품절 등) 첫 탭으로 되돌린다
+                if (_tabs.length > 0 && !_tabs.some(c => c.key === currentMainTab)) {
+                    currentMainTab = _tabs[0].key;
                 }
-                tabContainer.innerHTML = `
-                    <button class="main-tab-btn ${currentMainTab === 'onsite-frozen' ? 'active' : ''}" data-tab="onsite-frozen" onclick="switchMainTab('onsite-frozen')">냉동</button>
-                    <button class="main-tab-btn ${currentMainTab === 'onsite-refrigerated' ? 'active' : ''}" data-tab="onsite-refrigerated" onclick="switchMainTab('onsite-refrigerated')">냉장</button>
-                    <button class="main-tab-btn ${currentMainTab === 'onsite-room' ? 'active' : ''}" data-tab="onsite-room" onclick="switchMainTab('onsite-room')">상온</button>
-                `;
+
+                // [수정] 분류가 많아서 한 줄로는 다 안 보인다. 두 줄(5칸씩)로 펼쳐 전체를 한눈에 보여준다.
+                tabContainer.classList.add('grid-tabs');
+                tabContainer.innerHTML = _tabs.map(c =>
+                    `<button class="main-tab-btn ${currentMainTab === c.key ? 'active' : ''}" data-tab="${c.key}" onclick="switchMainTab('${c.key}')">${c.label}</button>`
+                ).join('');
+
+                // 고른 탭이 화면 밖에 있으면 탭 줄만 옆으로 밀어 준다.
+                //  (scrollIntoView는 페이지 전체가 움직일 수 있어 쓰지 않는다)
+                requestAnimationFrame(() => {
+                    if (tabContainer.scrollWidth <= tabContainer.clientWidth) return; // 두 줄로 다 보이면 밀 필요 없다
+                    const act = tabContainer.querySelector('.main-tab-btn.active');
+                    if (act) {
+                        const mid = act.offsetLeft - (tabContainer.clientWidth - act.offsetWidth) / 2;
+                        tabContainer.scrollLeft = Math.max(0, mid);
+                    }
+                });
             } else {
                 // 예약배송 모드 탭 목록 (기존 탭)
                 // 야채/기타 유무에 따라 과일 탭 텍스트 설정
@@ -2513,19 +2698,9 @@
                 if (isAdminMode) {
                     showSystemModal("관리자 기능이 활성화되었습니다.<br>(상품목록이 비공개여도 사장님께는 보입니다)", 'alert');
 
-                    // 관리자 설정 버튼들 표시
-                    const adminElements = [
-                        'ADMIN_DELIVERY_ON', 'ADMIN_DELIVERY_OFF',
-                        'ADMIN_DELIVERY_FEE_ON', 'ADMIN_DELIVERY_FEE_OFF',
-                        'ADMIN_HOLIDAY_MANAGE',
-                        'ADMIN_SATURDAY_WEEKDAY_ON', 'ADMIN_SATURDAY_WEEKDAY_OFF',
-                        'ADMIN_LOGIN_ON', 'ADMIN_LOGIN_OFF', 'btn-unlink-kakao',
-                        'ADMIN_PRODUCT_LIST_ON', 'ADMIN_PRODUCT_LIST_OFF', 'ADMIN_HR'
-                    ];
-                    adminElements.forEach(id => {
-                        const el = document.getElementById(id);
-                        if (el) el.style.setProperty('display', 'block', 'important');
-                    });
+                    // [수정] 버튼을 하나씩 켜지 않고, 묶어 둔 '사장님 설정' 판만 펼친다
+                    const _panel = document.getElementById('admin-panel');
+                    if (_panel) _panel.style.setProperty('display', 'block', 'important');
 
                     const modal = document.getElementById('profile-modal');
                     if (modal) modal.classList.remove('login-forced');
@@ -2692,18 +2867,8 @@
         // 페이지 로드 시 관리자 모드라면 버튼들 미리 노출
         window.addEventListener('load', () => {
             if (isAdminMode) {
-                const adminElements = [
-                    'ADMIN_DELIVERY_ON', 'ADMIN_DELIVERY_OFF',
-                    'ADMIN_DELIVERY_FEE_ON', 'ADMIN_DELIVERY_FEE_OFF',
-                    'ADMIN_HOLIDAY_MANAGE',
-                    'ADMIN_SATURDAY_WEEKDAY_ON', 'ADMIN_SATURDAY_WEEKDAY_OFF',
-                    'ADMIN_LOGIN_ON', 'ADMIN_LOGIN_OFF', 'btn-unlink-kakao',
-                    'ADMIN_PRODUCT_LIST_ON', 'ADMIN_PRODUCT_LIST_OFF', 'ADMIN_HR'
-                ];
-                adminElements.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.style.setProperty('display', 'block', 'important');
-                });
+                const _panel = document.getElementById('admin-panel');
+                if (_panel) _panel.style.setProperty('display', 'block', 'important');
             }
         });
 
@@ -2744,25 +2909,25 @@
 
             if (onBtn && offBtn) {
                 if (isDeliveryEnabled) {
-                    onBtn.innerHTML = '🚚 배달 기능 활성화 [현재 적용중]';
+                    onBtn.innerHTML = '🚚 배달 켜기 ✅';
                     onBtn.style.background = '#e1f5fe'; // 다른 적용중 버튼들과 통일감 있는 색상
                     onBtn.style.border = '1.5px solid #2196F3';
                     onBtn.style.color = '#2196F3';
                     onBtn.style.opacity = '1';
 
-                    offBtn.innerHTML = '🚫 배달 기능 끄기';
+                    offBtn.innerHTML = '🚫 배달 끄기';
                     offBtn.style.background = 'white';
                     offBtn.style.border = '1.5px solid #ff4d4d';
                     offBtn.style.color = '#ff4d4d';
                     offBtn.style.opacity = '0.5';
                 } else {
-                    offBtn.innerHTML = '🚫 배달 기능 비활성화 [현재 적용중]';
+                    offBtn.innerHTML = '🚫 배달 끄기 ✅';
                     offBtn.style.background = '#eceff1'; // 비활성화 적용중 색상
                     offBtn.style.border = '1.5px solid #607D8B';
                     offBtn.style.color = '#607D8B';
                     offBtn.style.opacity = '1';
 
-                    onBtn.innerHTML = '🚚 배달 기능 켜기';
+                    onBtn.innerHTML = '🚚 배달 켜기';
                     onBtn.style.background = 'white';
                     onBtn.style.border = '1.5px solid var(--moket-green)';
                     onBtn.style.color = 'var(--moket-green)';
@@ -2787,6 +2952,61 @@
         }
 
 
+        // [신규] 카카오 로그인은 했는데 번호를 못 받은 손님을 한 번 더 로그인시킨다.
+        //  카카오는 '전화번호 제공'에 동의해야만 번호를 넘겨준다. 동의를 안 했으면 번호가 없고,
+        //  그러면 손님이 적은 번호가 주문 서랍 이름이 되어 오타 하나에 지난 주문을 통째로 잃는다.
+        //  로그인 표시를 지우면 아래 로직이 로그인 화면을 띄운다.
+        //  동의를 또 안 할 수도 있으므로 딱 한 번만 시도한다. (계속 띄우면 주문을 못 하게 된다)
+        const LOGIN_RECHECK_KEY = 'moket_kakao_phone_recheck';
+        function gMaybeAskKakaoAgain() {
+            try {
+                if (!isLoginEntryEnabled) return false;
+                if (localStorage.getItem(LOGIN_RECHECK_KEY) === 'done') return false;
+
+                const hasLogin = !!localStorage.getItem('kakao_original_name');
+                if (!hasLogin) return false; // 아예 로그인 안 한 분은 원래 로직이 로그인 화면을 띄운다
+
+                const kk = normP(localStorage.getItem('kakao_original_phone') || "");
+                if (kk.length >= 10) return false; // 번호가 이미 있으면 건드리지 않는다
+
+                localStorage.setItem(LOGIN_RECHECK_KEY, 'done');
+                localStorage.removeItem('kakao_original_name'); // 이걸 지우면 로그인 화면이 뜬다
+                return true;
+            } catch (e) { return false; }
+        }
+
+        // ===== [신규] 로그인 없이 둘러보기 (숨은 통로) =====
+        //  로그인 화면 아래 사업자 정보의 '강성민'을 10번 누르면 로그인 창을 닫고 상품을 볼 수 있다.
+        //  · 관리자 모드와는 별개다. 비공개 상품이 보이거나 관리자 버튼이 생기지는 않는다.
+        //  · 창(탭)을 닫으면 풀린다. 주문할 때는 예전처럼 로그인·회원정보가 필요하다.
+        const GUEST_VIEW_KEY = 'moket_guest_view';
+        let guestTapCount = 0;
+        let guestTapLastTime = 0;
+
+        function gIsGuestView() {
+            try { return sessionStorage.getItem(GUEST_VIEW_KEY) === 'true'; } catch (e) { return false; }
+        }
+
+        function handleGuestEntry(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+
+            // 관리자 모드 진입과 같은 방식: 3초 안에 이어서 눌러야 세어진다
+            const now = Date.now();
+            if (now - guestTapLastTime > 3000) guestTapCount = 0;
+            guestTapLastTime = now;
+            guestTapCount++;
+            if (guestTapCount < 10) return;
+
+            guestTapCount = 0;
+            try { sessionStorage.setItem(GUEST_VIEW_KEY, 'true'); } catch (err) { /* 저장 못 해도 이번 화면은 열린다 */ }
+
+            const modal = document.getElementById('profile-modal');
+            if (modal) modal.classList.remove('login-forced');
+            closeModal('profile-modal');
+            checkScrollLock();
+            showToast('로그인 없이 둘러보기로 들어왔습니다.');
+        }
+
         let isLoginEntryEnabled = true; // 기본값은 로그인 강제
         async function fetchLoginEntryStatus() {
             try {
@@ -2800,9 +3020,16 @@
                 //  배포되는 https 환경에서는 기존과 동일하게 로그인 화면이 뜬다.
                 if (window.location.protocol === 'file:') return;
 
+                // [신규] 로그인은 했는데 카카오 번호가 없는 손님만 한 번 더 로그인시킨다.
+                //  주문이 담기는 서랍 이름을 카카오 번호로 쓰기 때문에, 번호가 없으면
+                //  손님이 적은 번호가 그대로 서랍 이름이 되어 오타가 나면 지난 주문을 잃는다.
+                //  로그인할 때 번호 제공에 동의하지 않으면 또 못 받으므로 딱 한 번만 시도한다.
+                gMaybeAskKakaoAgain();
+
                 // 로그인 화면 강제 여부에 따라 초기 모달 제어
+                //  [신규] '로그인 없이 둘러보기'로 들어온 창은 이 탭을 닫을 때까지 다시 막지 않는다.
                 const kakaoInfo = localStorage.getItem('kakao_original_name');
-                if (!kakaoInfo && isLoginEntryEnabled) {
+                if (!kakaoInfo && isLoginEntryEnabled && !gIsGuestView()) {
                     const modal = document.getElementById('profile-modal');
                     if (modal) {
                         modal.classList.add('login-forced');
@@ -2818,16 +3045,16 @@
             const offBtn = document.getElementById('ADMIN_LOGIN_OFF');
             if (onBtn && offBtn) {
                 if (isLoginEntryEnabled) {
-                    onBtn.innerHTML = '🔒 전체 로그인 강제 [현재 적용중]';
+                    onBtn.innerHTML = '🔒 로그인 강제 ✅';
                     onBtn.style.background = '#e3f2fd';
-                    offBtn.innerHTML = '🔓 로그인 화면 끄기';
+                    offBtn.innerHTML = '🔓 로그인 끄기';
                     offBtn.style.background = 'white';
                     offBtn.style.opacity = '0.5';
                     onBtn.style.opacity = '1';
                 } else {
-                    offBtn.innerHTML = '🔓 수동입력 모드 [현재 적용중]';
+                    offBtn.innerHTML = '🔓 로그인 끄기 ✅';
                     offBtn.style.background = '#fff3e0';
-                    onBtn.innerHTML = '🔒 전체 로그인 강제하기';
+                    onBtn.innerHTML = '🔒 로그인 강제';
                     onBtn.style.background = 'white';
                     onBtn.style.opacity = '0.5';
                     offBtn.style.opacity = '1';
@@ -2879,16 +3106,16 @@
             const offBtn = document.getElementById('ADMIN_PRODUCT_LIST_OFF');
             if (onBtn && offBtn) {
                 if (isProductListEnabled) {
-                    onBtn.innerHTML = '📦 상품목록 전체 공개 [현재 적용중]';
+                    onBtn.innerHTML = '📦 상품목록 공개 ✅';
                     onBtn.style.background = '#e1f5fe';
-                    offBtn.innerHTML = '🌑 상품목록 전체 비공개';
+                    offBtn.innerHTML = '🌑 상품목록 숨김';
                     offBtn.style.background = 'white';
                     offBtn.style.opacity = '0.5';
                     onBtn.style.opacity = '1';
                 } else {
-                    offBtn.innerHTML = '🌑 상품목록 비공개 중 [현재 적용중]';
+                    offBtn.innerHTML = '🌑 상품목록 숨김 ✅';
                     offBtn.style.background = '#eceff1';
-                    onBtn.innerHTML = '📦 상품목록 전체 공개하기';
+                    onBtn.innerHTML = '📦 상품목록 공개';
                     onBtn.style.background = 'white';
                     onBtn.style.opacity = '0.5';
                     offBtn.style.opacity = '1';
@@ -2948,25 +3175,25 @@
 
             if (onBtn && offBtn) {
                 if (isSaturdayAsWeekday) {
-                    onBtn.innerHTML = '🗓️ 토요일 평일 작동 활성화 [현재 적용중]';
+                    onBtn.innerHTML = '🗓️ 토요일 영업 ✅';
                     onBtn.style.background = '#e1f5fe';
                     onBtn.style.border = '1.5px solid #2196F3';
                     onBtn.style.color = '#2196F3';
                     onBtn.style.opacity = '1';
 
-                    offBtn.innerHTML = '🗓️ 토요일 주말 작동 (배달 휴무)';
+                    offBtn.innerHTML = '🗓️ 토요일 휴무';
                     offBtn.style.background = 'white';
                     offBtn.style.border = '1.5px solid #ff4d4d';
                     offBtn.style.color = '#ff4d4d';
                     offBtn.style.opacity = '0.5';
                 } else {
-                    offBtn.innerHTML = '🗓️ 토요일 주말 작동 [현재 적용중]';
+                    offBtn.innerHTML = '🗓️ 토요일 휴무 ✅';
                     offBtn.style.background = '#eceff1';
                     offBtn.style.border = '1.5px solid #607D8B';
                     offBtn.style.color = '#607D8B';
                     offBtn.style.opacity = '1';
 
-                    onBtn.innerHTML = '🗓️ 토요일 평일 작동 활성화';
+                    onBtn.innerHTML = '🗓️ 토요일 영업';
                     onBtn.style.background = 'white';
                     onBtn.style.border = '1.5px solid var(--moket-green)';
                     onBtn.style.color = 'var(--moket-green)';
@@ -4485,8 +4712,11 @@
             }
 
             // 로컬 스토리지에 저장
+            // [수정] 연락처는 숫자 11자리로 정리해서 담는다.
+            //  예전에는 적은 그대로 담아 '010-9448-9133'처럼 하이픈이 붙거나
+            //  '**01044301278'같은 값이 그대로 주문에 실려 나갔다.
             localStorage.setItem('moket_user_name', name);
-            localStorage.setItem('moket_user_phone', phone);
+            localStorage.setItem('moket_user_phone', normP(phone));
             localStorage.setItem('moket_user_address', address);
             localStorage.setItem('moket_user_address_detail', addressDetail);
             localStorage.setItem('moket_user_entrance', entrance);
@@ -7223,12 +7453,9 @@
                         }, 300);
                     }
                 };
-            } else if (currentMainTab === 'onsite-frozen') {
-                activeFilter = '냉동';
-            } else if (currentMainTab === 'onsite-refrigerated') {
-                activeFilter = '냉장';
-            } else if (currentMainTab === 'onsite-room') {
-                activeFilter = '상온';
+            } else if (String(currentMainTab).startsWith('onsite-')) {
+                // [수정] 상시판매는 탭 키(분류)를 그대로 목록 키로 쓴다
+                activeFilter = currentMainTab;
             } else if (currentMainTab === 'fruit-veg') {
                 const fvCats = [
                     { key: '과일', label: '과일' }
@@ -7322,14 +7549,23 @@
         // [신규] 상품 검색 (현재 배송유형 탭 안에서만)
         let productSearchQuery = "";
 
+        // [수정] 검색 범위 딱지를 위 탭 이름과 똑같이 맞춘다.
+        //  예전에는 상시판매 탭에서도 '예약구매'라고 적혀 있어, 어디를 검색하는지 잘못 읽혔다.
         function updateSearchScopeLabel() {
             const el = document.getElementById('search-scope-label');
             if (!el) return;
-            const isToday = (currentDeliveryType === 'today');
-            el.innerText = isToday ? '당일구매' : '예약구매';
-            el.style.background = isToday ? '#fff3e0' : '#eef2ff';
-            el.style.color = isToday ? '#e65100' : '#4f46e5';
-            el.style.borderColor = isToday ? '#ffcc80' : '#c7d2fe';
+
+            const styles = {
+                today: { text: '당일판매', bg: '#fff3e0', fg: '#e65100', bd: '#ffcc80' },
+                onsite: { text: '상시판매', bg: '#eafaf2', fg: '#047857', bd: '#a7e8c9' },
+                reserve: { text: '예약판매', bg: '#eef2ff', fg: '#4f46e5', bd: '#c7d2fe' }
+            };
+            const s = styles[currentDeliveryType] || styles.reserve;
+
+            el.innerText = s.text;
+            el.style.background = s.bg;
+            el.style.color = s.fg;
+            el.style.borderColor = s.bd;
         }
 
         function handleProductSearch(v) {
@@ -7465,7 +7701,11 @@
                         if (!isAdminMode) {
                             if (isFruitVeg) {
                                 // [신규] 예약배송 모드일 때는 과일 상품의 요일 및 시간 제약을 일체 배제 (24시간 무중단 노출 및 예약을 받기 위함)
-                                if (currentDeliveryType !== 'reserve') {
+                                // [신규] 상시판매 분류탭으로 옮긴 과일도 마감(15시)·휴무일 규칙에서 뺀다.
+                                //  당일 과일이 아니라 매장에 늘 있는 상품으로 옮긴 것이므로 오후에도 계속 보여야 한다.
+                                //  (분류탭을 지정하지 않은 당일 과일은 예전 규칙 그대로다)
+                                const _isOnsiteAssigned = String(gDisplayTabOf(p) || '').startsWith('onsite-');
+                                if (currentDeliveryType !== 'reserve' && !_isOnsiteAssigned) {
                                     // [신규] 전날(오늘 이전) 날짜의 과일/야채 상품은 모두 숨김
                                     if (pDate < today) {
                                         return false;
@@ -7599,6 +7839,10 @@
                 });
             } else if (targetKey === '사다드림') {
                 filteredData = visibleProducts.filter(gIsSadaProduct);
+            } else if (String(targetKey).startsWith('onsite-')) {
+                // [신규] 상시판매 — 음식 종류별 분류. 상품에 지정된 분류(displayTab)로 나눈다.
+                //  분류를 아직 안 정한 상품은 '기타' 탭에 모아 사라지지 않게 한다.
+                filteredData = visibleProducts.filter(p => gOnsiteTabCatOf(p) === targetKey);
             } else {
                 filteredData = targetKey === '전체상품_예약'
                 ? visibleProducts.filter(p => {
@@ -7724,7 +7968,8 @@
             //  · 이 탭으로 지정된 상품은 기존 규칙에 안 걸렸어도 넣는다.
             //  지정이 없는 상품(displayTab 빈 값)은 위에서 계산한 기존 결과 그대로다.
             //  검색 중에는 탭과 무관하게 찾는 것이 목적이므로 건드리지 않는다.
-            if (!_searchQ) {
+            if (!_searchQ && !String(targetKey).startsWith('onsite-')) {
+                // [수정] 상시판매 분류 탭은 바로 위에서 이미 분류(displayTab)대로 걸렀으므로 건너뛴다.
                 const _tabKey = gTabKeyOfTarget(targetKey);
                 if (_tabKey) {
                     filteredData = filteredData.filter(p => !p.displayTab || p.displayTab === _tabKey);
@@ -7941,6 +8186,7 @@
                     `<div class="item-info-top">` +
                     `<div class="item-name">${p.name.replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
                     `<div class="item-price-row">` +
+                    gStorageBadge(p) +
                     `<div class="item-price-val">${gCardPriceLabel(p)}</div>` +
                     `</div>` +
                     // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
@@ -8008,6 +8254,19 @@
         function gPriceLabel(price) {
             const v = parseInt(price) || 0;
             return v.toLocaleString() + '원' + (v === 0 ? '~' : '');
+        }
+
+        // [신규] 보관방법(냉동·냉장·상온) 표시. 받아서 어디에 둬야 하는지 카드에서 바로 보이게 한다.
+        //  보관분류가 없는 상품(과일·날짜 공동구매 등)은 붙이지 않는다.
+        function gStorageBadge(p) {
+            const s = String((p && p.matchKey) || "") + " " + String((p && p.storage) || "");
+            let label, bg, fg;
+            if (/냉동/.test(s)) { label = '❄️ 냉동'; bg = '#eef4ff'; fg = '#1d4ed8'; }
+            else if (/냉장/.test(s)) { label = '🧊 냉장'; bg = '#eafaf2'; fg = '#047857'; }
+            else if (/상온|실온/.test(s)) { label = '📦 상온'; bg = '#fff4e9'; fg = '#c2610a'; }
+            else return '';
+            return `<span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:${fg}; background:${bg};` +
+                ` padding:3px 8px; border-radius:6px; white-space:nowrap; line-height:1.3;">${label}</span>`;
         }
 
         // [신규] 고를 수 있는 옵션(선택옵션)이 실제로 있는 상품인지.
@@ -10530,7 +10789,8 @@
                 const payload = {
                     // [삭제] header:'order' — 구글 시트로 보내던 시절의 표시. 지금은 읽는 곳이 없다.
                     name: name,
-                    phone: phone,
+                    // [수정] 하이픈·별표가 섞인 채로 저장돼 전화·문자가 안 걸리던 건이 있었다. 숫자 11자리로 정리해 담는다.
+                    phone: normP(phone),
                     address: userAddress,
                     addressDetail: userAddressDetail,
                     entrance: userEntrance,
