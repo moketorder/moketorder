@@ -250,8 +250,9 @@
         .main-tabs.grid-tabs .main-tab-btn {
             flex: none;
             width: auto;
-            padding: 6px 9px;
-            font-size: 12.5px;
+            /* [수정] 글자가 작아 잘 안 읽혀서 키웠다. 두 줄 격자라 가로로는 밀리기만 하고 잘리지 않는다. */
+            padding: 7px 11px;
+            font-size: 14.5px;
             line-height: 1.3;
             white-space: nowrap;
         }
@@ -981,7 +982,9 @@
             position: absolute;
             top: 0; /* [수정] 실제 위치는 JS에서 날짜 행(offsetTop) 기준으로 카테고리·날짜 사이에 설정 */
             left: 50%;
-            transform: translateX(-50%) scale(0.9);
+            /* [수정] 가운데(-50%)가 기본이지만, '픽업/배달 예정일' 줄 오른쪽에 붙일 때는 JS에서 0으로 바꾼다 */
+            --gx: -50%;
+            transform: translateX(var(--gx)) scale(0.9);
             background: rgba(255, 109, 0, 0.95);
             color: var(--white);
             padding: 6px 14px;
@@ -1723,7 +1726,7 @@
             <li onclick="openSideModal('profile-modal')">주문자 변경</li>
             <li onclick="openSideModal('location-modal')">매장위치</li>
             <li onclick="openSideModal('bank-modal')">계좌번호</li>
-            <li onclick="showCombinedDeliveryGuide()">합배송 안내</li>
+            <li onclick="showCombinedDeliveryGuide()">배송서비스 안내</li>
             <li onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기</li>
 
         </ul>
@@ -1903,13 +1906,19 @@
         </div>
         <!-- [통합] 필터 영역 (하위 카테고리/날짜 표시) -->
         <div class="date-scroll-guide" id="date-scroll-guide"><span class="bounce-arrow">←</span> 옆으로 밀어서 날짜 더보기</div>
+        <!-- [신규] 날짜 버튼이 무슨 날짜인지 한 줄로 알려준다. 버튼 줄은 옆으로 밀리므로
+             줄 안에 딱지를 넣지 않고 바로 위에 얇게 얹어 가로 폭을 잡아먹지 않게 했다. -->
+        <div id="date-filters-caption" style="display:none; align-items:center; gap:5px; padding:2px 14px 5px; font-size:11.5px; font-weight:800; color:#8a94a6; letter-spacing:-0.2px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--moket-green)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            픽업/배달 예정일
+        </div>
         <div class="date-filter-container" id="date-filters"></div>
         <div class="date-filter-container" id="date-filters-categories" style="display:none;"></div>
         <!-- [신규] 상품 검색 바 (현재 배송유형 탭 안에서만 검색) -->
         <!-- [수정] 안내문과 자리를 맞바꿨다. 검색은 탭을 고른 다음 바로 쓰는 것이라 탭 바로 밑이 맞고,
              안내문은 읽고 나서 목록으로 넘어가는 것이라 맨 아래가 맞다. -->
         <div id="product-search-bar" style="display:flex; align-items:center; gap:8px; padding:8px 14px 10px;">
-            <span id="search-scope-label" style="flex-shrink:0; font-size:13px; font-weight:800; padding:9px 12px; border-radius:10px; border:1.5px solid #ffcc80; background:#fff3e0; color:#e65100; white-space:nowrap;">당일구매</span>
+            <span id="search-scope-label" style="flex-shrink:0; font-size:13px; font-weight:800; padding:9px 12px; border-radius:10px; border:1.5px solid #ffcc80; background:#fff3e0; color:#e65100; white-space:nowrap;">당일판매</span>
             <div style="position:relative; flex:1; min-width:0;">
                 <input id="product-search-input" type="text" inputmode="search" autocomplete="off" placeholder="상품 검색" oninput="handleProductSearch(this.value)"
                     style="width:100%; box-sizing:border-box; padding:10px 40px 10px 14px; border:1.5px solid #e2e8f0; border-radius:10px; font-size:14px; font-weight:600; outline:none;">
@@ -2140,10 +2149,12 @@
                      마지막 칸('취소' 버튼 자리)에는 정렬방향·새로고침 아이콘 두 개를 나눠 넣는다. -->
                 <div
                     style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; align-items: stretch;">
+                    <!-- [수정] '날짜순'만으로는 무슨 날짜인지 알 수 없어 '픽업/배송일순'으로 적는다.
+                         글자가 길어진 만큼 두 버튼의 글자 크기를 함께 줄여 칸 안에 한 줄로 들어가게 맞춘다. -->
                     <button class="date-btn active" id="btn-sort-order" onclick="changeSortMode('timestamp')"
-                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
+                        style="height:32px; font-size:13.5px; letter-spacing:-0.5px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
                     <button class="date-btn" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
-                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">날짜순</button>
+                        style="height:32px; font-size:13.5px; letter-spacing:-0.5px; padding:0; font-weight:900; white-space:nowrap;">픽업/배송일순</button>
                     <div style="display:flex; gap:6px; min-width:0;">
                         <button class="date-btn" id="btn-sort-dir" onclick="toggleSortDir()"
                             style="height: 32px; flex:1 1 0; min-width:0; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
@@ -2284,8 +2295,8 @@
             if (type === 'today' || type === 'reserve') {
                 const conflict = (type === 'today') ? 'reserve' : 'today';
                 if (getCartDeliveryTypes().has(conflict)) {
-                    const targetLabel = (type === 'today') ? '당일구매' : '예약구매';
-                    const conflictLabel = (conflict === 'today') ? '당일구매' : '예약구매';
+                    const targetLabel = (type === 'today') ? '당일판매' : '예약판매';
+                    const conflictLabel = (conflict === 'today') ? '당일판매' : '예약판매';
                     const em = (t) => `<b style="color:var(--nego-orange);">${t}</b>`;
                     showSystemModal(
                         // 모바일에서 문장이 어색하게 끊기지 않도록 강제 줄바꿈을 없애고 keep-all로 단어 단위 줄바꿈
@@ -2311,21 +2322,31 @@
                 if (isHoliday) {
                     let holidayMsg = "";
                     if (publicHolidays.includes(todayStr)) {
-                        holidayMsg = "임시휴무일에는 당일구매 주문이 불가능합니다.";
+                        holidayMsg = "임시휴무일";
                     } else if (isSaturdayAsWeekday) {
-                        holidayMsg = "일요일에는 당일구매 주문이 불가능합니다.";
+                        holidayMsg = "일요일";
                     } else {
-                        holidayMsg = "주말에는 당일구매 주문이 불가능합니다.";
+                        holidayMsg = "주말";
                     }
-                    showSystemModal(`${holidayMsg}<br><br><b>[🗓️ 예약구매]</b>를 이용해 주세요!`, 'alert');
+                    showSystemModal(
+                        // [수정] 안내가 한눈에 들어오게 핵심 낱말에만 색을 넣는다. (휴무 사유=주황, 안내=초록)
+                        `<div style="line-height:1.75; word-break:keep-all;">` +
+                        `<b style="color:var(--nego-orange);">${holidayMsg}</b>에는 <b style="color:var(--item-black);">당일판매</b> 주문이 불가능합니다.<br><br>` +
+                        `<b style="color:var(--moket-green);">다른 상품페이지</b>를 이용해 주세요!` +
+                        `</div>`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
-                
-                // 2. 평일 15시 이후 당일구매 마감 차단 (오픈은 자정 0시)
+
+                // 2. 평일 15시 이후 당일판매 마감 차단 (오픈은 자정 0시)
                 if (hour >= 15) {
                     const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
-                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>00:00 - 15:00</b>`, 'alert');
+                    showSystemModal(
+                        `<div style="line-height:1.75; word-break:keep-all;">` +
+                        `<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일판매 주문 가능시간]</span>` +
+                        `<b style="color:var(--item-black);">${daysStr}</b><br>` +
+                        `<b style="color:var(--nego-orange); font-size:1.05em;">00:00 - 15:00</b>` +
+                        `</div>`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -2578,7 +2599,24 @@
             }
         }
 
-        // [신규] 상단 안내 문구를 한 곳에서 결정 (매장판매 / 코스트코 / 사다드림)
+        // [신규] 판매유형 안내 카드. 배송서비스 안내(메뉴)와 같은 모양·같은 색으로 맞춰,
+        //  손님이 어느 화면에서 보든 같은 것으로 읽히게 한다.
+        function gTypeNoticeCard(icon, title, accent, tint, lines) {
+            // [수정] 글씨가 작아 잘 안 읽힌다고 해서 제목·본문을 한 단계씩 키웠다. (13/12.5 → 14.5/13.5)
+            return `<div style="background:#fff; border:1px solid #edf1f5; border-radius:14px; padding:12px 14px; text-align:left; word-break:keep-all; box-shadow:0 1px 3px rgba(16,24,40,0.04);">` +
+                `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
+                `<span style="flex:0 0 auto; width:26px; height:26px; border-radius:9px; background:${tint}; display:inline-flex; align-items:center; justify-content:center; font-size:14px; line-height:1;">${icon}</span>` +
+                `<span style="font-size:14.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
+                `</div>` +
+                lines.map(t =>
+                    `<div style="display:flex; gap:7px; font-size:13.5px; font-weight:700; color:#6b7684; line-height:1.6; margin-top:4px;">` +
+                    `<span style="flex:0 0 auto; width:4px; height:4px; border-radius:50%; background:${accent}; opacity:0.45; margin-top:8px;"></span>` +
+                    `<span style="min-width:0;">${t}</span></div>`
+                ).join('') +
+                `</div>`;
+        }
+
+        // [신규] 상단 안내 문구를 한 곳에서 결정 (판매유형 / 매장판매 / 코스트코 / 사다드림)
         //  목록을 그릴 때마다 항상 새로 정하므로, 탭을 바꾸면 이전 안내가 자동으로 사라진다.
         function updateSectionNotice(targetKey, filteredData, searchQ) {
             const el = document.getElementById('main-section-title');
@@ -2590,9 +2628,16 @@
 
             let html = "";
 
+            const daysStr = (typeof isSaturdayAsWeekday !== 'undefined' && isSaturdayAsWeekday) ? '월~토' : '월~금';
+
             if (currentDeliveryType === 'onsite') {
-                // 상시판매 탭이면 하위 탭(냉동·냉장·상온)과 상관없이 항상 노출
-                html = `<div style="font-size: 18px; font-weight: 800; color: #ff4d4d; letter-spacing: -0.5px; line-height: 1.4;">매장 판매로 품절될 경우 제공되지 못할 수 있습니다.</div>`;
+                // 상시판매 탭이면 하위 분류와 상관없이 항상 노출.
+                // [수정] 품절 경고만 크게 떠 있어 '상시판매가 뭔지'는 알 수 없었다. 판매 특징을 함께 적는다.
+                html = gTypeNoticeCard('🏪', '상시판매', '#047857', '#eafaf2', [
+                    `늘 파는 상품이라 언제든 담으실 수 있어요`,
+                    `당일판매·예약판매 어느 쪽에 담으셔도 그 주문과 함께 나가요`,
+                    `<b style="color:#ff4d4d;">매장에서도 함께 팔아 품절될 수 있어요</b>`
+                ]);
             } else if (currentMainTab === 'costco') {
                 html = `<div style="font-size: 18px; font-weight: 900; color: #ff4d4d; margin-bottom: 6px;">코스트코 구매대행 상품입니다.</div>` +
                     `<div style="font-size: 14px; font-weight: 600; color: #666; letter-spacing: -0.5px;">가격에 수수료가 포함되어있으며 품절시 제공되지 못할 수 있습니다.</div>`;
@@ -2603,15 +2648,28 @@
             } else if (key === '사다드림' || hasSadaInList) {
                 // [수정] 입금 안내창에서 뺀 사다드림 안내(당일 입금·카드 불가)를 여기로 옮겼다.
                 //  상품을 고르는 시점에 알아야 하는 내용이라 목록 위가 더 맞는 자리.
-                html = `<div style="background:#fff4e9; border:1px solid #ffd9b3; border-radius:14px; padding:11px 14px; text-align:left; word-break:keep-all;">` +
-                    `<div style="display:flex; align-items:center; gap:6px; font-size:14px; font-weight:900; color:#c2610a; margin-bottom:6px;"><span style="flex:0 0 auto;">🛵</span><span>사다드림 안내</span></div>` +
-                    `<div style="display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:700; color:#8a6a45; line-height:1.55;">` +
-                    `<div>· 무료배달 기준 금액(15,000원)에 <b style="color:#c2610a;">포함되지 않아요.</b></div>` +
-                    `<div>· <b style="color:#c2610a;">당일 입금</b>이 확인되어야 주문이 확정됩니다.</div>` +
-                    `<div>· 사다드림은 <b style="color:#c2610a;">카드 결제가 불가</b>합니다.</div>` +
-                    // [수정] 대행료 안내는 여기 두지 않는다. 대행료는 상세옵션에서 주문금액에 따라
-                    //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
-                    `</div></div>`;
+                // [수정] 다른 안내(당일·상시·예약판매)와 같은 카드 모양·같은 말투로 맞춘다. 내용은 그대로.
+                //  대행료 안내는 여기 두지 않는다. 대행료는 상세옵션에서 주문금액에 따라
+                //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
+                html = gTypeNoticeCard('🛵', '사다드림', '#c2410a', '#fff1e8', [
+                    `무료배달 기준 금액(15,000원)에 <b style="color:#c2410a;">포함되지 않아요</b>`,
+                    `<b style="color:#c2410a;">당일 입금</b>이 확인되어야 주문이 확정돼요`,
+                    `사다드림은 <b style="color:#c2410a;">카드 결제가 안 돼요</b>`
+                ]);
+            } else if (currentDeliveryType === 'today') {
+                // [신규] 당일판매 특징
+                html = gTypeNoticeCard('🚚', '당일판매', '#e65100', '#fff3e0', [
+                    `오늘 받는 상품이에요`,
+                    `${daysStr} <b style="color:#e65100;">오후 3시</b>까지 주문하시면 오늘 배달·픽업해 드려요 (일요일·휴무일은 쉬어요)`,
+                    `🍎 과일은 <b style="color:#e65100;">매일 새벽시장</b>에서 가장 신선하고 당도 높은 것만 골라와요`
+                ]);
+            } else if (currentDeliveryType === 'reserve') {
+                // [신규] 예약판매 특징
+                html = gTypeNoticeCard('🗓️', '예약판매', '#4f46e5', '#eef2ff', [
+                    `정해진 날짜에 들어오는 상품이라 그날 받으실 수 있어요`,
+                    `위에서 받는 날짜를 고르시면 그날 상품만 보여요`,
+                    `날짜가 다른 상품을 같이 담으시면 <b style="color:#4f46e5;">가장 늦은 날짜에 한 번에</b> 나가요`
+                ]);
             }
 
             el.innerHTML = html;
@@ -3518,9 +3576,9 @@
                 showSystemModal(
                     feeModal(
                         `배달 최소주문금액 미달`,
-                        feeRow('사다드림 주문금액', sadaTotal) + feeRow('예약구매 주문금액', reserveTotal),
+                        feeRow('사다드림 주문금액', sadaTotal) + feeRow('예약판매 주문금액', reserveTotal),
                         feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.'),
-                        `사다드림과 예약구매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
+                        `사다드림과 예약판매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
                         `<span style="display:block; text-align:center; margin-top:8px;">배달비 ${feeAmount(deliveryFee)} × 2 = ${feeAmount(deliveryFee * 2)}</span>`
                     ),
                     'confirm',
@@ -4396,46 +4454,65 @@
             document.body.style.overflow = isAnyOpen ? 'hidden' : '';
         }
 
-        // ===== [신규] 합배송 안내 =====
-        // 같은 날짜 상품을 한 번에 배달하고, 합계가 무료배달 기준을 넘으면 이미 낸 배달비까지
-        // 빼주는 기능이 코드에는 있는데 어디에도 설명이 없었다. 설명 본문을 여기 한 곳에 두고
-        // 메뉴(전체 안내)와 각 안내창(접이식)에서 같이 쓴다.
+        // ===== 배송서비스 안내 =====
+        // [수정] 요약과 상세가 따로 놀아 같은 말이 두 번 나오고 색 상자가 겹쳐 읽기 어려웠다.
+        //  '배달비 → 언제 받나 → 알아두기' 세 묶음으로 한 번만 정리하고, 색은 강조할 낱말에만 쓴다.
+        //  메뉴(전체 안내)와 주문 중 접이식 안내가 이 본문 하나를 같이 쓴다.
+        //  금액·요일은 실제 설정값(deliveryFee·토요일 영업)을 읽어 쓰므로 설정을 바꾸면 안내도 따라 바뀐다.
         function gCombinedDeliveryGuideBody() {
-            const line = (label, value, opt = {}) =>
-                `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; ${opt.mt ? 'margin-top:5px;' : ''}">` +
-                `<span style="font-size:13px; font-weight:700; color:${opt.color || '#8a97a3'};">${label}</span>` +
-                `<span style="font-size:${opt.strong ? '15px' : '13.5px'}; font-weight:${opt.strong ? '900' : '800'}; color:${opt.color || 'var(--item-black)'}; font-variant-numeric:tabular-nums; white-space:nowrap;">${value}</span>` +
+            const fee = (typeof deliveryFee !== 'undefined' ? deliveryFee : 3000);
+            const daysStr = (typeof isSaturdayAsWeekday !== 'undefined' && isSaturdayAsWeekday) ? '월~토' : '월~금';
+            const O = (t) => `<b style="color:var(--nego-orange);">${t}</b>`;   // 금액·핵심 결과(주황)
+            const K = (t) => `<b style="color:var(--item-black);">${t}</b>`;     // 조건·이름(검정)
+
+            // 카드 하나 = 아이콘 + 제목 + 짧은 줄 몇 개. 네 가지(배달비·배송일·판매방식·합배송)를 같은 모양으로 맞춘다.
+            // [수정] 네 카드가 모두 주황 테두리라 눈이 피로했다. 테두리는 연한 회색으로 낮추고,
+            //  주제별 색은 아이콘 동그라미·제목·글머리 점에만 얹는다. (탭 색과 같은 계열로 맞춤)
+            const card = (icon, title, accent, tint, lines) =>
+                `<div style="background:#fff; border:1px solid #edf1f5; border-radius:14px; padding:12px 14px; margin-top:10px; box-shadow:0 1px 3px rgba(16,24,40,0.04);">` +
+                `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
+                `<span style="flex:0 0 auto; width:27px; height:27px; border-radius:9px; background:${tint}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
+                `<span style="font-size:14.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
+                `</div>` +
+                lines.map(t =>
+                    `<div style="display:flex; gap:7px; font-size:13.5px; font-weight:700; color:#6b7684; line-height:1.65; margin-top:4px;">` +
+                    `<span style="flex:0 0 auto; width:4px; height:4px; border-radius:50%; background:${accent}; opacity:0.45; margin-top:8px;"></span>` +
+                    `<span style="min-width:0;">${t}</span></div>`
+                ).join('') +
                 `</div>`;
 
-            return `<div style="white-space:normal; text-align:left; word-break:keep-all; line-height:1.65;">` +
-                `<div style="font-size:14px; font-weight:700; color:var(--item-black);">받는 날짜가 같으면 <b style="color:var(--nego-orange);">여러 번 나눠 주문하셔도 한 번에 배달</b>됩니다.</div>` +
+            // 주제별 강조색 (주문서 탭 색과 같은 계열)
+            const C_FEE = ['#e65100', '#fff3e0'];      // 배달비 · 주황
+            const C_DATE = ['#047857', '#eafaf2'];     // 배송일 · 초록
+            const C_TAB = ['#4f46e5', '#eef2ff'];      // 판매방식 · 남색
+            const C_PACK = ['#c2410c', '#fff1e8'];     // 합배송 · 진주황
 
-                `<div style="background:#f8f9fa; border:1px solid #eef1f4; border-radius:10px; padding:11px 12px; margin-top:10px;">` +
-                `<div style="font-size:11.5px; font-weight:900; color:#8a97a3; letter-spacing:0.03em; margin-bottom:8px;">예시 · 8월 20일에 받는 주문</div>` +
-                line('1차 주문', '9,000원') +
-                line('└ 배달비', '+3,000원', { mt: true, color: '#d32f2f' }) +
-                line('2차 주문', '8,000원', { mt: true }) +
-                `<div style="border-top:1px dashed #dde3e8; margin-top:9px; padding-top:9px;">` +
-                line('상품 합계', '17,000원', { strong: true, color: 'var(--nego-orange)' }) +
-                `</div></div>` +
+            return `<div style="white-space:normal; text-align:left; word-break:keep-all;">` +
 
-                `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:11px 12px; margin-top:8px; font-size:13px; font-weight:700; color:#2e7d32; display:flex; flex-direction:column; gap:5px;">` +
-                `<div>✅ 15,000원을 넘어 <b>1차에 내신 배달비 3,000원을 빼드려요.</b></div>` +
-                `<div>✅ 상품은 8월 20일에 <b>한 번에</b> 배달돼요.</div>` +
-                `</div>` +
+                // [수정] 말투를 '해요체 + 존댓말(–시–)'로 통일한다. 명령형(받으세요)·설명체(쉽니다)가
+                //  섞여 있어 읽을 때 걸렸다. 모든 줄을 '~해요 / ~하실 수 있어요'로 맞춘다.
+                card('🛵', '배달비', C_FEE[0], C_FEE[1], [
+                    `배달비는 ${O(fee.toLocaleString() + '원')}이고, 같은 날 받는 상품이 ${O('15,000원 이상')}이면 무료예요`,
+                    `매장픽업은 배달비가 없어요`
+                ]) +
 
-                // [신규] 과일은 당일에만 살 수 있어서, 받는 날 오후 3시 전에 얹으면
-                //  같은 배달로 나가고 무료배달 기준도 채우기 쉽다. 주력 상품이라 눈에 띄게 둔다.
-                `<div style="background:#fff9f2; border:1px solid #ffe8cc; border-radius:10px; padding:11px 12px; margin-top:8px;">` +
-                `<div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:4px;">🍎 받는 날 당일에도 과일을 더할 수 있어요</div>` +
-                // [수정] 당일구매와 예약구매는 한 장바구니에 담을 수 없으므로 '따로 주문'이라고 짚어준다
-                `<div style="font-size:12.5px; font-weight:700; color:#8a7461;">과일은 <b style="color:var(--item-black);">받는 날 당일에만</b> 주문할 수 있어요. 그날 <b style="color:var(--nego-orange);">오후 3시</b> 전까지 따로 주문하시면 같은 배달에 함께 나갑니다.</div>` +
-                `</div>` +
+                card('🗓️', '배송일', C_DATE[0], C_DATE[1], [
+                    `상품마다 ${K('받는 날짜')}가 정해져 있어요 (픽업/배달 예정일)`,
+                    `받는 날짜는 상품 목록과 주문내역에서 확인하실 수 있어요`
+                ]) +
 
-                `<div style="margin-top:10px; font-size:12.5px; font-weight:700; color:#8a7461; display:flex; flex-direction:column; gap:4px;">` +
-                `<div>· 받는 날짜가 다르면 각각 배달되고 배달비도 각각 붙어요.</div>` +
-                `<div>· 사다드림은 당일 드시는 상품이라 더 늦은 날짜 상품과 함께 배달되지 않아요.</div>` +
-                `</div>` +
+                card('🏪', '당일판매 · 예약판매', C_TAB[0], C_TAB[1], [
+                    `${K('당일판매')} — ${daysStr} ${O('오후 3시')}까지 주문하시면 그날 받으실 수 있어요 (일요일·휴무일은 쉬어요)`,
+                    `${K('예약판매')} — 정해진 날짜에 들어오는 상품이라 그날 받으실 수 있어요`,
+                    `${K('상시판매')} — 늘 파는 상품이라 어느 쪽에 담으셔도 함께 나가요`
+                ]) +
+
+                card('📦', '합배송', C_PACK[0], C_PACK[1], [
+                    `날짜가 다른 상품을 ${K('같이 담아 주문')}하시면 ${O('가장 늦은 날짜에 한 번에')} 배달돼요 (배달비도 한 번만 붙어요)`,
+                    `${K('따로 주문')}하셔도 받는 날이 같으면 함께 나가고, 합쳐서 ${O('15,000원')}이 넘으면 먼저 내신 배달비를 빼드려요`,
+                    `매장픽업은 상품이 들어온 날에 각각 찾아가시면 돼요`
+                ]) +
+
                 `</div>`;
         }
 
@@ -4456,7 +4533,8 @@
             if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
             showSystemModal(
                 `<div style="white-space:normal;">` +
-                `<div style="text-align:center; font-size:18px; font-weight:900; color:var(--nego-orange); margin-bottom:14px;">🛵 합배송 안내</div>` +
+                `<div style="text-align:center; font-size:18px; font-weight:900; color:var(--nego-orange); margin-bottom:4px;">🛵 배송서비스 안내</div>` +
+                `<div style="text-align:center; font-size:12.5px; font-weight:700; color:#8a97a3; margin-bottom:16px;">배달비 · 받는 날짜 한눈에</div>` +
                 gCombinedDeliveryGuideBody() +
                 `</div>`,
                 'alert'
@@ -7323,11 +7401,13 @@
             filterAreaCategories.innerHTML = '';
             filterAreaDates.style.display = 'none';
             filterAreaCategories.style.display = 'none';
+            const dateCaption = document.getElementById('date-filters-caption');
+            if (dateCaption) dateCaption.style.display = 'none';
             const dateScrollGuide = document.getElementById('date-scroll-guide');
             if (dateScrollGuide) {
                 dateScrollGuide.style.display = 'none';
                 dateScrollGuide.style.opacity = '0';
-                dateScrollGuide.style.transform = 'translateX(-50%) scale(0.9)';
+                dateScrollGuide.style.transform = 'translateX(var(--gx)) scale(0.9)';
             }
 
             let activeFilter = null;
@@ -7381,6 +7461,7 @@
 
             if (currentMainTab === 'reserve') {
                 filterAreaDates.style.display = 'flex';
+                if (dateCaption) dateCaption.style.display = 'flex';
 
                 // [수정] 사다드림은 예약구매의 별도 대분류 탭으로 분리 → 공동구매 날짜 필터에서는 제외
                 const finalDates = ['전체상품_예약'];
@@ -7422,20 +7503,35 @@
                             guide.style.display = 'block';
                             guide.offsetHeight; // Force reflow
                             // [수정] 카테고리 행과 날짜 행 사이에 위치 (날짜 행 top 기준 앵커 → 검색창 등 다른 요소 추가에도 안 틀어짐)
+                            //  '픽업/배달 예정일' 한 줄이 생긴 뒤로는 그 줄과 높이를 맞춰, 글씨와 겹치지 않고 나란히 뜨게 한다.
                             guide.style.bottom = 'auto';
-                            guide.style.top = Math.max(0, filterAreaDates.offsetTop - Math.round(guide.offsetHeight / 2)) + 'px';
+                            const _capOn = dateCaption && dateCaption.style.display !== 'none';
+                            const _anchor = _capOn
+                                ? dateCaption.offsetTop + Math.round((dateCaption.offsetHeight - guide.offsetHeight) / 2)
+                                : filterAreaDates.offsetTop - Math.round(guide.offsetHeight / 2);
+                            guide.style.top = Math.max(0, _anchor) + 'px';
+                            // 안내 줄이 있으면 그 줄 오른쪽 끝에 붙이고(글씨와 안 겹침), 없으면 예전처럼 가운데
+                            if (_capOn) {
+                                guide.style.left = 'auto';
+                                guide.style.right = '12px';
+                                guide.style.setProperty('--gx', '0px');
+                            } else {
+                                guide.style.left = '50%';
+                                guide.style.right = 'auto';
+                                guide.style.setProperty('--gx', '-50%');
+                            }
                             guide.style.opacity = '1';
-                            guide.style.transform = 'translateX(-50%) scale(1)';
+                            guide.style.transform = 'translateX(var(--gx)) scale(1)';
                             // [신규] 몇 초 보였다가 스르륵 사라짐
                             clearTimeout(window.__dateGuideHideTimer);
                             window.__dateGuideHideTimer = setTimeout(() => {
                                 guide.style.opacity = '0';
-                                guide.style.transform = 'translateX(-50%) scale(0.9)';
+                                guide.style.transform = 'translateX(var(--gx)) scale(0.9)';
                                 setTimeout(() => { if (guide.style.opacity === '0') guide.style.display = 'none'; }, 350);
                             }, 3500);
                         } else {
                             guide.style.opacity = '0';
-                            guide.style.transform = 'translateX(-50%) scale(0.9)';
+                            guide.style.transform = 'translateX(var(--gx)) scale(0.9)';
                             guide.style.display = 'none';
                         }
                     }
@@ -7446,7 +7542,7 @@
                     const guide = document.getElementById('date-scroll-guide');
                     if (guide && filterAreaDates.scrollLeft > 10 && guide.style.opacity !== '0') {
                         guide.style.opacity = '0';
-                        guide.style.transform = 'translateX(-50%) scale(0.9)';
+                        guide.style.transform = 'translateX(var(--gx)) scale(0.9)';
                         setTimeout(() => {
                             if (guide.style.opacity === '0') {
                                 guide.style.display = 'none';
@@ -8077,7 +8173,7 @@
                 const emptyMsg = document.createElement('div');
                 emptyMsg.style = "text-align:center; padding:80px 20px; color:#999; font-weight:700;";
                 if (_searchQ) {
-                    emptyMsg.innerHTML = `'${productSearchQuery.trim()}' 검색 결과가 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#bbb; display:block; margin-top:8px;">(현재 ${currentDeliveryType === 'today' ? '당일구매' : '예약구매'} 탭에서 검색 중)</span>`;
+                    emptyMsg.innerHTML = `'${productSearchQuery.trim()}' 검색 결과가 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#bbb; display:block; margin-top:8px;">(현재 ${currentDeliveryType === 'today' ? '당일판매' : (currentDeliveryType === 'onsite' ? '상시판매' : '예약판매')} 탭에서 검색 중)</span>`;
                 } else if (targetKey === 'today-fruit' || targetKey === 'today-fruit-only' || targetKey === 'today-veg-only') {
                     emptyMsg.style = "text-align:center; padding:80px 20px; color:#999; font-weight:700; font-size:18px; line-height:1.5;";
                     const now = new Date();
@@ -9226,9 +9322,9 @@
                 if (!hasItems) {
                     titleEl.innerHTML = `🛒 장바구니 담은 목록`;
                 } else if (cartType === 'today') {
-                    titleEl.innerHTML = `🚚 당일구매 장바구니 목록`;
+                    titleEl.innerHTML = `🚚 당일판매 장바구니 목록`;
                 } else {
-                    titleEl.innerHTML = `🗓️ 예약구매 장바구니 목록`;
+                    titleEl.innerHTML = `🗓️ 예약판매 장바구니 목록`;
                 }
             }
 
@@ -9661,7 +9757,7 @@
             }
 
             if (hasTodayOnlyItem && hasReserveOnlyItem) {
-                showSystemModal("당일구매 상품과 예약구매 상품은 함께 주문할 수 없습니다.<br><br>구매 유형별(당일구매 및 예약구매)로 각각 나누어 따로 주문해 주세요.", 'alert');
+                showSystemModal("당일판매 상품과 예약판매 상품은 함께 주문할 수 없습니다.<br><br>구매 유형별(당일판매 및 예약판매)로 각각 나누어 따로 주문해 주세요.", 'alert');
                 return;
             }
 
@@ -9743,13 +9839,18 @@
                 if (isHoliday) {
                     let holidayMsg = "";
                     if (publicHolidays.includes(todayStr)) {
-                        holidayMsg = "임시휴무일에는 당일구매 주문이 불가능합니다.";
+                        holidayMsg = "임시휴무일";
                     } else if (isSaturdayAsWeekday) {
-                        holidayMsg = "일요일에는 당일구매 주문이 불가능합니다.";
+                        holidayMsg = "일요일";
                     } else {
-                        holidayMsg = "주말에는 당일구매 주문이 불가능합니다.";
+                        holidayMsg = "주말";
                     }
-                    showSystemModal(`${holidayMsg}<br><br><b>[🗓️ 예약구매]</b>를 이용해 주세요!`, 'alert');
+                    showSystemModal(
+                        // [수정] 안내가 한눈에 들어오게 핵심 낱말에만 색을 넣는다. (휴무 사유=주황, 안내=초록)
+                        `<div style="line-height:1.75; word-break:keep-all;">` +
+                        `<b style="color:var(--nego-orange);">${holidayMsg}</b>에는 <b style="color:var(--item-black);">당일판매</b> 주문이 불가능합니다.<br><br>` +
+                        `<b style="color:var(--moket-green);">다른 상품페이지</b>를 이용해 주세요!` +
+                        `</div>`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
@@ -9759,7 +9860,12 @@
                 }
                 if (currentHour >= 15) {
                     const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
-                    showSystemModal(`<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일구매 주문 가능시간]</span><b>${daysStr}</b><br><b>00:00 - 15:00</b>`, 'alert');
+                    showSystemModal(
+                        `<div style="line-height:1.75; word-break:keep-all;">` +
+                        `<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일판매 주문 가능시간]</span>` +
+                        `<b style="color:var(--item-black);">${daysStr}</b><br>` +
+                        `<b style="color:var(--nego-orange); font-size:1.05em;">00:00 - 15:00</b>` +
+                        `</div>`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
