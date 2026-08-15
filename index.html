@@ -2613,12 +2613,12 @@
             // [수정] 흰 바탕이라 목록과 구분이 잘 안 돼, 강조색을 아주 옅게(5%) 깔고 테두리도 같은 색으로 맞췄다.
             return `<div style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; text-align:left; word-break:keep-all;">` +
                 `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
-                `<span style="flex:0 0 auto; width:26px; height:26px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:14px; line-height:1;">${icon}</span>` +
-                `<span style="font-size:14.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
+                `<span style="flex:0 0 auto; width:28px; height:28px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
+                `<span style="font-size:15.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
                 `</div>` +
                 lines.map(t =>
-                    `<div style="display:flex; gap:7px; font-size:13.5px; font-weight:700; color:#6b7684; line-height:1.6; margin-top:4px;">` +
-                    `<span style="flex:0 0 auto; width:4px; height:4px; border-radius:50%; background:${accent}; opacity:0.45; margin-top:8px;"></span>` +
+                    `<div style="display:flex; gap:7px; font-size:14.5px; font-weight:700; color:#616d7b; line-height:1.6; margin-top:5px;">` +
+                    `<span style="flex:0 0 auto; width:4.5px; height:4.5px; border-radius:50%; background:${accent}; opacity:0.45; margin-top:8px;"></span>` +
                     `<span style="min-width:0;">${t}</span></div>`
                 ).join('') +
                 `</div>`;
@@ -2685,11 +2685,12 @@
             el.classList.remove('notice-hidden'); // 목록을 새로 그리면 다시 펼친 상태로
         }
 
-        // [신규] 안내 줄은 스크롤을 내리면 접히고, 위로 올리면 다시 나온다.
+        // [신규] 안내 줄은 스크롤을 내리면 접힌다.
         //  sticky 헤더 안에 있어 가만두면 화면을 계속 차지한다. 상품을 볼 때는 비켜 주는 게 맞다.
-        //  [주의] 접히면 페이지 높이가 줄면서 스크롤 위치가 저절로 밀린다. 그걸 '위로 올렸다'로 읽으면
-        //   다시 펼치고 또 접히기를 반복해 부르르 떨린다. 그래서 (1) 접는 동안에는 스크롤을 보지 않고,
-        //   (2) 방향이 바뀌었다고 인정하는 폭을 넉넉히 둔다.
+        //  [수정] 한 번 접히면 **맨 위로 올라갈 때까지** 다시 나오지 않는다.
+        //   예전에는 조금만 위로 올려도 다시 튀어나와 목록을 훑을 때 걸리적거렸다.
+        //  [주의] 접히면 페이지 높이가 줄면서 스크롤 위치가 저절로 밀린다. 그 변화를 손님의 스크롤로
+        //   잘못 읽지 않도록, 접히는 동안(0.65초)에는 스크롤을 보지 않는다.
         let _noticeLastY = 0;
         let _noticeLockUntil = 0;
         window.addEventListener('scroll', () => {
@@ -2708,8 +2709,8 @@
             if (!hidden && y > 80 && y > _noticeLastY + 10) {
                 el.classList.add('notice-hidden');        // 아래로 충분히 내렸다
                 _noticeLockUntil = now + 650;
-            } else if (hidden && (y <= 20 || y < _noticeLastY - 10)) {
-                el.classList.remove('notice-hidden');     // 위로 충분히 올렸거나 맨 위
+            } else if (hidden && y <= 20) {
+                el.classList.remove('notice-hidden');     // 맨 위까지 올라왔을 때만 다시 보여준다
                 _noticeLockUntil = now + 650;
             }
             _noticeLastY = y;
@@ -4479,12 +4480,12 @@
             const card = (icon, title, accent, tint, lines) =>
                 `<div style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; margin-top:10px;">` +
                 `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
-                `<span style="flex:0 0 auto; width:27px; height:27px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
-                `<span style="font-size:14.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
+                `<span style="flex:0 0 auto; width:28px; height:28px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
+                `<span style="font-size:15.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
                 `</div>` +
                 lines.map(t =>
-                    `<div style="display:flex; gap:7px; font-size:13.5px; font-weight:700; color:#6b7684; line-height:1.65; margin-top:4px;">` +
-                    `<span style="flex:0 0 auto; width:4px; height:4px; border-radius:50%; background:${accent}; opacity:0.45; margin-top:8px;"></span>` +
+                    `<div style="display:flex; gap:7px; font-size:14.5px; font-weight:700; color:#616d7b; line-height:1.65; margin-top:5px;">` +
+                    `<span style="flex:0 0 auto; width:4.5px; height:4.5px; border-radius:50%; background:${accent}; opacity:0.45; margin-top:8px;"></span>` +
                     `<span style="min-width:0;">${t}</span></div>`
                 ).join('') +
                 `</div>`;
