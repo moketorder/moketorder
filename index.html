@@ -2139,9 +2139,7 @@
                      [수정] 위 '전체/입고/픽업/취소' 줄과 칸·글자 크기를 똑같이 맞추려고 같은 4칸 그리드를 쓴다.
                      마지막 칸('취소' 버튼 자리)에는 정렬방향·새로고침 아이콘 두 개를 나눠 넣는다. -->
                 <div
-                    style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; align-items: stretch;">
-                    <button class="date-btn" id="btn-period" onclick="cyclePeriodFilter()"
-                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">1주일 ▾</button>
+                    style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; align-items: stretch;">
                     <button class="date-btn active" id="btn-sort-order" onclick="changeSortMode('timestamp')"
                         style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
                     <button class="date-btn" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
@@ -5123,7 +5121,9 @@
         let fullHistoryData = []; // 서버에서 가져온 전체 데이터 저장
         let currentSortBy = 'timestamp'; // 'timestamp' (주문일) 기본값
         let currentSortDir = 'desc'; // [수정] 기본 내림차순 (최신순)
-        let currentFilter = 'week'; // '1주일' 기본값
+        // [수정] 기간 고르는 버튼은 없앴다. 주문내역은 항상 최근 한 달치를 보여준다.
+        //  (완료된 주문은 10일이 지나면 보관함으로 옮겨지므로, 실제로는 그보다 짧게 남는다)
+        let currentFilter = 'month';
         let currentStatusFilter = 'all'; // '전체' 기본값
 
         function toggleSortDir() {
@@ -5148,7 +5148,7 @@
 
             if (modal.style.display !== 'flex') {
                 currentSortBy = 'timestamp';
-                currentFilter = 'week';
+                currentFilter = 'month';   // 항상 최근 한 달
                 currentStatusFilter = 'all';
                 currentSortDir = 'desc';
                 currentHistoryLimit = 10;
@@ -5983,6 +5983,7 @@
             currentHistoryLimit += 10;
             renderHistory();
         }
+
         // 고객이 주문 취소(부분 취소)한 경우 배달비 조건 체크 및 부과 처리 함수
         // [신규] 상품이 전부 취소되어 홀로 남은 배달비 항목을 취소 처리한다.
         // 취소 방식(PATCH 내용·재시도)은 deleteOrderCard와 동일하게 맞춤. 배달비는 재고 항목이
