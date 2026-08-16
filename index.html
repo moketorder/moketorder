@@ -2645,7 +2645,7 @@
                 // [수정] 품절 경고만 크게 떠 있어 '상시판매가 뭔지'는 알 수 없었다. 판매 특징을 함께 적는다.
                 html = gTypeNoticeCard('🏪', '상시판매', '#047857', '#eafaf2', [
                     `늘 파는 상품이라 언제든 담으실 수 있어요`,
-                    `당일판매·예약판매 어느 쪽에 담으셔도 그 주문과 함께 나가요`,
+                    `당일판매·예약판매 어느 쪽이랑 같이 담으셔도 그 주문과 함께 나가요`,
                     `<b style="color:#ff4d4d;">매장에서도 함께 팔아 품절될 수 있어요</b>`
                 ]);
             } else if (currentMainTab === 'costco') {
@@ -2801,6 +2801,157 @@
 
                 bypassCount = 0;
                 renderList(gCurrentListKey());
+            }
+        }
+
+        // ===== [신규] 관리자 모드 — 상품별 분류탭(displayTab) 바꾸기 =====
+        //  주문관리에 들어가지 않고도 화면에서 바로 "이 상품은 이 탭" 을 고칠 수 있게 한다.
+        //  · 저장하는 값은 displayTab 하나뿐이다. 가격·재고·이름은 절대 건드리지 않는다.
+        //  · 고를 수 있는 값도 아래 목록 안으로 제한한다. (주문관리의 '분류탭 설정'과 같은 목록)
+        const ADMIN_TAB_GROUPS = [
+            {
+                group: '당일판매', items: [
+                    { key: 'today-fruit', label: '과일 / 야채' },
+                    { key: 'today-reserve', label: '공동구매' }
+                ]
+            },
+            { group: '상시판매', items: ONSITE_CATS.map(c => ({ key: c.key, label: c.label })) },
+            {
+                group: '예약판매', items: [
+                    { key: 'reserve', label: '공동구매' },
+                    { key: 'sada', label: '사다드림' },
+                    { key: 'costco', label: '코스트코' }
+                ]
+            }
+        ];
+
+        // 카드 버튼처럼 자리가 좁은 곳에 쓰는 짧은 이름 (묶음 이름은 빼고 분류만)
+        function gAdminTabShortLabel(key) {
+            if (!key) return '분류 없음';
+            for (const g of ADMIN_TAB_GROUPS) {
+                const hit = g.items.find(it => it.key === key);
+                if (hit) return (g.group === '상시판매') ? hit.label : `${g.group.replace('판매', '')} ${hit.label}`;
+            }
+            return '분류 없음';
+        }
+
+        function gAdminTabLabel(key) {
+            if (!key) return '지정 없음';
+            for (const g of ADMIN_TAB_GROUPS) {
+                const hit = g.items.find(it => it.key === key);
+                if (hit) return `${g.group} › ${hit.label}`;
+            }
+            return '지정 없음';
+        }
+
+        function closeAdminTabPicker() {
+            const el = document.getElementById('admin-tab-modal');
+            if (el) el.remove();
+            checkScrollLock();
+        }
+
+        function openAdminTabPicker(name, matchKey) {
+            if (!isAdminMode) return;
+            closeAdminTabPicker();
+
+            const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
+            if (!target) { showToast("상품을 찾지 못했습니다."); return; }
+            const cur = String(target.displayTab || "");
+
+            const row = (key, label) => {
+                const on = (cur === key);
+                return `<div onclick="adminSetDisplayTab('${escapeArg(name)}','${escapeArg(matchKey)}','${key}')"` +
+                    ` style="display:flex; align-items:center; gap:9px; padding:11px 12px; margin-bottom:6px; cursor:pointer; border-radius:10px;` +
+                    ` border:1.5px solid ${on ? 'var(--moket-green)' : '#e2e8f0'}; background:${on ? '#f1fbf5' : '#fff'};">` +
+                    `<span style="flex:0 0 auto; width:17px; height:17px; border-radius:50%; border:2px solid ${on ? 'var(--moket-green)' : '#cfd6dc'};` +
+                    ` background:${on ? 'var(--moket-green)' : '#fff'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:900;">${on ? '✓' : ''}</span>` +
+                    `<span style="font-size:14px; font-weight:800; color:var(--item-black);">${label}</span>` +
+                    `</div>`;
+            };
+
+            let body = row('', '지정 없음 (상품명·분류대로)');
+            ADMIN_TAB_GROUPS.forEach(g => {
+                body += `<div style="font-size:11.5px; font-weight:900; color:#8a97a3; letter-spacing:0.03em; margin:14px 0 6px;">${g.group}</div>`;
+                g.items.forEach(it => { body += row(it.key, it.label); });
+            });
+
+            const wrap = document.createElement('div');
+            wrap.id = 'admin-tab-modal';
+            wrap.className = 'modal-overlay';
+            wrap.style.display = 'flex';
+            wrap.style.zIndex = '10050';
+            wrap.onclick = (e) => { if (e.target === wrap) closeAdminTabPicker(); };
+            wrap.innerHTML =
+                `<div class="modal-content" style="width:92%; max-width:420px; max-height:84vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px;">` +
+                `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">` +
+                `<div style="font-size:17px; font-weight:900; color:var(--item-black);">🏷️ 분류탭 바꾸기</div>` +
+                `<span onclick="closeAdminTabPicker()" style="font-size:24px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="font-size:12.5px; font-weight:700; color:#8a97a3; line-height:1.5; margin-bottom:14px; word-break:keep-all; text-align:left;">${name}</div>` +
+                `<div style="text-align:left;">${body}</div>` +
+                `<button class="btn-common btn-close" onclick="closeAdminTabPicker()" style="margin-top:14px;">닫기</button>` +
+                `</div>`;
+            document.body.appendChild(wrap);
+            checkScrollLock();
+        }
+
+        async function adminSetDisplayTab(name, matchKey, newTab) {
+            if (!isAdminMode) return;
+            const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
+            if (!target) { showToast("상품을 찾지 못했습니다."); return; }
+            if (String(target.displayTab || "") === String(newTab || "")) { closeAdminTabPicker(); return; }
+
+            closeAdminTabPicker();
+            showToast("분류탭을 저장하는 중…");
+
+            try {
+                // 1) 저장할 자리(번호) 확인. 주문관리에서 상품을 지웠으면 번호가 밀렸을 수 있으므로
+                //    그 자리의 상품명이 실제로 같은지 먼저 보고, 다르면 전체에서 다시 찾는다.
+                let idx = target.__pubIdx;
+                let ok = false;
+                if (idx !== undefined && idx !== null) {
+                    const chk = await fetch(`${FIREBASE_DB_URL}published_products/${idx}.json?t=${Date.now()}`);
+                    if (chk.ok) {
+                        const cur = await chk.json();
+                        ok = !!(cur && String(cur.name || "").trim() === String(name).trim());
+                    }
+                }
+                if (!ok) {
+                    const all = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
+                    if (!all.ok) throw new Error("상품 목록을 읽지 못했습니다.");
+                    const list = await all.json() || [];
+                    const keys = Array.isArray(list) ? list.map((v, i) => [i, v]) : Object.entries(list);
+                    const hit = keys.find(([, v]) => v && String(v.name || "").trim() === String(name).trim()
+                        && String((v.matchKey || v.date || "")).trim() === String(matchKey).trim());
+                    if (!hit) throw new Error("서버에서 이 상품을 찾지 못했습니다.");
+                    idx = hit[0];
+                    target.__pubIdx = idx;
+                }
+
+                // 2) displayTab 한 값만 고쳐 쓴다
+                const res = await fetch(`${FIREBASE_DB_URL}published_products/${idx}.json`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ displayTab: newTab || "", updatedAt: Date.now() })
+                });
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+
+                // 3) 다른 기기·손님 화면도 새로 받아가도록 갱신 시각을 올린다
+                await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
+                }).catch(() => { });
+
+                // 4) 이 화면에도 바로 반영
+                target.displayTab = newTab || "";
+                const cached = productsData.find(p => p === target);
+                if (cached) cached.displayTab = newTab || "";
+                try { localStorage.setItem('moket_products_cache_v3', JSON.stringify(productsData)); } catch (e) { }
+                showToast(`분류탭을 '${gAdminTabLabel(newTab)}'(으)로 바꿨습니다.`);
+                initMainTabs(false);
+                renderList(gCurrentListKey());
+            } catch (e) {
+                console.error("분류탭 저장 실패:", e);
+                showSystemModal("분류탭을 저장하지 못했습니다.<br><br>" + String(e.message || e), 'alert');
             }
         }
 
@@ -4108,10 +4259,21 @@
         try {
             const cachedHolidays = localStorage.getItem('moket_public_holidays');
             if (cachedHolidays) {
-                publicHolidays = JSON.parse(cachedHolidays) || [];
+                // 캐시에 지난 날짜가 남아 있을 수 있으므로 걸러서 쓴다
+                publicHolidays = gPruneHolidays(JSON.parse(cachedHolidays) || []);
             }
         } catch (e) {
             console.error("로컬 휴무일 캐시 읽기 실패:", e);
+        }
+
+        // [신규] 지난 임시 휴무일은 쓸모가 없으므로 목록에서 뺀다. (오늘은 남긴다)
+        function gPruneHolidays(list) {
+            const now = new Date();
+            const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            return (Array.isArray(list) ? list : [])
+                .map(s => String(s || "").trim())
+                .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s) && s >= todayKey)
+                .sort();
         }
 
         async function fetchHolidays() {
@@ -4119,7 +4281,15 @@
                 const res = await fetch(FIREBASE_DB_URL + "public_holidays.json?t=" + Date.now());
                 const data = await res.json();
                 if (data) {
-                    const newHolidays = Array.isArray(data) ? data : data.split(',').map(s => s.trim());
+                    const rawHolidays = Array.isArray(data) ? data : data.split(',').map(s => s.trim());
+                    // [신규] 지난 날짜는 화면·판정에서 바로 뺀다. 서버 정리는 사장님(관리자 모드)이 열 때만 한다.
+                    const newHolidays = gPruneHolidays(rawHolidays);
+                    if (isAdminMode && JSON.stringify(rawHolidays.slice().sort()) !== JSON.stringify(newHolidays)) {
+                        fetch(FIREBASE_DB_URL + "public_holidays.json", {
+                            method: 'PUT', body: JSON.stringify(newHolidays)
+                        }).then(r => { if (r.ok) console.log("지난 임시 휴무일을 목록에서 정리했습니다."); })
+                          .catch(e => console.error("휴무일 정리 실패:", e));
+                    }
                     const hasChanged = JSON.stringify(publicHolidays) !== JSON.stringify(newHolidays);
                     publicHolidays = newHolidays;
                     localStorage.setItem('moket_public_holidays', JSON.stringify(publicHolidays));
@@ -4149,7 +4319,8 @@
             const side = document.getElementById('side-menu');
             if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
 
-            holidayDraft = Array.isArray(publicHolidays) ? publicHolidays.slice() : [];
+            // 지난 날짜는 빼고 연다 → 저장을 누르면 서버 목록도 정리된다
+            holidayDraft = gPruneHolidays(publicHolidays);
             const now = new Date();
             holidayCalMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -4238,7 +4409,7 @@
         }
 
         async function saveHolidayCalendar() {
-            const newHolidays = holidayDraft.slice().sort();
+            const newHolidays = gPruneHolidays(holidayDraft);   // 지난 날짜는 저장하지 않는다
             try {
                 const res = await fetch(FIREBASE_DB_URL + "public_holidays.json", {
                     method: 'PUT',
@@ -6895,6 +7066,12 @@
                     throw new Error('네트워크 응답이 올바르지 않습니다.');
                 }
 
+                // [신규] published_products 안에서의 자리(번호)를 상품마다 붙여 둔다.
+                //  관리자 모드에서 분류탭을 고칠 때 이 번호로 그 상품만 콕 집어 저장한다.
+                //  (rawData는 publishedProducts를 그대로 복사한 것이라 번호가 서로 같다)
+                if (Array.isArray(publishedProducts)) publishedProducts.forEach((p, i) => { if (p) p.__pubIdx = i; });
+                if (Array.isArray(rawData)) rawData.forEach((p, i) => { if (p) p.__pubIdx = i; });
+
                 // 실시간 전역 재고 변동분 처리
                 let globalAdjustments = {};
                 if (stockRes && stockRes.ok) {
@@ -8322,11 +8499,20 @@
                     `</div>` +
                     // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
                     //  아래 버튼줄에 따로 한 줄을 차지하면 카드가 길어지고 썸네일이 작아 보인다.
-                    `<div class="qty-stepper wide" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
+                    // [신규] 관리자 모드에서는 그 줄 왼쪽에 분류탭 버튼을 나란히 붙인다. (손님 화면에는 없다)
+                    //  줄을 새로 만들지 않으므로 카드 길이가 늘지 않는다.
+                    (isAdminMode ? `<div style="display:flex; align-items:stretch; gap:6px; width:100%;">` +
+                        `<button onclick="openAdminTabPicker('${escapeArg(p.name)}','${escapeArg(p.matchKey || '')}')"` +
+                        ` style="flex:1 1 0; min-width:0; height:40px; padding:0 8px; box-sizing:border-box; align-self:flex-end;` +
+                        ` border:1.5px dashed #90caf9; background:#f5fbff; color:#1976d2; border-radius:8px;` +
+                        ` font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">` +
+                        `🏷️ ${gAdminTabShortLabel(p.displayTab)}</button>` : ``) +
+                    `<div class="qty-stepper wide" style="${isAdminMode ? 'flex:1 1 0; min-width:0;' : ''}${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
                     `<button class="qty-step-btn" onclick="stepQty(this, -1)">-</button>` +
                     `<input class="qty-sel" value="1" readonly>` +
                     `<button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>` +
                     `</div>` +
+                    (isAdminMode ? `</div>` : ``) +
                     `</div></div>` +
                     `<div class="item-controls-bottom-v">` +
                     `<button class="btn-detail" onclick="openDetail('${escapeArg(p.name)}')">상세보기</button>` +
