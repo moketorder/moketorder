@@ -909,31 +909,15 @@
             padding-top: 10px; /* 대분류 탭 위에 흰색 패딩을 깔아 회색선 비침 방지 */
         }
 
+        /* [수정] 접기 애니메이션을 없앴다. sticky 헤더 밖에 있으므로 스크롤하면
+           다른 내용과 똑같이 위로 밀려 사라진다. (움직임이 어긋나 끊겨 보이던 문제 해결) */
         .date-section-title {
-            padding: 8px 20px 4px 20px;
+            padding: 10px 12px 2px 12px;
             font-size: 18px;
             font-weight: 800;
             letter-spacing: 1px;
             color: var(--item-black);
             text-align: center;
-            /* [신규] 스크롤을 내리면 접혀서 사라지고, 위로 올리면 다시 나온다.
-               이 줄은 sticky 헤더 안에 있어 예전에는 화면을 계속 차지했다. */
-            overflow: hidden;
-            max-height: 320px;
-            opacity: 1;
-            /* [수정] 0.3초는 툭 끊기듯 사라져서 눈에 거슬렸다. 0.55초로 늘리고
-               ease 대신 뒤로 갈수록 느려지는 곡선을 써서 스르륵 닫히게 한다.
-               흐려지는 것은 접히는 것보다 살짝 늦게 끝나야 갑자기 사라지지 않는다. */
-            transition: max-height 0.55s cubic-bezier(0.25, 0.1, 0.25, 1),
-                        opacity 0.45s ease,
-                        padding 0.55s cubic-bezier(0.25, 0.1, 0.25, 1);
-        }
-
-        .date-section-title.notice-hidden {
-            max-height: 0;
-            opacity: 0;
-            padding-top: 0;
-            padding-bottom: 0;
         }
 
         .date-filter-container {
@@ -1914,9 +1898,6 @@
         </div>
         <div class="date-filter-container" id="date-filters"></div>
         <div class="date-filter-container" id="date-filters-categories" style="display:none;"></div>
-        <!-- [수정] 안내문을 하위 탭(분류·날짜) 바로 아래로 올린다. 탭을 고르면 그 판매유형이
-             어떤 것인지 먼저 읽히는 자리가 맞다. 검색줄은 그 아래로 내려간다. -->
-        <div class="date-section-title" id="main-section-title" style="display:none;"></div>
         <!-- [신규] 상품 검색 바 (현재 배송유형 탭 안에서만 검색) -->
         <div id="product-search-bar" style="display:flex; align-items:center; gap:8px; padding:8px 14px 10px;">
             <span id="search-scope-label" style="flex-shrink:0; font-size:13px; font-weight:800; padding:9px 12px; border-radius:10px; border:1.5px solid #ffcc80; background:#fff3e0; color:#e65100; white-space:nowrap;">당일판매</span>
@@ -1927,6 +1908,9 @@
             </div>
         </div>
     </div>
+    <!-- [수정] 판매유형 안내는 sticky 헤더 밖으로 뺐다. 접었다 펴는 움직임이 스크롤과 어긋나
+         뚝뚝 끊겨 보였기 때문. 이제는 그냥 화면 내용처럼 스크롤에 맞춰 위로 밀려 사라진다. -->
+    <div class="date-section-title" id="main-section-title" style="display:none;"></div>
     <div class="container" id="product-list"></div>
     <div id="detail-overlay" class="modal-overlay" onclick="if(event.target === this) closeModal('detail-overlay')">
         <div class="modal-content">
@@ -2686,60 +2670,11 @@
                 ]);
             }
 
-            // [수정] 한 번 스크롤로 사라진 안내는 다시 띄우지 않는다. 다시 보여주는 경우는 두 가지뿐이다.
-            //   ① 상위 탭(당일판매·상시판매·예약판매)을 옮겼을 때 → 그 판매유형 안내를 한 번 더
-            //   ② 사다드림 탭에 새로 들어왔을 때 → 사다드림 안내를 한 번 더 (입금·카드 안내라 매번 보여준다)
-            //  하위 분류(과일·고기·반찬…)를 오가는 것만으로는 다시 나오지 않는다.
-            if (currentDeliveryType !== _noticeLastType) {
-                _noticeLastType = currentDeliveryType;
-                ['today', 'onsite', 'reserve', 'costco'].forEach(k => _noticeDismissed.delete(k));
-            }
-            if (kind === 'sada' && _noticeLastKind !== 'sada') _noticeDismissed.delete('sada');
-            _noticeLastKind = kind;
-            _noticeKind = kind;
-
+            // [수정] 접었다 펴는 처리를 모두 없앴다. 안내는 sticky 헤더 밖에 있어 스크롤하면
+            //  다른 내용처럼 위로 밀려 사라지고, 맨 위로 올리면 다시 보인다.
             el.innerHTML = html;
-            el.style.display = (html && !_noticeDismissed.has(kind)) ? 'block' : 'none';
-            el.classList.remove('notice-hidden');
+            el.style.display = html ? 'block' : 'none';
         }
-
-        // [신규] 안내 줄은 스크롤을 내리면 접힌다.
-        //  sticky 헤더 안에 있어 가만두면 화면을 계속 차지한다. 상품을 볼 때는 비켜 주는 게 맞다.
-        //  [수정] 한 번 사라지면 다시 나오지 않는다. (맨 위로 올려도 그대로)
-        //   상위 탭을 옮기거나 사다드림에 새로 들어오면 다시 보여준다. → updateSectionNotice()
-        //  [주의] 접히면 페이지 높이가 줄면서 스크롤 위치가 저절로 밀린다. 그 변화를 손님의 스크롤로
-        //   잘못 읽지 않도록, 접히는 동안(0.65초)에는 스크롤을 보지 않는다.
-        let _noticeLastY = 0;
-        let _noticeLockUntil = 0;
-        const _noticeDismissed = new Set();   // 스크롤로 이미 치운 안내 종류
-        let _noticeKind = '';                 // 지금 화면에 떠 있는 안내 종류
-        let _noticeLastType = '';             // 마지막으로 안내를 띄운 상위 탭
-        let _noticeLastKind = '';             // 마지막으로 띄운 안내 종류 (사다드림 재진입 판별용)
-        window.addEventListener('scroll', () => {
-            const el = document.getElementById('main-section-title');
-            if (!el || el.style.display === 'none') return;
-
-            const y = window.scrollY || document.documentElement.scrollTop || 0;
-            const now = Date.now();
-
-            // 접히거나 펼쳐지는 동안 생기는 위치 변화는 무시한다
-            if (now < _noticeLockUntil) { _noticeLastY = y; return; }
-
-            const hidden = el.classList.contains('notice-hidden');
-            // [수정] 아래로 내리면 접히고, 접힌 뒤에는 다시 펼치지 않는다. (탭을 옮겨야 다시 보인다)
-            //  잠금 시간은 접히는 시간(0.55초)보다 길어야 한다. 짧으면 접히는 도중의 높이 변화를
-            //  '손님이 스크롤했다'로 잘못 읽는다.
-            if (!hidden && y > 80 && y > _noticeLastY + 10) {
-                el.classList.add('notice-hidden');        // 아래로 충분히 내렸다
-                if (_noticeKind) _noticeDismissed.add(_noticeKind);   // 이 안내는 끝
-                _noticeLockUntil = now + 650;
-                // 접히는 동안만 자리를 잡아 두고, 다 접히면 자리 자체를 없앤다
-                setTimeout(() => {
-                    if (el.classList.contains('notice-hidden')) el.style.display = 'none';
-                }, 600);
-            }
-            _noticeLastY = y;
-        }, { passive: true });
 
         // [대분류 탭 전환]
         function switchMainTab(type) {
