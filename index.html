@@ -3420,10 +3420,21 @@
         fetchSaturdayWeekdayStatus();
 
 
-                        async function handleDeliveryOrderClick() {
+                        /* [수정] fromFeeConfirm — 배달비 안내창에서 '확인'을 눌러 이어서 부른 경우에만 true.
+                           손님이 주문하기를 누른 것이라면 배달비 동의 표시를 매번 지운다.
+                           그래야 배달비가 붙는 상황에서는 누를 때마다 안내가 다시 뜬다.
+                           (예전에는 한 번 확인하면 그 뒤로는 조용히 넘어가, 장바구니를 바꿔
+                            금액이 달라져도 안내가 안 나왔다) */
+                        async function handleDeliveryOrderClick(fromFeeConfirm = false) {
             if (!isDeliveryEnabled) {
                 showSystemModal("배달주문은 추후 제공 예정입니다.", "alert");
                 return;
+            }
+
+            if (!fromFeeConfirm) {
+                window.isSadaDeliveryFeeAdded = false;
+                window.isReserveDeliveryFeeAdded = false;
+                window.isDeliveryFeeAddedUnder15000 = false;
             }
 
             // [신규] 배달은 합배송으로 나가므로, 사다드림보다 늦은 배달일 상품이 섞여 있으면 배달 주문을 막는다.
@@ -3706,72 +3717,78 @@
                 ? `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:9px 12px; margin-top:10px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all; text-align:center;">💡 같은 날짜 상품을 ${`<b>${shortfall.toLocaleString()}원</b>`}만 더 담으면 배달비가 무료예요.</div>`
                 : ``;
 
-            // [수정] 배달비 안내가 가장 먼저 나온다. 대신 위에서 합배송분을 합쳐 계산했으므로
-            //  실제로 배달비가 붙는 경우에만 여기까지 온다. (붙지 않으면 안내 없이 그냥 지나간다)
-            if (needSadaFeePrompt && needReserveFeePrompt) {
-                showSystemModal(
-                    feeModal(
-                        `배달 최소주문금액 미달`,
-                        feeRow('사다드림 주문금액', sadaTotal) + feeRow('예약판매 주문금액', reserveTotal),
-                        feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.'),
-                        `사다드림과 예약판매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
-                        `<span style="display:block; text-align:center; margin-top:8px;">배달비 ${feeAmount(deliveryFee)} × 2 = ${feeAmount(deliveryFee * 2)}</span>`
-                    ),
-                    'confirm',
-                    async () => {
-                        window.isSadaDeliveryFeeAdded = true;
-                        window.isReserveDeliveryFeeAdded = true;
-                        await handleDeliveryOrderClick();
-                    },
-                    () => {
-                        window.isSadaDeliveryFeeAdded = false;
-                        window.isReserveDeliveryFeeAdded = false;
-                    }
-                );
-                return;
-            }
+            /* [수정] 배달비 안내를 여기서 바로 띄우지 않고 함수로만 만들어 둔다.
+               예전에는 배달비 안내 → 합배송 날짜 안내 순서였는데, 손님 입장에서는
+               '언제 오는지'를 먼저 보고 '얼마 더 내는지'를 보는 편이 자연스럽다.
+               그래서 합배송 안내를 확인한 뒤(proceed) 이 함수를 부른다. */
+            const showFeePromptIfNeeded = (onOk) => {
+                if (needSadaFeePrompt && needReserveFeePrompt) {
+                    showSystemModal(
+                        feeModal(
+                            `배달 최소주문금액 미달`,
+                            feeRow('사다드림 주문금액', sadaTotal) + feeRow('예약판매 주문금액', reserveTotal),
+                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.'),
+                            `사다드림과 예약판매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
+                            `<span style="display:block; text-align:center; margin-top:8px;">배달비 ${feeAmount(deliveryFee)} × 2 = ${feeAmount(deliveryFee * 2)}</span>`
+                        ),
+                        'confirm',
+                        () => {
+                            window.isSadaDeliveryFeeAdded = true;
+                            window.isReserveDeliveryFeeAdded = true;
+                            onOk();
+                        },
+                        () => {
+                            window.isSadaDeliveryFeeAdded = false;
+                            window.isReserveDeliveryFeeAdded = false;
+                        }
+                    );
+                    return;
+                }
 
-            if (needSadaFeePrompt) {
-                showSystemModal(
-                    feeModal(
-                        `배달비 안내`,
-                        feeRow('사다드림 주문금액', sadaTotal),
-                        feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.'),
-                        `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>`
-                    ),
-                    'confirm',
-                    async () => {
-                        window.isSadaDeliveryFeeAdded = true;
-                        await handleDeliveryOrderClick();
-                    },
-                    () => {
-                        window.isSadaDeliveryFeeAdded = false;
-                    }
-                );
-                return;
-            }
+                if (needSadaFeePrompt) {
+                    showSystemModal(
+                        feeModal(
+                            `배달비 안내`,
+                            feeRow('사다드림 주문금액', sadaTotal),
+                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.'),
+                            `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>`
+                        ),
+                        'confirm',
+                        () => {
+                            window.isSadaDeliveryFeeAdded = true;
+                            onOk();
+                        },
+                        () => {
+                            window.isSadaDeliveryFeeAdded = false;
+                        }
+                    );
+                    return;
+                }
 
-            if (needReserveFeePrompt) {
-                showSystemModal(
-                    feeModal(
-                        `배달 최소주문금액 미달`,
-                        feeRow('주문금액', reserveTotal) + feeRow('최소주문금액', 15000),
-                        cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.') : ``,
-                        `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>` +
-                        feeNudge(15000 - reserveTotal) +
-                        gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?')
-                    ),
-                    'confirm',
-                    async () => {
-                        window.isReserveDeliveryFeeAdded = true;
-                        await handleDeliveryOrderClick();
-                    },
-                    () => {
-                        window.isReserveDeliveryFeeAdded = false;
-                    }
-                );
-                return;
-            }
+                if (needReserveFeePrompt) {
+                    showSystemModal(
+                        feeModal(
+                            `배달 최소주문금액 미달`,
+                            feeRow('주문금액', reserveTotal) + feeRow('최소주문금액', 15000),
+                            cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.') : ``,
+                            `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>` +
+                            feeNudge(15000 - reserveTotal) +
+                            gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?')
+                        ),
+                        'confirm',
+                        () => {
+                            window.isReserveDeliveryFeeAdded = true;
+                            onOk();
+                        },
+                        () => {
+                            window.isReserveDeliveryFeeAdded = false;
+                        }
+                    );
+                    return;
+                }
+
+                onOk();   // 배달비가 안 붙으면 안내 없이 그대로 진행
+            };
  
             // 1. 배달 안내 및 11시 마감 체크
             
@@ -3963,11 +3980,14 @@
                 //  (배달비 계산에서 사다드림 금액을 빼는 것은 별개 로직이라 영향받지 않는다)
                 const pendingItems = getPendingItemsByDate(deliveryDate, true);
 
+                // [수정] 합배송 날짜 안내를 확인한 다음에 배달비 안내를 띄운다 (순서 뒤바꿈).
                 const proceed = () => {
-                    selectedShippingMethod = '배달주문';
-                    combinedDeliveryItems = pendingItems;
-                    closeModal('shipping-overlay');
-                    openConfirm();
+                    showFeePromptIfNeeded(() => {
+                        selectedShippingMethod = '배달주문';
+                        combinedDeliveryItems = pendingItems;
+                        closeModal('shipping-overlay');
+                        openConfirm();
+                    });
                 };
 
                 let body = noticeHtml || "";
@@ -8274,6 +8294,19 @@
                 const recB = gIsRecommendProduct(b) || gIsSadaProduct(b);
                 if (recA !== recB) return recA ? -1 : 1;
 
+                /* [신규] 사다드림 탭은 배달일이 빠른 순으로 놓는다.
+                   사다드림은 날짜가 곧 받는 날이라, 이름 가나다순으로 섞여 있으면
+                   '언제 오는 물건인지' 훑기 어려웠다.
+                   아래 머릿말 규칙(getPriority)보다 앞에 둔다. 그러지 않으면 이름에 [ ]가 없는 상품이
+                   날짜와 상관없이 맨 뒤로 밀려 날짜순이 깨진다. */
+                if (targetKey === '사다드림') {
+                    const dA = gGetDeliveryDateKey(a) || '';
+                    const dB = gGetDeliveryDateKey(b) || '';
+                    if (dA && dB && dA !== dB) return dA.localeCompare(dB);
+                    if (dA && !dB) return -1;   // 날짜 없는 상품은 뒤로
+                    if (!dA && dB) return 1;
+                }
+
                 // 둘 다 재고가 있거나 둘 다 품절인 경우 (같은 그룹 내)에서만 우선순위 가동
                 const pA = getPriority(a.name);
                 const pB = getPriority(b.name);
@@ -8332,6 +8365,7 @@
                     // 날짜가 같거나 없는 경우 업로드 순서(originalIndex) 내림차순 정렬
                     if (a.originalIndex !== b.originalIndex) return b.originalIndex - a.originalIndex;
                 }
+
                 return a.name.localeCompare(b.name, 'ko', { numeric: true, sensitivity: 'base' });
             });
 
@@ -8454,7 +8488,7 @@
                     `<div class="item-info-top">` +
                     // [수정] [오늘의추천]은 이름이 아니라 isRecommend 값으로 그린다 (gRecommendMark).
                     //  이름에서는 gDisplayName으로 그 말머리를 떼어내 두 번 나오지 않게 한다.
-                    `<div class="item-name">${gRecommendMark(p)}${gDisplayName(p).replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
+                    `<div class="item-name">${gRecommendMark(p)}${gFreshMark(p)}${gDisplayName(p).replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
                     `<div class="item-price-row">` +
                     gStorageBadge(p) +
                     `<div class="item-price-val">${gCardPriceLabel(p)}</div>` +
@@ -8716,6 +8750,14 @@
             return `<span style="color:var(--nego-orange); font-size: 0.9em;">[오늘의추천]</span><br>`;
         }
 
+        // [신규] 신선식품 표시. 사다드림은 이름에 [사다드림]이 박혀 있어 저절로 보이지만,
+        //  신선식품은 이름에 아무것도 넣지 않으므로 isFresh 값을 보고 여기서 그린다.
+        //  사다드림(주황)과 구분되도록 초록으로 둔다.
+        function gFreshMark(p, size) {
+            if (!gIsFreshProduct(p)) return '';
+            return `<span style="color:#047857; font-size: ${size || '0.9em'};">[신선식품]</span><br>`;
+        }
+
         /* ===== [신규] 재고 선점 (오버셀 방지) =====
            Firebase 실시간DB REST의 조건부 쓰기를 쓴다.
            · GET에 X-Firebase-ETag: true 를 넣으면 응답 헤더로 ETag가 온다.
@@ -8973,7 +9015,7 @@
                 `<div style="line-height:1.7; word-break:keep-all;">` +
                 `<div style="font-weight:900; color:var(--nego-orange); font-size:1.05em; margin-bottom:10px;">🛵 함께 배달할 수 없어요</div>` +
                 `배달은 가장 늦은 입고일에<br>한 번에 나갑니다.<br><br>` +
-                `<b style="color:#c2610a;">사다드림</b>·<b style="color:#047857;">신선식품</b>은 당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
+                `<b style="color:#c2610a;">사다드림</b>·<b style="color:#047857;">신선식품</b>은<br>당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
                 `<div style="background:#f8f9fa; border-radius:10px; padding:12px 14px; text-align:left;">` +
                 listHtml +
                 `</div><br>` +
@@ -9775,6 +9817,7 @@
             // [수정] 상품카드와 같은 방식 — [오늘의추천]은 isRecommend 값으로 그리고 이름에서는 떼어낸다.
             document.getElementById('detail-title').innerHTML =
                 (gIsRecommendProduct(p) ? `<span style="color:var(--nego-orange); font-size: 0.85em;">[오늘의추천]</span><br>` : '') +
+                gFreshMark(p, '0.85em') +
                 gDisplayName(p).replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.85em;">[$1]</span>') + '<br>' : '');
             document.getElementById('detail-price').innerText = gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
