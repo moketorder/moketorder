@@ -8679,6 +8679,19 @@
             return String(p.name || "").includes("사다드림") || p.matchKey === "사다드림";
         }
 
+        // [신규] '신선식품'으로 표시해 둔 상품인지. 상품등록 공동구매 칸에서 고른 값(isFresh)을 본다.
+        function gIsFreshProduct(p) {
+            if (!p) return false;
+            return (p.isFresh === true || p.isFresh === 'true');
+        }
+
+        // [신규] 합배송에서 '자기 날짜를 지켜야 하는' 상품인지.
+        //  사다드림과 신선식품이 여기에 든다. 둘 다 그날 드셔야 하는 물건이라
+        //  더 늦은 날짜 상품과 한 차에 실어 보낼 수 없다.
+        function gIsDateBoundProduct(p) {
+            return gIsSadaProduct(p) || gIsFreshProduct(p);
+        }
+
         // [신규] '오늘의추천' 상품인지 — 사다드림과 같은 방식.
         //  상품등록의 오늘의추천 체크(isRecommend)가 기준이고, 상품명에는 말머리를 넣지 않는다.
         //  아직 isRecommend가 없는 예전 상품만 이름 말머리로 판단한다.
@@ -8800,18 +8813,19 @@
                 const p = gFindCartProduct(n); // [버그수정] 상세옵션 상품은 장바구니 키가 달라 이름 직접 비교로는 못 찾는다
                 if (!p) continue;
                 const d = gGetDeliveryDateKey(p);
-                const isSada = gIsSadaProduct(p);
+                // [수정] 사다드림뿐 아니라 신선식품도 자기 날짜를 지켜야 한다.
+                const isBound = gIsDateBoundProduct(p);
 
-                if (isSada) {
-                    // 사다드림이 여러 개면 가장 이른 날짜가 기준이 된다
+                if (isBound) {
+                    // 기준이 되는 상품이 여러 개면 가장 이른 날짜가 기준이 된다
                     if (d && (!sadaDate || d < sadaDate)) sadaDate = d;
                 }
-                if (d) dated.push({ p, d, isSada });
+                if (d) dated.push({ p, d, isSada: isBound, isFresh: gIsFreshProduct(p) });
             }
 
             if (!sadaDate) return null;
 
-            // [수정] 사다드림끼리도 날짜가 다르면 함께 배달할 수 없으므로 사다드림도 비교 대상에 포함한다.
+            // [수정] 사다드림·신선식품끼리도 날짜가 다르면 함께 배달할 수 없으므로 비교 대상에 포함한다.
             const sadaItems = dated.filter(o => o.isSada && o.d === sadaDate);
             const laterItems = dated.filter(o => o.d > sadaDate).sort((a, b) => a.d.localeCompare(b.d));
             if (laterItems.length === 0) return null;
@@ -8820,10 +8834,24 @@
         }
 
         // 안내창에서 상품을 바로 장바구니에서 빼는 버튼
+        // [신규] 안내창에서 한 날짜에 담긴 상품을 통째로 뺀다.
+        //  상품마다 빼기를 누르게 하면 날짜가 여러 개일 때 버튼이 너무 많아진다.
+        function removeConflictDate(encodedNames) {
+            let names = [];
+            try { names = JSON.parse(decodeURIComponent(encodedNames)) || []; } catch (e) { return; }
+            names.forEach(n => { delete cart[n]; delete cartDeliveryType[n]; });
+            afterConflictRemove();
+        }
+
         function removeConflictItem(encodedName) {
             const name = decodeURIComponent(encodedName);
             delete cart[name];
             delete cartDeliveryType[name];
+            afterConflictRemove();
+        }
+
+        // 뺀 뒤 화면을 맞추고, 아직 걸리면 안내창을 다시 띄운다
+        function afterConflictRemove() {
             updateFooter();
             refreshProductListAfterCartChange();
 
@@ -8838,15 +8866,61 @@
                 }
             }
 
-            // 아직 걸리는 조합이 남아 있으면 안내창을 갱신하고, 해결됐으면 닫는다
+            // 아직 걸리는 조합이 남아 있으면 안내창을 갱신하고, 해결됐으면 남은 것으로 바로 주문할지 묻는다
             if (!isSadaDeliveryBlocked()) {
+                showRemainingCartConfirm();
+            }
+        }
+
+        /* [신규] 합배송 문제를 푼 뒤, 장바구니에 남은 상품을 보여 주고 바로 주문할지 묻는다.
+           예전에는 '정리됐어요. 주문하기를 다시 눌러주세요'만 띄우고 창을 닫았는데,
+           손님이 무엇이 남았는지 못 본 채 다시 주문 버튼을 찾아 눌러야 했다. */
+        function showRemainingCartConfirm() {
+            const names = Object.keys(cart).filter(n => cart[n] > 0);
+
+            if (names.length === 0) {
                 showSystemModal(
                     `<div style="line-height:1.7; word-break:keep-all;">` +
-                    `<div style="font-weight:900; color:var(--moket-green); font-size:1.05em; margin-bottom:10px;">✅ 정리됐어요</div>` +
-                    `이제 함께 배달할 수 있습니다.<br>주문하기를 다시 눌러주세요.` +
-                    `</div>`,
-                    'alert');
+                    `<div style="font-weight:900; color:var(--nego-orange); font-size:1.05em; margin-bottom:10px;">장바구니가 비었어요</div>` +
+                    `상품을 다시 담아 주세요.</div>`, 'alert');
+                return;
             }
+
+            let total = 0;
+            const rows = names.map(n => {
+                const p = gFindCartProduct(n);
+                const qty = cart[n] || 0;
+                const unit = p ? gCartPaidUnitPrice(p, n) : 0;
+                const sum = unit * qty;
+                total += sum;
+                const d = p ? gGetDeliveryDateKey(p) : '';
+                const dateTag = d
+                    ? `<span style="font-size:10.5px; font-weight:800; color:#1d4ed8; background:#eff6ff; padding:1px 6px; border-radius:5px; margin-left:4px;">${gFormatDateKey(d, p)}</span>`
+                    : ``;
+                return `<div style="display:flex; align-items:baseline; gap:6px; padding:5px 0; border-top:1px solid #eef1f4;">` +
+                    `<div style="flex:1; min-width:0; font-size:13px; font-weight:700; color:var(--item-black); line-height:1.45;">${gCartName(n)}${dateTag}</div>` +
+                    `<div style="flex:0 0 auto; font-size:12px; font-weight:800; color:#888;">${qty}개</div>` +
+                    `</div>`;
+            }).join('');
+
+            showSystemModal(
+                `<div style="line-height:1.7; word-break:keep-all;">` +
+                `<div style="font-weight:900; color:var(--moket-green); font-size:1.05em; margin-bottom:10px;">✅ 이제 함께 배달할 수 있어요</div>` +
+                `<div style="background:#f8f9fa; border-radius:10px; padding:12px 14px; text-align:left;">` +
+                `<div style="font-size:12px; font-weight:900; color:#555; margin-bottom:2px;">남은 상품 ${names.length}개</div>` +
+                rows +
+                `<div style="display:flex; justify-content:space-between; align-items:baseline; border-top:1.5px solid #e2e8f0; margin-top:8px; padding-top:8px;">` +
+                `<span style="font-size:12.5px; font-weight:900; color:#555;">상품 합계</span>` +
+                `<span style="font-size:15px; font-weight:900; color:var(--nego-orange);">${total.toLocaleString()}원</span>` +
+                `</div></div><br>` +
+                `이대로 주문하시겠어요?` +
+                `</div>`,
+                'confirm',
+                () => {
+                    document.getElementById('system-modal').style.display = 'none';
+                    checkScrollLock();
+                    handleDeliveryOrderClick();   // 바로 배달 주문을 이어서 진행한다
+                });
         }
 
         // 배달 주문이 사다드림 합배송 규칙에 걸리면 안내창을 띄우고 true(차단)를 반환한다.
@@ -8854,18 +8928,20 @@
             const c = findSadaDeliveryConflict();
             if (!c) return false;
 
-            // [수정] 날짜별로 묶어서 보여주되, 기준 날짜(주황)와 함께 갈 수 없는 날짜(파랑)를 색과 태그로 구분한다.
+            /* [수정] 날짜별로 한 덩어리씩 보여 주고, 빼기도 그 날짜 통째로 한 번에 한다.
+               상품마다 빼기 버튼을 두니 여러 날짜가 겹칠 때 버튼이 수십 개로 늘어나
+               무엇을 눌러야 할지 알기 어려웠다. 어차피 해결하려면 한 날짜를 통째로 빼야 한다. */
+            const kindTag = (item) => item.isFresh
+                ? `<span style="display:inline-block; background:#eafaf2; color:#047857; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">신선식품</span>`
+                : (item.isSada
+                    ? `<span style="display:inline-block; background:#fff4e9; color:#c2610a; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">사다드림</span>`
+                    : ``);
+
             const row = (item) => {
                 const nm = String(item.p.name || "");
-                const kind = item.isSada
-                    ? `<span style="display:inline-block; background:#fff4e9; color:#c2610a; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">사다드림</span>`
-                    : ``;
-                return `<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid #eef1f4;">` +
-                    `<div style="flex:1; min-width:0;">` +
-                    `<div style="font-weight:800; font-size:13.5px; color:var(--item-black); line-height:1.4;">${nm}</div>` +
-                    `<div style="font-size:12px; font-weight:700; color:#888; margin-top:2px;">${cart[nm] || 0}개${kind}</div>` +
-                    `</div>` +
-                    `<button type="button" onclick="removeConflictItem('${encodeURIComponent(nm)}')" style="flex:0 0 auto; padding:7px 12px; border:1.5px solid #ffd6d6; background:#fff; color:#ff4d4d; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">빼기</button>` +
+                return `<div style="display:flex; align-items:baseline; gap:6px; padding:4px 0;">` +
+                    `<div style="flex:1; min-width:0; font-weight:700; font-size:13px; color:var(--item-black); line-height:1.45;">${nm}${kindTag(item)}</div>` +
+                    `<div style="flex:0 0 auto; font-size:12px; font-weight:800; color:#888;">${cart[nm] || 0}개</div>` +
                     `</div>`;
             };
 
@@ -8877,20 +8953,27 @@
 
             const listHtml = Object.keys(byDate).sort().map((d, idx) => {
                 const isBase = (d === c.sadaDate);
+                const items = byDate[d];
                 const color = isBase ? 'var(--nego-orange)' : '#2563eb';
                 const tag = isBase
                     ? `<span style="font-size:10.5px; font-weight:800; color:#c2610a; background:#fff4e9; padding:1px 6px; border-radius:5px; margin-left:6px;">기준</span>`
                     : `<span style="font-size:10.5px; font-weight:800; color:#1d4ed8; background:#eff6ff; padding:1px 6px; border-radius:5px; margin-left:6px;">함께 불가</span>`;
-                return `<div style="font-size:12px; font-weight:900; color:${color}; margin-top:${idx ? 12 : 0}px;">` +
-                    `${gFormatDateKey(d, byDate[d][0].p)}${tag}</div>` +
-                    byDate[d].map(row).join('');
+                // 이 날짜에 담긴 상품 이름들을 버튼 하나에 실어 보낸다
+                const names = encodeURIComponent(JSON.stringify(items.map(o => String(o.p.name || ""))));
+                return `<div style="border:1px solid #eef1f4; border-radius:10px; padding:10px 12px; background:#fff; margin-top:${idx ? 8 : 0}px;">` +
+                    `<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">` +
+                    `<div style="flex:1; min-width:0; font-size:12.5px; font-weight:900; color:${color};">${gFormatDateKey(d, items[0].p)}${tag}</div>` +
+                    `<button type="button" onclick="removeConflictDate('${names}')" style="flex:0 0 auto; padding:6px 12px; border:1.5px solid #ffd6d6; background:#fff; color:#ff4d4d; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">빼기</button>` +
+                    `</div>` +
+                    items.map(row).join('') +
+                    `</div>`;
             }).join('');
 
             showSystemModal(
                 `<div style="line-height:1.7; word-break:keep-all;">` +
                 `<div style="font-weight:900; color:var(--nego-orange); font-size:1.05em; margin-bottom:10px;">🛵 함께 배달할 수 없어요</div>` +
                 `배달은 가장 늦은 입고일에<br>한 번에 나갑니다.<br><br>` +
-                `사다드림은 당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
+                `<b style="color:#c2610a;">사다드림</b>·<b style="color:#047857;">신선식품</b>은 당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
                 `<div style="background:#f8f9fa; border-radius:10px; padding:12px 14px; text-align:left;">` +
                 listHtml +
                 `</div><br>` +
@@ -10323,16 +10406,11 @@
                 const isTodayOffOrAfterCutoff = isTodayOff || (currentHour >= 15);
 
                 // [추가] 공동구매 상품 입고일들 중 가장 늦은 날짜(maxReserveDate) 찾기
-                // [버그수정] 사다드림 상품은 여기서 뺀다.
-                //  사다드림도 예약 탭에서 등록되어 matchKey가 날짜인 경우가 있는데, 그대로 두면
-                //  그 날짜가 maxReserveDate로 잡혀 아래 합배송 처리에서 '다른 날짜 상품'까지
-                //  사다드림 날짜로 끌려갔다. (사다드림 배달일은 자기 상품에만 쓰는 날짜다)
                 let maxReserveDate = null;
                 for (const name in cart) {
                     if (cart[name] > 0) {
                         const p = gFindCartProduct(name);
                         if (p) {
-                            if (gIsSadaProduct(p)) continue;   // 사다드림은 합배송 기준 날짜에서 제외
                             const mk = String(p.matchKey || "").trim();
                             const normalizedMk = normalizeDateString(mk);
                             const isDate = /^\d{4}-\d{2}-\d{2}$/.test(normalizedMk);
