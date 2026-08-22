@@ -8779,6 +8779,30 @@
         }
 
         // 재고를 qty만큼 잡는다. 모자라면 { ok:false, remain } 을 돌려준다.
+        /* [신규] 주문확정 직전에 서버의 '기본 재고'를 다시 읽는다.
+           CAS 선점은 조정값(global_stock)만 지켜 준다. 그런데 사장님이 [품절] 버튼을 누르면
+           기본 재고가 0이 되고 조정값도 0으로 리셋된다. 손님 화면에는 열었을 때의 옛 기본 재고
+           (예: 1)가 남아 있어서, 1 + 0 = 1 로 계산돼 품절인 상품이 그대로 주문됐다.
+           그래서 확정하는 순간 그 상품의 재고 칸만 콕 집어 다시 확인한다(몇 바이트라 부담이 없다).
+           자리(index)가 바뀌었을 수 있으니 이름이 같을 때만 믿는다. */
+        async function gFetchLiveBaseStock(pData) {
+            const idx = pData && pData.__pubIdx;
+            if (idx === undefined || idx === null) return null;
+            try {
+                const [nRes, sRes] = await Promise.all([
+                    fetch(`${FIREBASE_DB_URL}published_products/${idx}/name.json?t=${Date.now()}`),
+                    fetch(`${FIREBASE_DB_URL}published_products/${idx}/stock.json?t=${Date.now()}`)
+                ]);
+                if (!nRes.ok || !sRes.ok) return null;
+                const nm = await nRes.json();
+                const norm = s => String(s || '').replace(/\s+/g, '');
+                if (norm(nm) !== norm(pData.name)) return null;   // 다른 상품 자리면 판단하지 않는다
+                const st = await sRes.json();
+                if (st === '' || st === null || st === undefined || String(st).trim() === '무제한') return 'unlimited';
+                return Math.max(0, parseInt(st) || 0);
+            } catch (e) { console.warn('기본 재고 재확인 실패:', e); return null; }
+        }
+
         async function gReserveStockCAS(adjKey, baseStock, qty) {
             const url = gStockUrl(adjKey);
             let lastRemain = 0;
@@ -11357,10 +11381,15 @@
                         const pData = productsData.find(pd => pd.name === it.name);
                         if (gIsUnlimitedStock(pData)) continue;
 
-                        const base = parseInt((pData && pData.originalStock) || 0) || 0;
+                        let base = parseInt((pData && pData.originalStock) || 0) || 0;
                         const adjKey = fGetAdjKey(it.matchKey || it.date, it.name);
                         const need = parseInt(it.qty) || 0;
                         if (need <= 0) continue;
+
+                        // [신규] 확정 직전에 서버 기본 재고를 한 번 더 본다 (그 사이 품절 처리됐을 수 있다)
+                        const live = await gFetchLiveBaseStock(pData);
+                        if (live === 'unlimited') continue;            // 그새 무제한으로 풀렸다
+                        if (live !== null) base = live;                // 서버 값이 우선
 
                         const r = await gReserveStockCAS(adjKey, base, need);
                         if (r.ok) { if (!r.unlimited) reserved.push({ adjKey, qty: need }); }
@@ -11379,11 +11408,17 @@
                         isHistoryProcessing = false;
                         document.getElementById('system-modal').style.display = 'none';
 
-                        const lines = failed.map(f =>
-                            `· ${f.name}<br><span style="color:#d32f2f; font-weight:800;">주문 ${f.need}개 / 남은 수량 ${Math.max(0, f.remain)}개</span>`).join('<br><br>');
+                        // 남은 수량이 0이면 '품절', 모자라기만 하면 '수량 부족'으로 나눠 알린다
+                        const allOut = failed.every(f => Math.max(0, f.remain) <= 0);
+                        const lines = failed.map(f => {
+                            const remain = Math.max(0, f.remain);
+                            return `· ${f.name}<br><span style="color:#d32f2f; font-weight:800;">`
+                                + (remain <= 0 ? `품절되었습니다` : `주문 ${f.need}개 / 남은 수량 ${remain}개`)
+                                + `</span>`;
+                        }).join('<br><br>');
                         showSystemModal(
-                            `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[재고 부족]</span>` +
-                            `방금 다른 분이 먼저 주문하셨습니다.<br><br>${lines}<br><br>` +
+                            `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${allOut ? '품절' : '재고 부족'}]</span>` +
+                            `${allOut ? '방금 품절된 상품이 있습니다.' : '방금 다른 분이 먼저 주문하셨습니다.'}<br><br>${lines}<br><br>` +
                             `수량을 줄이거나 장바구니에서 빼고 다시 주문해 주세요.`,
                             'alert',
                             () => { try { loadData(true); } catch (e) { location.reload(); } }
