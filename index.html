@@ -2230,7 +2230,9 @@
         //  '어디에 보관하는지'로 찾지 않는다. 그래서 음식 종류로 나눈다.
         //  key는 주문관리 '분류탭 설정'에 저장되는 값(displayTab)과 같아야 한다.
         const ONSITE_CATS = [
-            { key: 'onsite-fruit', label: '🍎 과일' },
+            // [수정] 이름을 '과일·신선'으로 바꿨다. 당일판매의 과일 탭과 헷갈려서.
+            //  (키는 이미 저장된 상품들이 쓰고 있으므로 그대로 둔다)
+            { key: 'onsite-fruit', label: '🥬 과일·신선' },
             { key: 'onsite-soup', label: '🍲 국·탕·찌개' },
             { key: 'onsite-meat', label: '🍖 고기·반찬' },
             { key: 'onsite-noodle', label: '🍜 면류' },
@@ -2274,6 +2276,25 @@
             if (ONSITE_CATS.some(c => c.key === t)) return t;
             if (t) return '';                                   // 다른 탭(사다드림 등)으로 지정된 상품
             return gIsOnsiteProduct(p) ? ONSITE_ETC.key : '';
+        }
+
+        /* [신규] 이 상품이 지금 보고 있는 대분류(당일판매 / 상시판매 / 예약판매)에 속하는지.
+           검색을 그 대분류 안에서만 하도록 쓴다. 각 탭이 실제로 보여 주는 기준과 같게 맞췄다.
+            · 상시판매 = 분류탭으로 지정했거나 보관분류(냉동·냉장·상온)인 상품
+            · 당일판매 = 과일·야채 + 오늘 날짜 공동구매
+              (visibleProducts가 오늘이 아닌 날짜는 이미 걸러 둔다)
+            · 예약판매 = 공동구매(날짜) · 사다드림 · 코스트코. 과일·야채는 당일 전용이라 뺀다.
+              (여기도 오늘 날짜 공동구매는 visibleProducts에서 이미 빠져 있다) */
+        function gBelongsToCurrentDeliveryType(p) {
+            const s = String((p && p.matchKey) || "").trim();
+            const nm = String((p && p.name) || "");
+            const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
+            const isFV = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(nm);
+
+            if (currentDeliveryType === 'onsite') return !!gOnsiteTabCatOf(p);
+            if (currentDeliveryType === 'today') return isFV || isDate;
+            if (isFV) return false;
+            return isDate || s.includes("코스트코") || gIsSadaProduct(p);
         }
 
         // [신규] 배송유형 대분류 전환 함수
@@ -7909,6 +7930,15 @@
                 // 1. 비공개 필터링
                 if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
 
+                /* [신규] 분류탭을 '상시판매 › …'로 직접 지정한 상품은 상시판매에서만 보인다.
+                   분류탭 설정은 기존 분류(상품명·matchKey)보다 '우선'하는 값인데, 여기서 걸러 주지 않아
+                   과일을 상시판매로 옮겨도 당일판매 과일 탭에 그대로 남아 있었다.
+                   (주문관리 상품목록은 이미 같은 규칙으로 걸러 낸다) */
+                if (currentDeliveryType !== 'onsite') {
+                    const _dt = gDisplayTabOf(p);
+                    if (ONSITE_CATS.some(c => c.key === _dt)) return false;
+                }
+
                 // [신규] 배송 유형(당일배송/예약배송)별 보이기/숨기기 따로 적용 (관리자 모드 아닐 때만 적용)
                 if (!isAdminMode) {
                     if (currentDeliveryType === 'today') {
@@ -8039,7 +8069,12 @@
             const _searchQ = (productSearchQuery || "").trim().toLowerCase();
 
             if (_searchQ) {
-                filteredData = visibleProducts.filter(p => String(p.name || "").toLowerCase().includes(_searchQ));
+                /* [수정] 검색이 탭 구분을 통째로 건너뛰고 있었다. 그래서 예약판매에서 검색하면
+                   당일판매에만 있어야 할 과일까지 나왔고, 거기서 담으면 예약 상품으로 잡혀
+                   받는 날짜가 어긋날 수 있었다. 이제 지금 보고 있는 대분류(당일/상시/예약) 안에서만 찾는다.
+                   (그 안의 세부 탭은 넘나든다 — 과일 탭에서 '오늘의 상품'까지 함께 찾는 편이 편하다) */
+                filteredData = visibleProducts.filter(p =>
+                    gBelongsToCurrentDeliveryType(p) && String(p.name || "").toLowerCase().includes(_searchQ));
             } else if (targetKey === 'today-fruit' || targetKey === 'today-fruit-only') {
                 // 당일배송 - 과일: 예약배송의 과일 필터링과 동일하게 과일 상품만 추출
                 filteredData = visibleProducts.filter(p => {
