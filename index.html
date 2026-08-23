@@ -2229,7 +2229,9 @@
         //  예전에는 보관방법(냉동·냉장·상온)으로 나눴는데, 손님은 '무엇을 먹을지'로 찾지
         //  '어디에 보관하는지'로 찾지 않는다. 그래서 음식 종류로 나눈다.
         //  key는 주문관리 '분류탭 설정'에 저장되는 값(displayTab)과 같아야 한다.
-        const ONSITE_CATS = [
+        //  [수정] 사장님이 주문관리에서 이름을 고치거나 새 분류를 더할 수 있게 되어,
+        //   실제 목록은 서버(settings/onsite_categories)에서 받아 온다. 없으면 아래 기본값을 쓴다.
+        const ONSITE_CATS_DEFAULT = [
             // [수정] 이름을 '과일·신선'으로 바꿨다. 당일판매의 과일 탭과 헷갈려서.
             //  (키는 이미 저장된 상품들이 쓰고 있으므로 그대로 둔다)
             { key: 'onsite-fruit', label: '🥬 과일·신선' },
@@ -2245,6 +2247,21 @@
             { key: 'onsite-grocery', label: '🧂 식재료·양념' },
             { key: 'onsite-living', label: '🧴 생활용품' }
         ];
+        let ONSITE_CATS = ONSITE_CATS_DEFAULT.map(c => ({ ...c }));
+
+        // 사장님이 고친 분류 목록 받아 오기. 실패하면 기본값 그대로 쓴다.
+        async function loadOnsiteCats() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}settings/onsite_categories.json?t=${Date.now()}`);
+                if (!res.ok) return;
+                const arr = await res.json();
+                if (!Array.isArray(arr) || arr.length === 0) return;
+                const clean = arr
+                    .filter(c => c && String(c.key || '').trim() && String(c.label || '').trim())
+                    .map(c => ({ key: String(c.key).trim(), label: String(c.label).trim() }));
+                if (clean.length) ONSITE_CATS = clean;
+            } catch (e) { /* 못 받아도 기본 이름으로 그냥 보인다 */ }
+        }
         // 분류를 아직 정하지 않은 상시판매 상품이 사라지지 않도록 받아 주는 탭.
         //  해당 상품이 있을 때만 탭이 생긴다.
         const ONSITE_ETC = { key: 'onsite-etc', label: '기타' };
@@ -2273,6 +2290,8 @@
         //  1) 분류를 직접 지정했으면 그 탭   2) 지정이 없는 상시판매(냉동·냉장·상온) 상품은 '기타' 탭
         function gOnsiteTabCatOf(p) {
             const t = gDisplayTabOf(p);
+            // [신규] 사장님이 분류를 지우면서 '기타'로 옮겨 둔 상품
+            if (t === ONSITE_ETC.key) return ONSITE_ETC.key;
             if (ONSITE_CATS.some(c => c.key === t)) return t;
             if (t) return '';                                   // 다른 탭(사다드림 등)으로 지정된 상품
             return gIsOnsiteProduct(p) ? ONSITE_ETC.key : '';
@@ -8613,8 +8632,9 @@
             else if (/냉장/.test(s)) { label = '🧊 냉장'; bg = '#eafaf2'; fg = '#047857'; }
             else if (/상온|실온/.test(s)) { label = '📦 상온'; bg = '#fff4e9'; fg = '#c2610a'; }
             else return '';
-            return `<span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:${fg}; background:${bg};` +
-                ` padding:3px 8px; border-radius:6px; white-space:nowrap; line-height:1.3;">${label}</span>`;
+            // [수정] 옆의 가격(22px)에 비해 너무 작아 눈에 안 띄었다. 가격 줄 높이에 맞춰 키운다.
+            return `<span style="flex:0 0 auto; font-size:14px; font-weight:800; color:${fg}; background:${bg};` +
+                ` padding:6px 11px; border-radius:8px; white-space:nowrap; line-height:1.2;">${label}</span>`;
         }
 
         // [신규] 고를 수 있는 옵션(선택옵션)이 실제로 있는 상품인지.
@@ -11623,6 +11643,10 @@
 
             // [추가] 공휴일/휴무일 목록을 동기적으로 로드하거나 비동기 패치를 완료 대기하여 레이스 컨디션 완벽 차단
             await fetchHolidays();
+
+            // [신규] 상시판매 분류 이름(사장님이 고친 값)을 탭을 그리기 전에 받아 둔다.
+            //  실패하면 기본 이름으로 그대로 보인다.
+            await loadOnsiteCats();
 
             // [추가] 시간 기반 카테고리 순서 동적 설정 및 기본 탭 설정
             initMainTabs(true);
