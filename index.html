@@ -6722,7 +6722,8 @@
                         const optPromise = (async () => {
                             try {
                                 const picks = Array.isArray(order.optionPicks) ? order.optionPicks : [];
-                                if (picks.length === 0 || !_pForKey) return;
+                                if (picks.length === 0) return;
+                                if (!_pForKey) { console.warn("[옵션재고] 복구할 상품을 못 찾음", order.item); return; }
                                 const needs = gOptionNeedsOfCartLine(_pForKey, picks, diff);
                                 for (const n of needs) await gReleaseOptionCAS(n.optKey, n.need);
                             } catch (e) { console.error("옵션 재고 복구 실패:", e); }
@@ -6854,7 +6855,8 @@
                     try {
                         const rec = fullHistoryData[targetIdx] || {};
                         const picks = Array.isArray(rec.optionPicks) ? rec.optionPicks : [];
-                        if (picks.length === 0 || !_pForKey2) return;
+                        if (picks.length === 0) { if (rec.optionText) console.warn("[옵션재고] 되돌릴 옵션 정보가 없는 주문", rec.item); return; }
+                        if (!_pForKey2) { console.warn("[옵션재고] 복구할 상품을 못 찾음", rec.item); return; }
                         const needs = gOptionNeedsOfCartLine(_pForKey2, picks, diff);
                         for (const n of needs) {
                             await gReleaseOptionCAS(n.optKey, n.need);
@@ -11549,6 +11551,11 @@
                     rawTimestamp: tempTimestamp,
                     matchKey: it.date,
                     optionText: it.optionText || "", // [신규] 고른 상세옵션
+                    /* [버그수정] 이 값이 빠져 있어서 주문 직후 취소하면 옵션 재고가 안 돌아왔다.
+                       서버에서 다시 받은 주문내역에는 들어 있는데(통째로 복사하므로),
+                       방금 만든 이 로컬 목록에는 없어서 '되돌릴 옵션이 없다'고 판단해 버렸다. */
+                    optionPicks: ((cartOptions[it.cartKey] && cartOptions[it.cartKey].picks) || [])
+                        .map(pk => ({ group: pk.group, name: pk.name, qty: parseInt(pk.qty) || 1 })),
                     isSada: (it.isSada === true)     // [신규] 사다드림 여부 (로컬 주문내역에도 함께 보관)
                 }));
 
