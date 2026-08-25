@@ -6715,7 +6715,19 @@
                         // [삭제] 구글 시트로 보내려고 만들던 꾸러미. 보내는 코드는 이미 없어서
                         //  만들어 놓고 그냥 버리고 있었다.
 
-                        await Promise.all([fbPromise, stockPromise]);
+
+                        /* [신규] 선택옵션 항목 재고도 함께 되돌린다.
+                           주문에 남겨 둔 optionPicks(그룹·항목·수량)를 그대로 읽는다.
+                           옛 주문에는 이 값이 없다 — 그때는 옵션 재고를 쓰지 않았으므로 되돌릴 것도 없다. */
+                        const optPromise = (async () => {
+                            try {
+                                const picks = Array.isArray(order.optionPicks) ? order.optionPicks : [];
+                                if (picks.length === 0 || !_pForKey) return;
+                                const needs = gOptionNeedsOfCartLine(_pForKey, picks, diff);
+                                for (const n of needs) await gReleaseOptionCAS(n.optKey, n.need);
+                            } catch (e) { console.error("옵션 재고 복구 실패:", e); }
+                        })();
+                        await Promise.all([fbPromise, stockPromise, optPromise]);
 
                         // 1-4. 로컬 메모리 상태 즉시 반영 및 재고 락 설정
                         order.isProcessing = false;
@@ -6834,11 +6846,27 @@
                         });
                     }).catch(e => console.error("재고 복구 실패:", e));
 
+                /* [신규] 2-2. 선택옵션 항목 재고도 함께 되돌린다.
+                   주문할 때 남겨 둔 optionPicks(그룹·항목·수량)를 그대로 읽어 되돌린다.
+                   화면용 글자(optionText)를 되짚으면 이름에 쉼표가 들어간 항목에서 어긋난다.
+                   옛 주문에는 optionPicks가 없다 — 그때는 옵션 재고를 쓰지 않았으므로 되돌릴 것도 없다. */
+                const optPromise = (async () => {
+                    try {
+                        const rec = fullHistoryData[targetIdx] || {};
+                        const picks = Array.isArray(rec.optionPicks) ? rec.optionPicks : [];
+                        if (picks.length === 0 || !_pForKey2) return;
+                        const needs = gOptionNeedsOfCartLine(_pForKey2, picks, diff);
+                        for (const n of needs) {
+                            await gReleaseOptionCAS(n.optKey, n.need);
+                        }
+                    } catch (e) { console.error("옵션 재고 복구 실패:", e); }
+                })();
+
                 // [삭제] 구글 시트로 보내려고 만들던 꾸러미. 보내는 코드는 이미 없어서
                 //  만들어 놓고 그냥 버리고 있었다.
 
                 // 4. Firebase 완료 시 UI 즉시 갱신 (GAS를 기다리지 않음)
-                Promise.all([fbPromise, stockPromise]).then(() => {
+                Promise.all([fbPromise, stockPromise, optPromise]).then(() => {
                     isHistoryProcessing = false;
                     if (targetIdx !== -1) {
                         fullHistoryData[targetIdx].isProcessing = false;
@@ -7033,7 +7061,9 @@
 
                 const fetchPromises = [
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; })
+                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; }),
+                    // [신규] 선택옵션 항목별 재고 조정값 (상품 재고와 같은 방식)
+                    fetch(`${FIREBASE_DB_URL}option_stock.json?t=${Date.now()}`).catch(e => { console.error("옵션 재고 로드 실패:", e); return { ok: false }; }),
                 ];
 
                 if (!isProductsCacheValid) {
@@ -7043,7 +7073,14 @@
                 const results = await Promise.all(fetchPromises);
                 const stockRes = results[0];
                 const statusRes = results[1];
-                const pubRes = isProductsCacheValid ? null : results[2];
+                const optStockRes = results[2];                     // [신규] 옵션 재고
+                const pubRes = isProductsCacheValid ? null : results[3];
+
+                // [신규] 옵션 항목별 재고 조정값 반영
+                if (optStockRes && optStockRes.ok) {
+                    try { optionAdjustments = (await optStockRes.json()) || {}; }
+                    catch (e) { console.error("옵션 재고 해석 실패:", e); optionAdjustments = {}; }
+                }
 
                 // [추가] 공개 여부 설정을 즉시 확인하여 반영
                 const prevEnabled = isProductListEnabled;
@@ -8824,6 +8861,42 @@
            · PUT에 if-match: <ETag> 를 넣으면, 그 사이 값이 바뀐 경우 412로 거절된다.
            읽고 계산해서 쓰는 사이에 다른 손님이 먼저 사 갔으면 412가 나므로,
            다시 읽어 남은 수량을 세고 판단한다. 이래야 동시에 주문해도 하나만 통과한다. */
+
+        /* ===== [신규] 선택옵션 항목별 재고 =====
+           상품 재고(global_stock)와 똑같은 방식이다.
+           · 기본 수량은 상품에 적혀 있다 (options[].items[].stock). 그 칸이 비어 있으면 '제한 없음'.
+           · 팔린 만큼은 option_stock 에 조정값(마이너스)으로 쌓인다.
+           · 남은 수량 = 기본 수량 + 조정값.
+           상품 재고를 상품 자료에 직접 깎지 않는 이유와 같다 — 주문 한 건마다 상품 목록을
+           통째로 다시 쓰면 동시에 주문이 들어올 때 서로 덮어써 버린다. */
+        let optionAdjustments = {};   // { 옵션키: 조정값 }
+
+        // 옵션 항목 하나를 가리키는 키. 상품키 + 옵션그룹 + 항목이름.
+        function gOptStockKey(p, groupName, itemName) {
+            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '');
+            return base + '__' + fSafeKey(groupName) + '__' + fSafeKey(itemName);
+        }
+
+        // 그 항목의 기본 수량. 비어 있으면 null(=제한 없음).
+        function gOptBaseStock(it) {
+            if (!it) return null;
+            const v = it.stock;
+            if (v === undefined || v === null || String(v).trim() === '') return null;
+            const n = parseInt(v);
+            return isNaN(n) ? null : Math.max(0, n);
+        }
+
+        // 남은 수량. 제한 없는 항목이면 null.
+        function gOptRemain(p, groupName, it) {
+            const base = gOptBaseStock(it);
+            if (base === null) return null;
+            const adj = parseInt(optionAdjustments[gOptStockKey(p, groupName, it.name)] || 0) || 0;
+            return Math.max(0, base + adj);
+        }
+
+        function gOptStockUrl(optKey) {
+            return `${FIREBASE_DB_URL}option_stock/${encodeURIComponent(optKey)}.json`;
+        }
         function gStockUrl(adjKey) {
             return `${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`;
         }
@@ -8919,6 +8992,71 @@
             return false;
         }
 
+
+        /* [신규] 옵션 항목 재고도 상품 재고와 똑같이 조건부 쓰기(ETag)로 선점한다.
+           읽고 쓰는 사이에 다른 손님이 먼저 사 갔으면 412로 튕기고 다시 센다. */
+        async function gReserveOptionCAS(optKey, baseStock, qty) {
+            const url = gOptStockUrl(optKey);
+            let lastRemain = 0;
+            for (let attempt = 0; attempt < 8; attempt++) {
+                const g = await fetch(`${url}?t=${Date.now()}`, { headers: { 'X-Firebase-ETag': 'true' } });
+                if (!g.ok) throw new Error(`옵션 재고 확인 실패 ${g.status}`);
+                const etag = g.headers.get('ETag');
+                const cur = parseInt((await g.json()) || 0) || 0;
+                const remain = (parseInt(baseStock) || 0) + cur;
+                lastRemain = remain;
+                if (remain < qty) return { ok: false, remain };
+                if (!etag) throw new Error('옵션 재고 잠금(ETag)을 받지 못했습니다');
+
+                const w = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'if-match': etag, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cur - qty)
+                });
+                if (w.ok) { optionAdjustments[optKey] = cur - qty; return { ok: true, remain: remain - qty }; }
+                if (w.status !== 412) throw new Error(`옵션 재고 반영 실패 ${w.status}`);
+                await new Promise(r => setTimeout(r, 60 + Math.random() * 140));
+            }
+            return { ok: false, remain: lastRemain };
+        }
+
+        // 잡아 둔 옵션 재고를 도로 놓아 준다 (주문 기록 실패·주문 취소)
+        async function gReleaseOptionCAS(optKey, qty) {
+            const url = gOptStockUrl(optKey);
+            for (let attempt = 0; attempt < 8; attempt++) {
+                const g = await fetch(`${url}?t=${Date.now()}`, { headers: { 'X-Firebase-ETag': 'true' } });
+                if (!g.ok) return false;
+                const etag = g.headers.get('ETag');
+                const cur = parseInt((await g.json()) || 0) || 0;
+                if (!etag) return false;
+                const w = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'if-match': etag, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cur + qty)
+                });
+                if (w.ok) { optionAdjustments[optKey] = cur + qty; return true; }
+                if (w.status !== 412) return false;
+                await new Promise(r => setTimeout(r, 60 + Math.random() * 140));
+            }
+            return false;
+        }
+
+        /* [신규] 장바구니 한 줄에서 '옵션 항목마다 몇 개가 나가는지' 뽑는다.
+           cartOptions[key].picks = [{ group, name, qty }] 이고, 상품 수량(count)만큼 곱해진다. */
+        function gOptionNeedsOfCartLine(p, picks, count) {
+            const out = [];
+            (picks || []).forEach(pk => {
+                const g = ((p && p.options) || []).find(x => x && x.name === pk.group);
+                if (!g) return;
+                const it = (g.items || []).find(x => x && x.name === pk.name);
+                if (!it) return;
+                const base = gOptBaseStock(it);
+                if (base === null) return;                 // 수량 제한이 없는 항목은 셀 필요가 없다
+                const need = (parseInt(pk.qty) || 1) * Math.max(1, parseInt(count) || 1);
+                out.push({ optKey: gOptStockKey(p, g.name, it.name), base, need, label: `${it.name}` });
+            });
+            return out;
+        }
         function gFormatDateKey(key, p) {
             if (p && p.displayDate) return p.displayDate;
             const m = String(key).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -9340,8 +9478,16 @@
             const p = productsData.find(pd => pd.name === optionModalState.name);
             const g = (p.options || [])[gi];
             if (!g) return;
+            const it = (g.items || [])[ii];
 
+            // [신규] 다 팔린 항목은 고를 수 없다
+            const remain = gOptRemain(p, g.name, it);
             const cur = optionModalState.picks[gi] || {};
+            if (remain !== null && remain <= 0 && !cur[ii]) {
+                showToast(`'${(it && it.name) || '이 항목'}'은(는) 품절입니다.`);
+                return;
+            }
+
             if (g.selectType === 'multi') {
                 if (cur[ii]) delete cur[ii];
                 else cur[ii] = 1;
@@ -9359,6 +9505,19 @@
 
             const cur = optionModalState.picks[gi] || {};
             const next = (parseInt(cur[ii]) || 0) + delta;
+
+            // [신규] 남은 수량보다 많이 고를 수 없다
+            if (delta > 0) {
+                const p = productsData.find(pd => pd.name === optionModalState.name);
+                const g = (p && (p.options || [])[gi]) || null;
+                const it = g && (g.items || [])[ii];
+                const remain = g ? gOptRemain(p, g.name, it) : null;
+                if (remain !== null && next > remain) {
+                    showToast(`'${(it && it.name) || '이 항목'}'은(는) 더 담을 수 없습니다.`);   // 남은 개수는 알리지 않는다
+                    return;
+                }
+            }
+
             if (next < 1) delete cur[ii];
             else cur[ii] = next;
 
@@ -9440,6 +9599,24 @@
                 }
             });
 
+            /* [신규] 옵션 항목별 남은 수량 확인.
+               상품 수량(count)만큼 곱해서 센다 — 2개 주문이면 옵션도 2개씩 나간다. */
+            groups.forEach((g, gi) => {
+                const sel = st.picks[gi] || {};
+                (g.items || []).forEach((it, ii) => {
+                    const q = parseInt(sel[ii]) || 0;
+                    if (q <= 0) return;
+                    const remain = gOptRemain(p, g.name, it);
+                    if (remain === null) return;             // 제한 없는 항목
+                    const need = q * Math.max(1, st.count);
+                    if (need > remain) {
+                        errors.push(remain <= 0
+                            ? `'${it.name}'은(는) 품절입니다.`
+                            : `'${it.name}'은(는) 그 수량만큼 준비되지 않았습니다. 수량을 줄여 주세요.`);
+                    }
+                });
+            });
+
             // [수정] 최저·최대 금액은 실제로 내는 금액 기준으로 본다.
             //  기본가 + 옵션 + 개당 대행료를 수량만큼 곱한 값(payTotal)이 판단 기준이다.
             const feeUnit = gCalcAgencyFee(p, unit);
@@ -9500,9 +9677,19 @@
                         ? (q > 1 ? `+${(price * q).toLocaleString()}원` : `+${price.toLocaleString()}원`)
                         : '+0원';
 
-                    html += `<div onclick="pickOption(${gi}, ${ii})" style="display:flex; align-items:center; gap:8px; padding:11px 12px; margin-bottom:6px; border:1.5px solid ${on ? 'var(--moket-green)' : '#e8ebee'}; background:${on ? '#f1fbf5' : '#fff'}; border-radius:10px; cursor:pointer;">` +
-                        `<span style="flex:0 0 auto; width:18px; height:18px; border-radius:${isMulti ? '5px' : '50%'}; border:2px solid ${on ? 'var(--moket-green)' : '#cfd6dc'}; background:${on ? 'var(--moket-green)' : '#fff'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:900;">${on ? '✓' : ''}</span>` +
-                        `<span style="flex:1; min-width:0; font-size:14px; font-weight:${on ? '800' : '700'}; color:var(--item-black); word-break:keep-all;">${it.name}</span>` +
+                    /* [신규] 항목별 남은 수량으로 품절만 가린다.
+                       남은 개수는 손님에게 보여 주지 않는다 — 몇 개 남았는지 알리면
+                       재고를 재촉하는 느낌이 들고, 숫자가 자주 바뀌면 되레 불안해 보인다.
+                       0이 되면 고를 수 없게 흐리게 두고 '품절'이라고만 적는다. */
+                    const remain = gOptRemain(s.p, g.name, it);
+                    const soldOut = (remain !== null && remain <= 0 && !on);
+                    const stockText = soldOut ? '품절' : '';
+
+                    html += `<div onclick="pickOption(${gi}, ${ii})" style="display:flex; align-items:center; gap:8px; padding:11px 12px; margin-bottom:6px; border:1.5px solid ${on ? 'var(--moket-green)' : '#e8ebee'}; background:${soldOut ? '#f6f7f8' : (on ? '#f1fbf5' : '#fff')}; border-radius:10px; cursor:${soldOut ? 'default' : 'pointer'}; opacity:${soldOut ? '0.55' : '1'};">` +
+                        `<span style="flex:0 0 auto; width:18px; height:18px; border-radius:${isMulti ? '5px' : '50%'}; border:2px solid ${on ? 'var(--moket-green)' : '#cfd6dc'}; background:${on ? 'var(--moket-green)' : '#fff'};"></span>` +
+                        `<span style="flex:1; min-width:0; font-size:14px; font-weight:${on ? '800' : '700'}; color:var(--item-black); word-break:keep-all;">${it.name}` +
+                        (stockText ? `<span style="margin-left:6px; font-size:11px; font-weight:800; color:${soldOut ? '#d32f2f' : '#7f93a3'};">${stockText}</span>` : '') +
+                        `</span>` +
                         stepper +
                         `<span style="flex:0 0 auto; min-width:62px; text-align:right; font-size:13px; font-weight:800; color:${price ? 'var(--nego-orange)' : '#aaa'};">${priceText}</span>` +
                         `</div>`;
@@ -10659,7 +10846,7 @@
 
                         // [신규] 사다드림 여부를 주문 항목에도 실어 보낸다. 주문 뒤 처리(취소·입금 안내 등)가
                         //  상품명 대신 이 값을 보게 되어, 이름을 바꿔도 판정이 흔들리지 않는다.
-                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada });
+                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
                     }
                 }
 
@@ -11431,14 +11618,40 @@
                    1개 남은 상품을 두 사람이 같은 순간에 주문하면 둘 다 기록되고 재고만 -1이 됐다.
                    이제 주문을 쓰기 전에 재고를 먼저 잡고, 못 잡으면 주문 자체를 만들지 않는다.
                    Firebase 조건부 쓰기(ETag + if-match)를 써서, 읽은 뒤 남이 바꿨으면 412로 튕기고 다시 센다. */
-                const reserved = [];   // 실패 시 되돌릴 목록
+                const reserved = [];       // 실패 시 되돌릴 목록 (상품 재고)
+                const reservedOpt = [];   // [신규] 되돌릴 목록 (옵션 재고)
                 {
                     const failed = [];
                     for (const it of saveItems) {
                         if (gIsFeeRow(it.name)) continue;              // 배달비는 재고와 무관
                         if (it.isExtra) continue;                      // 지난 주문은 그때 이미 깎았다
 
-                        const pData = productsData.find(pd => pd.name === it.name);
+                        /* [수정] 이름으로만 찾으면 같은 이름이 당일용·예약용으로 둘 이상 등록된 경우
+                           엉뚱한 쪽을 집는다. 옵션 재고 키는 상품의 matchKey로 만들어지므로
+                           다른 상품을 집으면 엉뚱한 칸을 깎거나 아예 못 깎는다.
+                           장바구니에 박아 둔 cartKey로 정확히 그 상품을 찾는다. */
+                        const pData = (it.cartKey && typeof gFindCartProduct === 'function')
+                            ? (gFindCartProduct(it.cartKey) || productsData.find(pd => pd.name === it.name))
+                            : productsData.find(pd => pd.name === it.name);
+
+                        /* [신규] 선택옵션 항목 재고를 먼저 잡는다.
+                           상품 재고가 무제한이어도 옵션은 수량이 정해져 있을 수 있으므로
+                           상품 재고 판정(gIsUnlimitedStock)보다 앞에 둔다. */
+                        if (pData && it.cartKey) {
+                            const o = cartOptions[it.cartKey];
+                            const picks = (o && o.picks) || [];
+                            const needs = gOptionNeedsOfCartLine(pData, picks, it.qty);
+                            if (picks.length > 0 && needs.length === 0) {
+                                // 고른 옵션은 있는데 깎을 게 없다 = 수량 제한이 없거나 상품을 잘못 찾았다는 뜻
+                                console.warn('[옵션재고] 깎을 항목을 못 찾음', { item: it.name, picks, prod: pData && pData.name });
+                            }
+                            for (const n of needs) {
+                                const ro = await gReserveOptionCAS(n.optKey, n.base, n.need);
+                                if (ro.ok) reservedOpt.push({ optKey: n.optKey, qty: n.need });
+                                else failed.push({ name: `${it.name} — ${n.label}`, need: n.need, remain: ro.remain });
+                            }
+                        }
+
                         if (gIsUnlimitedStock(pData)) continue;
 
                         let base = parseInt((pData && pData.originalStock) || 0) || 0;
@@ -11459,6 +11672,7 @@
                     if (failed.length > 0) {
                         // 이미 잡아 둔 것은 도로 놓아 준다 (다른 손님이 살 수 있게)
                         for (const rv of reserved) { try { await gReleaseStockCAS(rv.adjKey, rv.qty); } catch (e) {} }
+                        for (const rv of reservedOpt) { try { await gReleaseOptionCAS(rv.optKey, rv.qty); } catch (e) {} }
 
                         // 배달비 주입 플래그도 되돌린다 (주문을 만들지 않았으므로)
                         window.isDeliveryFeeAddedUnder15000 = false;
@@ -11515,6 +11729,10 @@
                         cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : "",
                         // [신규] 손님이 고른 상세옵션 (상품명은 그대로 두고 별도 항목으로 저장)
                         optionText: it.optionText || "",
+                        // [신규] 고른 옵션을 구조 그대로 남긴다. 주문을 취소할 때 옵션 재고를 정확히 되돌리려면
+                        //  화면용 글자(optionText)가 아니라 그룹·항목·수량이 그대로 있어야 한다.
+                        optionPicks: ((cartOptions[it.cartKey] && cartOptions[it.cartKey].picks) || [])
+                            .map(pk => ({ group: pk.group, name: pk.name, qty: parseInt(pk.qty) || 1 })),
                         // [신규] 상품 금액에 합쳐 청구한 사다드림 대행료 (정산 확인용)
                         agencyFee: it.agencyFee || 0,
                         // [신규] 사다드림 여부 (상품명 대신 이 값으로 판단)
@@ -11560,6 +11778,7 @@
                 } catch (e) {
                     // [신규] 주문을 못 남겼으면 잡아 둔 재고를 도로 놓아 준다 (재고만 줄어드는 일 방지)
                     for (const rv of reserved) { try { await gReleaseStockCAS(rv.adjKey, rv.qty); } catch (e2) {} }
+                    for (const rv of reservedOpt) { try { await gReleaseOptionCAS(rv.optKey, rv.qty); } catch (e2) {} }   // [신규] 옵션 재고도 도로 놓아 준다
                     throw e;
                 }
 
