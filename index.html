@@ -11648,7 +11648,8 @@
                             for (const n of needs) {
                                 const ro = await gReserveOptionCAS(n.optKey, n.base, n.need);
                                 if (ro.ok) reservedOpt.push({ optKey: n.optKey, qty: n.need });
-                                else failed.push({ name: `${it.name} — ${n.label}`, need: n.need, remain: ro.remain });
+                                // [수정] 상품명·옵션명을 따로 담는다. 안내 문구에서 옵션명을 앞세우기 위해서다.
+                                else failed.push({ name: it.name, optName: n.label, need: n.need, remain: ro.remain });
                             }
                         }
 
@@ -11682,18 +11683,37 @@
                         isHistoryProcessing = false;
                         document.getElementById('system-modal').style.display = 'none';
 
-                        // 남은 수량이 0이면 '품절', 모자라기만 하면 '수량 부족'으로 나눠 알린다
+                        /* [수정] 옵션만 떨어졌을 때도 '상품이 품절'이라고 알려서, 손님이
+                           상품 전체가 없는 줄 알고 장바구니에서 빼 버리는 일이 있었다.
+                           옵션 문제면 그렇게 말해 주고, 옵션명을 앞세운다 — 상품명이 길면
+                           정작 봐야 할 옵션명이 맨 뒤로 밀려 줄바꿈되어 눈에 안 들어왔다. */
                         const allOut = failed.every(f => Math.max(0, f.remain) <= 0);
+                        const allOpt = failed.every(f => !!f.optName);      // 걸린 게 전부 옵션인가
                         const lines = failed.map(f => {
                             const remain = Math.max(0, f.remain);
-                            return `· ${f.name}<br><span style="color:#d32f2f; font-weight:800;">`
-                                + (remain <= 0 ? `품절되었습니다` : `주문 ${f.need}개 / 남은 수량 ${remain}개`)
-                                + `</span>`;
+                            const reason = (remain <= 0 ? `품절되었습니다` : `주문 ${f.need}개 / 남은 수량 ${remain}개`);
+                            if (f.optName) {
+                                // 옵션: 옵션명을 굵게 앞에, 상품명은 작고 흐리게 아래에
+                                return `· <b>${f.optName}</b>`
+                                    + `<br><span style="color:#d32f2f; font-weight:800;">${reason}</span>`
+                                    + `<br><span style="font-size:0.86em; color:#8a9aa6;">${f.name}</span>`;
+                            }
+                            return `· ${f.name}<br><span style="color:#d32f2f; font-weight:800;">${reason}</span>`;
                         }).join('<br><br>');
+                        /* 부족한 경우의 문구는 '방금 다른 분이 먼저 주문하셨습니다'였다.
+                           손님 입장에서는 남 탓처럼 들리고, 사장님이 수량을 줄인 경우에도
+                           그렇게 떠서 사실과 달랐다. 무슨 일이 있었는지 말하지 않고 상태만 적는다. */
+                        const head = allOut
+                            ? (allOpt ? '방금 품절된 옵션이 있습니다.' : '방금 품절된 상품이 있습니다.')
+                            : '주문하신 수량만큼 남아 있지 않습니다.';
+                        const tail = allOpt
+                            ? '다른 옵션을 고르시면 주문하실 수 있어요.'
+                            : '수량을 줄이거나 장바구니에서 빼고 다시 주문해 주세요.';
+
                         showSystemModal(
                             `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${allOut ? '품절' : '재고 부족'}]</span>` +
-                            `${allOut ? '방금 품절된 상품이 있습니다.' : '방금 다른 분이 먼저 주문하셨습니다.'}<br><br>${lines}<br><br>` +
-                            `수량을 줄이거나 장바구니에서 빼고 다시 주문해 주세요.`,
+                            `${head}<br><br>${lines}<br><br>` +
+                            `${tail}`,
                             'alert',
                             () => { try { loadData(true); } catch (e) { location.reload(); } }
                         );
