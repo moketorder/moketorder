@@ -1022,6 +1022,8 @@
         }
 
         .product-card {
+            /* [신규] 판매가 글자 크기. 할인 표시(.item-orig-price)가 여기에 비례해 따라간다. */
+            --price-size: 22px;
             background: var(--white);
             border-radius: var(--common-radius);
             padding: 10px;
@@ -1322,28 +1324,30 @@
             pointer-events: none;
         }
 
-        /* [신규] 할인 상품 — 할인 전 금액을 판매가 바로 위에 작게 적는다.
+        /* [신규] 할인 상품 — '15% 할인  6,500원'을 판매가 바로 위에 작게 적는다.
+           글자 크기는 판매가(--price-size)에 비례시켜, 판매가 크기를 바꾸면 같이 따라가게 한다.
            금액줄(.item-price-row)이 margin-top:12px를 갖고 있어, 음수 여백으로 사이를 좁혀
            두 줄이 한 덩어리로 읽히게 한다. */
         .item-orig-price {
             display: flex;
-            align-items: center;
+            align-items: baseline;
             justify-content: flex-end;
-            gap: 5px;
+            gap: 6px;
             width: 100%;
             margin-top: 10px;
             margin-bottom: -9px;
+            font-size: calc(var(--price-size) * 0.6);
         }
 
         .item-orig-price .orig {
-            font-size: 13px;
+            font-size: 1em;
             font-weight: 700;
             color: #9aa5b1;
             text-decoration: line-through;
         }
 
         .item-orig-price .off {
-            font-size: 13px;
+            font-size: 1em;
             font-weight: 900;
             color: #e11d48;
         }
@@ -1354,13 +1358,46 @@
             color: #9aa5b1;
         }
 
+        /* [신규] 특가 상품 안내 — 상품명 바로 아랫줄. 재촉하는 말이라 크게 쓰지 않고
+           이름과 금액 사이에서 조용히 읽히도록 작게 둔다. */
+        .item-sale-note {
+            margin-top: 4px;
+            font-size: calc(var(--price-size) * 0.5);
+            font-weight: 700;
+            color: #e11d48;
+            line-height: 1.4;
+        }
+
+        /* [신규] 사진 위쪽 '15% 할인!' 띠. 아래 '예시이미지입니다.'와 같은 모양으로 맞추되
+           눈에 띄어야 하므로 빨간 바탕에 흰 글씨로 둔다. */
+        .thumb-sale {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(225, 29, 72, 0.88);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 900;
+            padding: 3px 0;
+            text-align: center;
+            letter-spacing: -0.3px;
+            pointer-events: none;
+            backdrop-filter: blur(1px);
+        }
+
         .item-price-val {
             color: var(--nego-orange);
             font-weight: 900;
-            font-size: 22px;
+            font-size: var(--price-size);
             /* 19px에서 약 15% 상향 */
             flex: 1;
             text-align: right;
+        }
+
+        /* [신규] 할인 상품은 판매가를 빨간색으로 (평소 주황색과 구분) */
+        .item-price-val.sale {
+            color: #e11d48;
         }
 
         /* [신규] '담기' 버튼 (수량 조절 바 대체) */
@@ -8614,18 +8651,21 @@
                     `<div class="thumb">` +
                     (imgId ? `<img src="${getImgUrl(imgId, 300)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain;" onload="this.classList.add('loaded')" onerror="this.onerror=null; this.src=getImgUrl('${imgId}', 300, true); this.classList.add('loaded');">` : 'No Image') +
                     `<div class="thumb-notice">예시이미지입니다.</div>` +
+                    // [신규] 할인 상품은 사진 위쪽에 '15% 할인!' 띠를 두른다 (아래 '예시이미지입니다.'와 짝)
+                    (gDiscountRateOf(p) ? `<div class="thumb-sale">${gDiscountRateOf(p)}% 할인!</div>` : '') +
                     `</div>` +
                     `<div class="item-info-top">` +
                     // [수정] [오늘의추천]은 이름이 아니라 isRecommend 값으로 그린다 (gRecommendMark).
                     //  이름에서는 gDisplayName으로 그 말머리를 떼어내 두 번 나오지 않게 한다.
-                    `<div class="item-name">${gRecommendMark(p)}${gFreshMark(p)}${gDisplayName(p).replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
+                    `<div class="item-name">${gSaleMark(p)}${gRecommendMark(p)}${gFreshMark(p)}${gDisplayName(p).replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
+                    gSaleNote(p) +
                     // [신규] 할인 상품은 판매가 바로 위에 할인 전 금액을 작게 적어 준다.
                     (gOrigPriceLabel(p)
-                        ? `<div class="item-orig-price"><span class="off">${gDiscountRateOf(p)}%</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`
+                        ? `<div class="item-orig-price"><span class="off">${gDiscountRateOf(p)}% 할인</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`
                         : '') +
                     `<div class="item-price-row">` +
                     gStorageBadge(p) +
-                    `<div class="item-price-val">${gCardPriceLabel(p)}</div>` +
+                    `<div class="item-price-val${gDiscountRateOf(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div>` +
                     `</div>` +
                     // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
                     //  아래 버튼줄에 따로 한 줄을 차지하면 카드가 길어지고 썸네일이 작아 보인다.
@@ -8923,6 +8963,21 @@
         function gFreshMark(p, size) {
             if (!gIsFreshProduct(p)) return '';
             return `<span style="color:#047857; font-size: ${size || '0.9em'};">[신선식품]</span><br>`;
+        }
+
+        /* [신규] 할인 상품 말머리 [오늘의 특가].
+           [오늘의추천]과 같은 방식으로 '그리기만' 한다. 상품 이름 자체에 넣지 않는 이유는,
+           이름이 곧 상품의 열쇠(재고 조정키·주문 기록·중복 차단)라서 이름을 건드리면
+           지난 주문과 재고가 통째로 어긋나기 때문이다. */
+        function gSaleMark(p, size) {
+            if (gDiscountRateOf(p) <= 0) return '';
+            return `<span style="color:#e11d48; font-size: ${size || '0.9em'};">[땡처리 특가]</span><br>`;
+        }
+
+        // [신규] 특가 상품 안내 문구. 상품명 바로 아랫줄에 붙는다.
+        function gSaleNote(p) {
+            if (gDiscountRateOf(p) <= 0) return '';
+            return `<div class="item-sale-note">(수량이 많지 않습니다.)</div>`;
         }
 
         /* ===== [신규] 재고 선점 (오버셀 방지) =====
@@ -10165,14 +10220,24 @@
 
             // [수정] 상품카드와 같은 방식 — [오늘의추천]은 isRecommend 값으로 그리고 이름에서는 떼어낸다.
             document.getElementById('detail-title').innerHTML =
+                gSaleMark(p, '0.85em') +
                 (gIsRecommendProduct(p) ? `<span style="color:var(--nego-orange); font-size: 0.85em;">[오늘의추천]</span><br>` : '') +
                 gFreshMark(p, '0.85em') +
                 gDisplayName(p).replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.85em;">[$1]</span>') + '<br>' : '');
-            // [수정] 할인 상품은 상세보기에서도 할인 전 금액을 위에 작게 적어 준다.
-            document.getElementById('detail-price').innerHTML =
+            // [수정] 할인 상품은 상세보기에서도 할인 전 금액을 위에 작게 적고, 판매가를 빨간색으로 바꾼다.
+            //  글자 크기 22px의 0.6배로, 카드와 같은 비율을 쓴다.
+            // [신규] 특가 상품은 상품명 아랫줄에 안내 문구를 붙인다 (상품카드와 같은 문구)
+            if (gDiscountRateOf(p)) {
+                document.getElementById('detail-title').insertAdjacentHTML('beforeend',
+                    `<div style="margin-top:6px; font-size:13px; font-weight:700; color:#e11d48;">(수량이 많지 않습니다.)</div>`);
+            }
+            const _dPriceEl = document.getElementById('detail-price');
+            const _dRate = gDiscountRateOf(p);
+            _dPriceEl.style.color = _dRate ? '#e11d48' : 'var(--nego-orange)';
+            _dPriceEl.innerHTML =
                 (gOrigPriceLabel(p)
-                    ? `<div style="display:flex; align-items:center; gap:6px; font-size:14px; font-weight:800; margin-bottom:2px;">`
-                      + `<span style="color:#e11d48;">${gDiscountRateOf(p)}%</span>`
+                    ? `<div style="display:flex; align-items:baseline; gap:6px; font-size:13.2px; font-weight:900; margin-bottom:2px;">`
+                      + `<span style="color:#e11d48;">${_dRate}% 할인</span>`
                       + `<span style="color:#9aa5b1; font-weight:700; text-decoration:line-through;">${gOrigPriceLabel(p)}</span></div>`
                     : '')
                 + gCardPriceLabel(p);
