@@ -2382,6 +2382,12 @@
             const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(s);
             const isFV = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(nm);
 
+            /* [신규] 특가(할인) 상품은 '오늘의 상품'으로 못박아 두었으므로 당일판매에 속한다.
+               이 판단은 검색에도 쓰인다. 여기서 걸러 주지 않으면, 원래는 상시판매인 특가 상품이
+               당일판매 검색에도(여기서 false) 상시판매 검색에도(할인 상품은 당일 모드에서만 보이므로)
+               걸리지 않아 어디서도 찾을 수 없게 된다. */
+            if (gDiscountRateOf(p) > 0) return currentDeliveryType === 'today';
+
             if (currentDeliveryType === 'onsite') return !!gOnsiteTabCatOf(p);
             if (currentDeliveryType === 'today') return isFV || isDate;
             if (isFV) return false;
@@ -8073,15 +8079,17 @@
                    분류탭 설정은 기존 분류(상품명·matchKey)보다 '우선'하는 값인데, 여기서 걸러 주지 않아
                    과일을 상시판매로 옮겨도 당일판매 과일 탭에 그대로 남아 있었다.
                    (주문관리 상품목록은 이미 같은 규칙으로 걸러 낸다) */
-                if (currentDeliveryType !== 'onsite') {
+                /* [신규] 특가(할인) 상품은 당일판매 '오늘의 상품' 탭에서만 보인다.
+                   [주의] 아래 '상시판매 분류탭' 거르기보다 먼저 봐야 한다. 특가 상품 대부분은
+                   원래 상시판매(onsite-…) 분류를 달고 있어서, 그쪽이 먼저 걸리면
+                   당일판매 모드에서 통째로 빠져 '오늘의 상품'에도 검색에도 안 나온다. */
+                const _saleRate = gDiscountRateOf(p);
+                if (_saleRate > 0) {
+                    if (currentDeliveryType !== 'today') return false;
+                } else if (currentDeliveryType !== 'onsite') {
                     const _dt = gDisplayTabOf(p);
                     if (ONSITE_CATS.some(c => c.key === _dt)) return false;
                 }
-
-                /* [신규] 특가(할인) 상품은 당일판매 '오늘의 상품' 탭에서만 보인다.
-                   분류탭을 today-reserve로 못박아 두지만, 탭별 거르기는 matchKey(날짜)로 판단하므로
-                   그것만으로는 원래 분류탭에 그대로 남는다. 여기서 다른 모드를 아예 막는다. */
-                if (gDiscountRateOf(p) > 0 && currentDeliveryType !== 'today') return false;
 
                 // [신규] 배송 유형(당일배송/예약배송)별 보이기/숨기기 따로 적용 (관리자 모드 아닐 때만 적용)
                 if (!isAdminMode) {
