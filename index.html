@@ -5553,8 +5553,13 @@
             : '';
         let currentSortBy = 'timestamp'; // 'timestamp' (주문일) 기본값
         let currentSortDir = 'desc'; // [수정] 기본 내림차순 (최신순)
-        // [수정] 기간 고르는 버튼은 없앴다. 주문내역은 항상 최근 한 달치를 보여준다.
-        //  (완료된 주문은 10일이 지나면 보관함으로 옮겨지므로, 실제로는 그보다 짧게 남는다)
+        /* [수정] 기간 고르는 버튼은 없앴다. 끝난 주문은 30일치만 보여준다.
+           자료는 어차피 손님 것을 통째로 받아오므로 며칠로 정하든 통신량은 같다.
+           목록 길이만 달라지는데, 넉넉히 두어 지난 내역과 완료사진을 오래 볼 수 있게 했다.
+           단, 아직 안 끝난 주문은 아무리 오래돼도 무조건 보여준다. */
+        const HISTORY_DAYS = 30;
+        // 아직 안 끝난 주문 — 취소도 픽업도 배달도 안 된 것
+        const gIsUnfinished = (item) => !isOrderCancelled(item) && !isOrderReceived(item) && !isOrderDelivered(item);
         let currentFilter = 'month';
         let currentStatusFilter = 'all'; // '전체' 기본값
 
@@ -5848,11 +5853,13 @@
                 const dateKey = gPickupDateKey(raw);
                 let g;
 
-                if (dateKey && dateKey < todayKey) {
-                    // 지난 픽업일 — 아직 못 받은 것만 '미픽업'으로 모은다
-                    if (isOrderReceived(item) || isOrderDelivered(item)) return;
+                if (dateKey && dateKey < todayKey && !(isOrderReceived(item) || isOrderDelivered(item))) {
+                    // 지난 픽업일인데 아직 못 받은 것 — 날짜와 상관없이 '미픽업'으로 모아 맨 위에 둔다
                     g = getGroup('__unpicked', '0', '미픽업');
                 } else if (dateKey) {
+                    /* [수정] 지난 날짜라도 다 받은 건을 통째로 빼던 것을 없앴다.
+                       그러면 배달 다음 날부터 이 탭에서 그 날짜가 사라져
+                       완료사진을 볼 방법이 없었다. 이제 위쪽 기간 필터(14일)가 알아서 자른다. */
                     const pd = parseKRDate(raw);
                     const w = ['일', '월', '화', '수', '목', '금', '토'][pd.getDay()];
                     const label = `${pd.getMonth() + 1}월 ${pd.getDate()}일 (${w})` + (dateKey === todayKey ? ' · 오늘' : '');
@@ -6066,18 +6073,19 @@
                     if ((!isReceived && !isDelivered) || isCancelled) return false;
                 }
 
-                // [기간 필터 적용] 주문일시(timestamp)와 현재 시간의 차이(diffDays)를 기준으로 통일
-                const orderDate = parseKRDate(item.timestamp);
-                const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+                /* [기간 필터] 끝난 주문만 14일로 자른다. 아직 안 끝난 것은 언제 것이든 남긴다.
+                   재는 날짜는 탭에 따라 다르다 — 주문순은 주문일, 픽업/배달일순은 픽업·배달일.
+                   같은 14일이라도 축이 다르면 잘리는 것이 달라져, 각 탭이 제 축으로 재야 앞뒤가 맞는다. */
+                if (gIsUnfinished(item)) return true;
 
-                if (currentFilter === 'week') return diffDays <= 7;
-                if (currentFilter === '2weeks') return diffDays <= 14;
-                if (currentFilter === 'month') return diffDays <= 30;
+                const axisDate = (currentSortBy === 'pickupDate')
+                    ? parseKRDate(String(item.pickupDate || ''))
+                    : parseKRDate(item.timestamp);
 
-                // [수정] '전체'는 말 그대로 전부 보여준다. (예전엔 31일로 잘려 있었다)
-                if (currentFilter === 'all') return true;
+                // 날짜를 못 읽는 것(상시판매·현장판매 등)은 자르지 않고 남긴다
+                if (!axisDate) return true;
 
-                return false;
+                return (now - axisDate) / (1000 * 60 * 60 * 24) <= HISTORY_DAYS;
             });
 
             if (filtered.length === 0) {
