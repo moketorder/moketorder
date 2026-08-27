@@ -6228,66 +6228,64 @@
                 htmlBuffer += `
                     <div style="background:var(--white); border: 1.5px solid ${cardBorderColor}; border-left: ${cardLeftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
                         <div onclick="toggleHistoryGroup('${group.key}', this)" style="background:${cardHeaderBg}; padding:12px 15px; cursor:pointer; position:relative; transition: background 0.2s;">
-                            <!-- [수정] 픽업/배달 예정일순 카드와 같은 짜임으로 맞췄다.
-                                 주문일시를 제목처럼 크게 쓰고 그 앞에 배달·픽업 딱지를 붙인다.
-                                 상품 건수는 금액 앞에 작은 글씨로 둔다.
-                                 (예전에는 '픽업정보 N개 날짜'가 오른쪽 위를 차지하고,
-                                  아랫줄에 금액·뱃지·버튼이 몰려 좁은 화면에서 밀렸다) -->
-                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-                                <div style="flex:1; min-width:0;">
-                                    <div style="font-size:11px; color:#999; margin-bottom:2px;">주문일시</div>
-                                    <!-- 날짜는 제목처럼 크게, 시각은 그 아래 작게. -->
-                                    <div style="font-size:16px; font-weight:800; color:${allCanceled ? '#94a3b8' : 'var(--item-black)'}; display:flex; align-items:center; gap:6px;">
-                                        ${isDeliveryCard
-                                            ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">배달</span>'
-                                            : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">픽업</span>'}
-                                        <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${orderTime}</span>
-                                    </div>
-                                    ${orderClock ? `<div style="margin-top:3px; font-size:12px; font-weight:700; color:#9aa5b1;">${orderClock}</div>` : ''}
+                            <!-- [수정] 머리를 두 줄로 나눴다.
+                                 윗줄 오른쪽 끝에 상태(뱃지·버튼)를 몰아 두고,
+                                 아랫줄에 날짜와 금액을 한 줄로 마주 놓는다.
+                                 금액이 뱃지와 자리를 다투지 않아 좁은 화면에서도 안 눌린다. -->
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:20px;">
+                                <div style="font-size:11px; color:#999; flex-shrink:0;">주문일시</div>
+                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+                                    <!-- 차례는 'N건 취소 → 취소완료 → 배달완료 → 완료사진 → 주문취소'.
+                                         먼저 빠진 것(취소)을 알려 주고, 그 다음 나머지가 어떻게 됐는지,
+                                         마지막에 눌러 볼 것을 두는 순서다. -->
+                                    ${someCanceled ? `
+                                        <span style="padding: 4px 8px; background:#fff5f5; color:#d32f2f; border:1px solid #ffd8d8; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            ${canceledCount}건 취소
+                                        </span>
+                                    ` : ''}
+                                    ${allCanceled ? `
+                                        <span style="padding: 4px 8px; background:#eef1f4; color:#64748b; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            취소완료
+                                        </span>
+                                    ` : ''}
+                                    <!-- 다 끝난 주문은 '취소완료'와 같은 모양으로 알린다.
+                                         카드 안 상품이 전부 완료됐거나 취소된 때만 붙는다. -->
+                                    ${(nonCanceledCount > 0 && !allCanceled && (isDeliveryCard ? allDelivered : allReceived)) ? `
+                                        <span style="padding: 4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            ${isDeliveryCard ? '배달완료' : '픽업완료'}
+                                        </span>
+                                    ` : ''}
+                                    ${(showDeliveredBadge && hasDeliveredPhoto) ? `
+                                        <button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${deliveredPhotoKey}')"
+                                             style="padding: 4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            완료사진
+                                        </button>
+                                    ` : ''}
+                                    ${hasCancelable ? `
+                                        <button onclick="event.stopPropagation(); deleteOrderCard('${escapeArg(orderTimeFull)}')"
+                                             style="padding: 4px 10px; background:#ffd8d8; color:#d32f2f; border:1px solid #ffb8b8; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap; transition: all 0.2s;">
+                                            주문취소
+                                        </button>
+                                    ` : ''}
                                 </div>
-                                <!-- [수정] 건수·금액을 날짜와 같은 줄(오른쪽)로 올렸다.
-                                     아래 한 줄을 통째로 쓰던 것을 없애 카드가 한 단 짧아진다.
-                                     뱃지·버튼은 그 밑에 붙어, 금액과 자리를 다투지 않는다. -->
-                                <div style="flex:0 0 auto; text-align:right;">
-                                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
-                                        <span style="font-size:13px; font-weight:700; color:#455464;">${originalCount}건</span>
-                                        <span style="font-size:16px; font-weight:900; color:${allCanceled ? '#94a3b8' : 'var(--nego-orange)'};">${group.totalPrice.toLocaleString()}원</span>
-                                        <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s; transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                                    </div>
-                                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap; margin-top:7px;">
-                                        <!-- 차례는 'N건 취소 → 취소완료 → 배달완료 → 완료사진 → 주문취소'.
-                                             먼저 빠진 것(취소)을 알려 주고, 그 다음 나머지가 어떻게 됐는지,
-                                             마지막에 눌러 볼 것을 두는 순서다. -->
-                                        ${someCanceled ? `
-                                            <span style="padding: 4px 8px; background:#fff5f5; color:#d32f2f; border:1px solid #ffd8d8; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                                ${canceledCount}건 취소
-                                            </span>
-                                        ` : ''}
-                                        ${allCanceled ? `
-                                            <span style="padding: 4px 8px; background:#eef1f4; color:#64748b; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                                취소완료
-                                            </span>
-                                        ` : ''}
-                                        <!-- 다 끝난 주문은 '취소완료'와 같은 모양으로 알린다.
-                                             카드 안 상품이 전부 완료됐거나 취소된 때만 붙는다. -->
-                                        ${(nonCanceledCount > 0 && !allCanceled && (isDeliveryCard ? allDelivered : allReceived)) ? `
-                                            <span style="padding: 4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                                ${isDeliveryCard ? '배달완료' : '픽업완료'}
-                                            </span>
-                                        ` : ''}
-                                        ${(showDeliveredBadge && hasDeliveredPhoto) ? `
-                                            <button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${deliveredPhotoKey}')"
-                                                 style="padding: 4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                                완료사진
-                                            </button>
-                                        ` : ''}
-                                        ${hasCancelable ? `
-                                            <button onclick="event.stopPropagation(); deleteOrderCard('${escapeArg(orderTimeFull)}')"
-                                                 style="padding: 4px 10px; background:#ffd8d8; color:#d32f2f; border:1px solid #ffb8b8; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap; transition: all 0.2s;">
-                                                주문취소
-                                            </button>
-                                        ` : ''}
-                                    </div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px;">
+                                <!-- 날짜는 제목처럼 크게, 시각은 그 오른쪽에 작게 붙인다. -->
+                                <div style="flex:1; min-width:0; font-size:16px; font-weight:800; color:${allCanceled ? '#94a3b8' : 'var(--item-black)'}; display:flex; align-items:center; gap:6px;">
+                                    ${isDeliveryCard
+                                        ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">배달</span>'
+                                        : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">픽업</span>'}
+                                    <!-- [수정] 날짜와 시각은 따로 묶어 밑선(baseline)을 맞춘다.
+                                         가운데맞춤으로 두면 글자 크기가 달라 시각이 위로 떠 보였다. -->
+                                    <span style="min-width:0; display:flex; align-items:baseline; gap:6px;">
+                                        <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${orderTime}</span>
+                                        ${orderClock ? `<span style="font-size:12px; font-weight:700; color:#9aa5b1; flex-shrink:0;">${orderClock}</span>` : ''}
+                                    </span>
+                                </div>
+                                <div style="flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                                    <span style="font-size:13px; font-weight:700; color:#455464;">${originalCount}건</span>
+                                    <span style="font-size:16px; font-weight:900; color:${allCanceled ? '#94a3b8' : 'var(--nego-orange)'};">${group.totalPrice.toLocaleString()}원</span>
+                                    <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s; transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                 </div>
                             </div>
                         </div>
