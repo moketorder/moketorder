@@ -4699,14 +4699,16 @@
         function toggleHistoryGroup(id, header) {
             const content = document.getElementById(id);
             const icon = header.querySelector('.toggle-icon');
+            /* [버그수정] 예전에는 여닫을 때 머리 바탕을 회색으로 덮어썼다.
+               카드마다 제 색(배달 초록·픽업 파랑·취소 회색)이 생긴 뒤로는
+               한 번 누르면 그 색이 사라져 카드가 회색으로 죽어 보였다.
+               여닫힌 것은 화살표가 돌아가는 것으로 이미 알 수 있어 바탕은 건드리지 않는다. */
             if (content.style.display === 'none') {
                 content.style.display = 'block';
                 if (icon) icon.style.transform = 'rotate(180deg)';
-                header.style.background = '#f1f3f5'; // 열렸을 때 배경색 변화
             } else {
                 content.style.display = 'none';
                 if (icon) icon.style.transform = 'rotate(0deg)';
-                header.style.background = '#f9fafb';
             }
         }
 
@@ -5922,7 +5924,7 @@
                                  윗줄 오른쪽 끝에 상태(배달완료·픽업완료·완료사진),
                                  아랫줄에 날짜와 건수·금액을 한 줄로 마주 놓는다.
                                  딱지는 이 카드 안 물건이 전부 끝난 때만 붙는다(주문순과 같은 잣대). -->
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:20px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:22px;">
                                 <div style="font-size:11px; color:#999; flex-shrink:0;">${isUnpicked ? '지난 날짜' : '픽업/배달 예정일'}</div>
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
                                     ${gDoneBadgeHtml(doneInfo.label)}
@@ -6272,9 +6274,13 @@
                 // [신규] 전부 취소된 주문은 카드 자체를 회색으로 눕혀 한눈에 알아보게 한다
                 const allCanceled = (totalCount > 0 && canceledCount === totalCount);
                 const someCanceled = (canceledCount > 0 && !allCanceled);
-                const cardBorderColor = allCanceled ? 'rgba(148, 163, 184, 0.4)' : (isDeliveryCard ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)');
-                const cardLeftBorder = allCanceled ? '4px solid #94a3b8' : (isDeliveryCard ? '4px solid #10b981' : '4px solid #3b82f6');
-                const cardHeaderBg = allCanceled ? '#f5f6f8' : (isDeliveryCard ? '#f0fdf4' : '#eff6ff');
+                /* [수정] 주문순 탭은 카드 색을 초록 하나로 맞춘다.
+                   배달이냐 픽업이냐는 '주문일시' 옆 딱지로 이미 알 수 있는데,
+                   카드 색까지 갈라지니 탭 전체가 얼룩덜룩해 보였다.
+                   (전부 취소된 카드만 회색으로 눕히는 것은 그대로 둔다) */
+                const cardBorderColor = allCanceled ? 'rgba(148, 163, 184, 0.4)' : 'rgba(16, 185, 129, 0.35)';
+                const cardLeftBorder = allCanceled ? '4px solid #94a3b8' : '4px solid #10b981';
+                const cardHeaderBg = allCanceled ? '#f5f6f8' : '#f0fdf4';
 
                 htmlBuffer += `
                     <div style="background:var(--white); border: 1.5px solid ${cardBorderColor}; border-left: ${cardLeftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
@@ -6283,14 +6289,16 @@
                                  윗줄 오른쪽 끝에 상태(뱃지·버튼)를 몰아 두고,
                                  아랫줄에 날짜와 금액을 한 줄로 마주 놓는다.
                                  금액이 뱃지와 자리를 다투지 않아 좁은 화면에서도 안 눌린다. -->
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:20px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:22px;">
                                 <!-- [수정] 배달·픽업 딱지를 '주문일시' 오른쪽으로 올렸다.
                                      날짜 앞에 있으면 날짜가 그만큼 밀려 좁은 화면에서 먼저 잘렸다. -->
                                 <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                                     <span style="font-size:11px; color:#999;">주문일시</span>
+                                    <!-- [수정] 오른쪽 상태 딱지와 같은 크기·모양으로 키웠다.
+                                         혼자만 작아서 한 줄 안에서 눈에 안 들어왔다. -->
                                     ${isDeliveryCard
-                                        ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">배달</span>'
-                                        : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">픽업</span>'}
+                                        ? '<span style="padding:4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height:22px; box-sizing:border-box; white-space:nowrap; flex-shrink:0;">배달</span>'
+                                        : '<span style="padding:4px 8px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height:22px; box-sizing:border-box; white-space:nowrap; flex-shrink:0;">픽업</span>'}
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
                                     <!-- 차례는 'N건 취소 → 취소완료 → 배달완료 → 완료사진 → 주문취소'.
@@ -6365,8 +6373,12 @@
                         pDisp = pDisp.replace(/^20(\d{2}년)/, '$1');
                     }
 
+                    /* [수정] 날짜 묶음을 감싸던 작은 카드(회색 바탕·테두리)를 없앴다.
+                       한 주문에 배달 날짜가 하나뿐이라 카드가 늘 한 장씩만 생겨,
+                       테두리 안에 테두리가 겹쳐 보이기만 했다.
+                       날짜 줄은 그대로 두고 상자만 걷어낸다. */
                     htmlBuffer += `
-                        <div style="margin-bottom: 12px; background: #fbfbfc; border: 1px solid #edf2f7; border-radius: 8px; padding: 10px 12px;">
+                        <div style="margin-bottom: 12px;">
                             <div style="font-size: 15px; font-weight: 800; color: var(--nego-orange); margin-bottom: 8px; display: flex; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 6px;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px; opacity:0.6;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                                 <span style="font-size: 0.8em; opacity: 0.8; margin-right: 4px;">[픽업/배달 예정일]</span> ${pDisp}
