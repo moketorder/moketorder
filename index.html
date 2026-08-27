@@ -2209,8 +2209,11 @@
                         style="height:32px; font-size:17px; padding:0; font-weight:900;">전체</button>
                     <button class="date-btn" id="status-stocked" onclick="filterStatus('stocked')"
                         style="height:32px; font-size:17px; padding:0; font-weight:900;">입고</button>
+                    <!-- [수정] 글자를 '픽업' → '완료'로 바꿨다.
+                         이 탭은 예전부터 픽업완료와 배달완료를 함께 보여 주는데(아래 filterStatus 'pickup' 참고),
+                         이름이 '픽업'이라 배달건은 없는 줄 알기 쉬웠다. 거르는 방식은 그대로 두고 이름만 맞춘다. -->
                     <button class="date-btn" id="status-pickup" onclick="filterStatus('pickup')"
-                        style="height:32px; font-size:17px; padding:0; font-weight:900;">픽업</button>
+                        style="height:32px; font-size:17px; padding:0; font-weight:900;">완료</button>
                     <button class="date-btn" id="status-cancel" onclick="filterStatus('cancel')"
                         style="height:32px; font-size:17px; padding:0; font-weight:900;">취소</button>
                 </div>
@@ -2788,7 +2791,8 @@
                 //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
                 html = gTypeNoticeCard('🛵', '사다드림', '#c2410a', '#fff1e8', [
                     `무료배달 기준 금액(15,000원)에 <b style="color:#c2410a;">포함되지 않아요</b>`,
-                    `배달·픽업 모두 <b style="color:#c2410a;">당일 입금</b>이 확인되어야 주문이 확정돼요`,
+                    // [수정] '(배달·픽업 모두)'는 괄호째 붙어 있어야 읽히므로 중간에 줄이 바뀌지 않게 묶어 둔다
+                    `주문마감 전까지 <b style="color:#c2410a;">입금이 확인</b>되어야 주문이 확정돼요<span style="white-space:nowrap;">(배달·픽업 모두)</span>`,
                     `사다드림은 <b style="color:#c2410a;">카드 결제가 안 돼요</b>`
                 ]);
             } else if (currentDeliveryType === 'today') {
@@ -5938,7 +5942,10 @@
                                 </div>
                                 <div style="text-align:right; min-width:80px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px;">
                                     ${payBadgeHtml}
-                                    ${statusText !== '배달완료' ? `<div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>` : ''}
+                                    <!-- [수정] '배달완료'만 상태 글자를 감추고 있었다.
+                                         다른 줄에는 다 글자가 있는데 그 줄만 비어 있어,
+                                         받은 것인지 표시가 빠진 것인지 알기 어려웠다. 이제 함께 적는다. -->
+                                    <div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>
                                 </div>
                             </div>
                         </div>
@@ -6132,9 +6139,16 @@
                 // 취소 가능한 품목이 1개라도 있는지 판별
                 let hasCancelable = false;
                 let allDelivered = true;
+                // [신규] 픽업 주문도 다 받아 갔는지 따로 센다 (카드 머리에 '픽업완료'를 적기 위함)
+                let allReceived = true;
                 let hasDeliveredPhoto = false;
                 let deliveredPhotoKey = '';
                 let nonCanceledCount = 0;
+                /* [신규] 카드 머리에 적을 '처음 주문한 상품 개수'.
+                   취소해도 줄지 않게 취소 여부를 보지 않는다. 손님이 "몇 개 시켰더라"를
+                   떠올리는 기준이라, 중간에 숫자가 바뀌면 오히려 헷갈린다.
+                   배달비·배달비 차감은 상품이 아니므로 빼고, [배달합산] 줄도 뺀다. */
+                let originalCount = 0;
                 // [신규] 카드 머리에 취소 상태를 표시하기 위한 집계.
                 //  예전에는 펼쳐서 항목을 봐야 취소된 줄 알 수 있었다. (사장님이 취소한 건도 마찬가지)
                 let canceledCount = 0;
@@ -6146,6 +6160,8 @@
                         const isCancelled = isOrderCancelled(order);
                         totalCount++;
                         if (isCancelled) canceledCount++;
+                        // 취소했어도 센다 (처음 주문한 개수를 그대로 두기 위함)
+                        if (!isCombined && !gIsFeeRow(order.item)) originalCount++;
                         const isProcessing = order.isProcessing === true;
                         const isReceived = isOrderReceived(order);
                         const isStocked = isOrderStocked(order);
@@ -6172,6 +6188,9 @@
                             nonCanceledCount++;
                             if (!isDelivered) {
                                 allDelivered = false;
+                            }
+                            if (!isReceived) {
+                                allReceived = false;
                             }
                             if (order.deliveryPhoto) {
                                 hasDeliveredPhoto = true;
@@ -6215,13 +6234,26 @@
                                     ${isDeliveryCard 
                                         ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">배달</span>' 
                                         : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">픽업</span>'}
-                                    <span style="display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">${displaySummary}</span>
+                                    <!-- [수정] 상품명 제목은 뺐다.
+                                         '첫상품명 외 3건'은 폭이 좁으면 이름이 잘리면서 정작 알아야 할
+                                         개수가 먼저 사라졌고, 잘린 이름만으로는 무슨 주문인지도 알기 어려웠다.
+                                         카드를 펼치면 상품이 줄줄이 나오므로 머리에는 개수만 둔다. -->
+                                    <span style="white-space:nowrap;">상품 ${originalCount}개</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:6px;">
                                     <span style="font-size:16px; font-weight:900; color:${allCanceled ? '#94a3b8' : 'var(--nego-orange)'};">${group.totalPrice.toLocaleString()}원</span>
                                     ${allCanceled ? `
                                         <span style="padding: 4px 8px; background:#eef1f4; color:#64748b; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
                                             취소완료
+                                        </span>
+                                    ` : ''}
+                                    <!-- [신규] 다 끝난 주문은 '취소완료'와 같은 자리·같은 모양으로 알린다.
+                                         카드 안 상품이 전부 완료됐거나 취소된 때만 붙는다.
+                                         (allDelivered·allReceived는 취소 건을 빼고 세므로
+                                          3개 중 1개 취소 + 2개 배달완료도 '배달완료'로 잡힌다) -->
+                                    ${(nonCanceledCount > 0 && !allCanceled && (isDeliveryCard ? allDelivered : allReceived)) ? `
+                                        <span style="padding: 4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            ${isDeliveryCard ? '배달완료' : '픽업완료'}
                                         </span>
                                     ` : ''}
                                     ${someCanceled ? `
@@ -6235,16 +6267,14 @@
                                             주문취소
                                         </button>
                                     ` : ''}
-                                    ${showDeliveredBadge ? `
-                                        <span style="padding: 4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box;">
-                                            배달완료
-                                        </span>
-                                        ${hasDeliveredPhoto ? `
-                                            <button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${deliveredPhotoKey}')" 
-                                                 style="padding: 4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box;">
-                                                완료사진
-                                            </button>
-                                        ` : ''}
+                                    <!-- [수정] 카드 머리의 '배달완료' 뱃지는 뺐다.
+                                         이제 상품 줄마다 상태가 적히므로 같은 말이 두 번 나왔다.
+                                         '완료사진' 버튼은 카드에만 있는 기능이라 그대로 둔다. -->
+                                    ${(showDeliveredBadge && hasDeliveredPhoto) ? `
+                                        <button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${deliveredPhotoKey}')"
+                                             style="padding: 4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box;">
+                                            완료사진
+                                        </button>
                                     ` : ''}
                                     <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s; transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                 </div>
@@ -6334,7 +6364,8 @@
                                     </div>
                                     <div style="text-align:right; min-width:80px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px;">
                                         ${payBadgeHtml}
-                                        ${statusText !== '배달완료' ? `<div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>` : ''}
+                                        <!-- [수정] 위 목록과 같이, '배달완료'도 상태 글자를 적는다 -->
+                                        <div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>
                                         ${isProcessing ? `<div style="width:70px; height:26px; display:flex; align-items:center; justify-content:center; background:#f5f5f5; color:#999; border-radius:4px; font-size:12px; font-weight:700;">대기중</div>` : ''}
                                     </div>
                                 </div>
