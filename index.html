@@ -5504,6 +5504,51 @@
         }
 
         let fullHistoryData = []; // 서버에서 가져온 전체 데이터 저장
+        let gHistoryPhoneKey = ''; // 주문내역을 불러온 대표키(서랍 이름). 배달 사진도 이 아래에 있다.
+
+        /* [신규] 같은 픽업·배달 날짜로 묶인 것들의 '다 끝났는지'와 '완료사진'을 한 곳에서 뽑는다.
+           배달 사진은 그날 배달분에만 붙으므로 날짜 묶음마다 많아야 한 장이다.
+           주문순 탭의 [픽업/배달 예정일] 소카드와 픽업/배달일순 탭의 카드가 같은 값을 쓰게 하려고 함께 둔다. */
+        function gGroupDoneInfo(items) {
+            let n = 0, done = true, anyDel = false, anyRec = false, photoKey = '', photoTime = -1;
+            (items || []).forEach(order => {
+                const isCombined = (order.item && order.item.includes('[배달합산]'));
+                // 배달비는 물건이 아니라 셈에서 빼고, 사진도 물건 줄에서 가져온다
+                if (isCombined || isOrderCancelled(order) || String(order.item || '').trim() === '배달비') return;
+                n++;
+                const d = isOrderDelivered(order);
+                const r = isOrderReceived(order);
+                if (!d && !r) done = false;
+                if (d) anyDel = true;
+                if (r) anyRec = true;
+                if (order.deliveryPhoto || order.deliveryPhotoExists) {
+                    const key = order.__fbKey || '';
+                    if (order.deliveryPhoto && key) {
+                        window.deliveryPhotos = window.deliveryPhotos || {};
+                        window.deliveryPhotos[key] = order.deliveryPhoto;
+                    }
+                    /* [수정] 한 주문이 여러 날로 나뉘어 배달되면 사진도 여러 장이 된다.
+                       그때는 가장 나중에 찍은 것을 보여 준다 (찍은 시각이 없는 예전 기록은 뒤로 민다). */
+                    const t = parseInt(order.deliveryPhotoTime, 10) || 0;
+                    if (t >= photoTime) { photoTime = t; photoKey = key; }
+                }
+            });
+            const finished = (n > 0 && done);
+            return {
+                finished,
+                // 한 날짜에 배달과 픽업이 섞이면 어느 쪽이라 하기 어려워 그냥 '완료'라 적는다
+                label: !finished ? '' : (anyDel && !anyRec ? '배달완료' : (anyRec && !anyDel ? '픽업완료' : '완료')),
+                photoKey: finished ? photoKey : ''
+            };
+        }
+
+        // 카드 머리에 붙는 딱지·단추. 모양은 주문순 탭의 '취소완료·배달완료'와 똑같이 맞춘다.
+        const gDoneBadgeHtml = (label) => label
+            ? `<span style="padding:4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height:22px; box-sizing:border-box; white-space:nowrap;">${label}</span>`
+            : '';
+        const gPhotoBtnHtml = (key) => key
+            ? `<button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${escapeArg(key)}')" style="padding:4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height:22px; box-sizing:border-box; white-space:nowrap; flex-shrink:0;">완료사진</button>`
+            : '';
         let currentSortBy = 'timestamp'; // 'timestamp' (주문일) 기본값
         let currentSortDir = 'desc'; // [수정] 기본 내림차순 (최신순)
         // [수정] 기간 고르는 버튼은 없앴다. 주문내역은 항상 최근 한 달치를 보여준다.
@@ -5579,6 +5624,9 @@
                 }
                 return;
             }
+
+            // [신규] 배달 사진 서랍(delivery_photos)도 이 대표키 아래에 있다. 나중에 찾아 쓰려고 적어 둔다.
+            gHistoryPhoneKey = cleanPhone;
 
             const cacheKey = `history_cache_${name}_${cleanPhone}`;
             const cached = localStorage.getItem(cacheKey);
@@ -5865,16 +5913,25 @@
                 const borderColor = isUnpicked ? 'rgba(211, 47, 47, 0.35)' : 'rgba(59, 130, 246, 0.35)';
                 const leftBorder = isUnpicked ? '4px solid #d32f2f' : '4px solid #3b82f6';
                 const headerBg = isUnpicked ? '#fff5f5' : '#eff6ff';
+                const doneInfo = gGroupDoneInfo(group.items);
 
                 html += `
                     <div style="background:var(--white); border: 1.5px solid ${borderColor}; border-left: ${leftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
                         <div onclick="toggleHistoryGroup('${domKey}', this)" style="background:${headerBg}; padding:12px 15px; cursor:pointer;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div style="flex:1; padding-right:10px; min-width:0;">
-                                    <div style="font-size:11px; color:#999; margin-bottom:2px;">${isUnpicked ? '지난 날짜' : '픽업/배달 예정일'}</div>
-                                    <div style="font-size:16px; font-weight:800; color:${isUnpicked ? '#d32f2f' : 'var(--item-black)'};">${group.label}</div>
+                            <!-- [수정] 주문순 탭 카드와 같은 짜임으로 맞췄다.
+                                 윗줄 오른쪽 끝에 상태(배달완료·픽업완료·완료사진),
+                                 아랫줄에 날짜와 건수·금액을 한 줄로 마주 놓는다.
+                                 딱지는 이 카드 안 물건이 전부 끝난 때만 붙는다(주문순과 같은 잣대). -->
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:20px;">
+                                <div style="font-size:11px; color:#999; flex-shrink:0;">${isUnpicked ? '지난 날짜' : '픽업/배달 예정일'}</div>
+                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+                                    ${gDoneBadgeHtml(doneInfo.label)}
+                                    ${gPhotoBtnHtml(doneInfo.photoKey)}
                                 </div>
-                                <div style="display:flex; align-items:center; gap:8px;">
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px;">
+                                <div style="flex:1; min-width:0; font-size:16px; font-weight:800; color:${isUnpicked ? '#d32f2f' : 'var(--item-black)'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${group.label}</div>
+                                <div style="flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
                                     <span style="font-size:13px; font-weight:700; color:#455464;">${group.count}건</span>
                                     <span style="font-size:16px; font-weight:900; color:var(--nego-orange);">${group.totalPrice.toLocaleString()}원</span>
                                     <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s; transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -5888,7 +5945,7 @@
                 groupItems.forEach((order, idx) => {
                     if (order.deliveryPhoto) {
                         window.deliveryPhotos = window.deliveryPhotos || {};
-                        window.deliveryPhotos[order.phone + "_" + order.orderKey] = order.deliveryPhoto;
+                        window.deliveryPhotos[order.__fbKey || ""] = order.deliveryPhoto; // [수정] 찾는 이름을 실제 열쇠(__fbKey)로 맞춘다
                     }
                     const isCombined = (order.item && order.item.includes('[배달합산]'));
                     const isCancelled = isOrderCancelled(order);
@@ -6150,8 +6207,7 @@
                 let allDelivered = true;
                 // [신규] 픽업 주문도 다 받아 갔는지 따로 센다 (카드 머리에 '픽업완료'를 적기 위함)
                 let allReceived = true;
-                let hasDeliveredPhoto = false;
-                let deliveredPhotoKey = '';
+
                 let nonCanceledCount = 0;
                 /* [수정] 카드 머리에 적을 건수 — '지금 남아 있는 것'만 센다.
                    취소한 건은 빼고, 배달비·배달비 차감은 함께 센다.
@@ -6201,13 +6257,6 @@
                             if (!isReceived) {
                                 allReceived = false;
                             }
-                            if (order.deliveryPhoto) {
-                                hasDeliveredPhoto = true;
-                                deliveredPhotoKey = order.phone + "_" + order.orderKey;
-                                // Save the delivery photo so that viewCustomerDeliveryPhoto can find it
-                                window.deliveryPhotos = window.deliveryPhotos || {};
-                                window.deliveryPhotos[deliveredPhotoKey] = order.deliveryPhoto;
-                            }
                         }
 
                         const orderCanDelete = !isCancelled && !isReceived && !isProcessing && !isStocked && !order.onSite && !isDelivered && !isCombined && !isHiddenProduct;
@@ -6216,8 +6265,10 @@
                         }
                     });
                 });
-                const showDeliveredBadge = (nonCanceledCount > 0 && allDelivered);
+
                 const isDeliveryCard = (group.shippingMethod === '배달주문');
+                // 카드 전체의 마무리 상태와 완료사진 (픽업/배달일순 탭과 같은 잣대를 쓴다)
+                const cardDone = gGroupDoneInfo(Object.values(group.pickupGroups).flat());
                 // [신규] 전부 취소된 주문은 카드 자체를 회색으로 눕혀 한눈에 알아보게 한다
                 const allCanceled = (totalCount > 0 && canceledCount === totalCount);
                 const someCanceled = (canceledCount > 0 && !allCanceled);
@@ -6262,12 +6313,9 @@
                                             ${isDeliveryCard ? '배달완료' : '픽업완료'}
                                         </span>
                                     ` : ''}
-                                    ${(showDeliveredBadge && hasDeliveredPhoto) ? `
-                                        <button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${deliveredPhotoKey}')"
-                                             style="padding: 4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                            완료사진
-                                        </button>
-                                    ` : ''}
+                                    <!-- 지금은 한 번 주문에 배달 날짜가 하나뿐이라 사진도 한 장이다.
+                                         (한 주문이 여러 날로 나뉘던 예전 기록은 마지막 사진 한 장만 보인다) -->
+                                    ${gPhotoBtnHtml(cardDone.photoKey)}
                                     ${hasCancelable ? `
                                         <button onclick="event.stopPropagation(); deleteOrderCard('${escapeArg(orderTimeFull)}')"
                                              style="padding: 4px 10px; background:#ffd8d8; color:#d32f2f; border:1px solid #ffb8b8; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap; transition: all 0.2s;">
@@ -6328,7 +6376,7 @@
                     items.forEach((order, idx) => {
                         if (order.deliveryPhoto) {
                             window.deliveryPhotos = window.deliveryPhotos || {};
-                            window.deliveryPhotos[order.phone + "_" + order.orderKey] = order.deliveryPhoto;
+                            window.deliveryPhotos[order.__fbKey || ""] = order.deliveryPhoto; // [수정] 찾는 이름을 실제 열쇠(__fbKey)로 맞춘다
                         }
                         const isCombined = (order.item && order.item.includes('[배달합산]'));
                         const isCancelled = isOrderCancelled(order);
@@ -12222,18 +12270,39 @@
             loadData(true);
         }
 
-        function viewCustomerDeliveryPhoto(photoKey) {
-            const photoData = window.deliveryPhotos ? window.deliveryPhotos[photoKey] : null;
+        /* [수정] 사진 알맹이는 주문 안에 없고 delivery_photos 서랍에 따로 들어 있다.
+           손에 없으면 그때 가서 받아 온다 (주문내역을 열 때마다 사진까지 받아 오면 느려진다). */
+        async function viewCustomerDeliveryPhoto(photoKey) {
+            const modal = document.getElementById("customer-photo-modal");
+            const modalImg = document.getElementById("customer-photo-modal-img");
+            if (!modal || !modalImg) return;
+
+            let photoData = window.deliveryPhotos ? window.deliveryPhotos[photoKey] : null;
+
+            if (!photoData && gHistoryPhoneKey && photoKey) {
+                try {
+                    const url = `${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(gHistoryPhoneKey)}/${encodeURIComponent(photoKey)}.json`;
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const d = await res.json();
+                        // 배달기사 앱은 {photo: "data:image..."} 꼴로 넣지만, 예전 자료는 통글자일 수 있다
+                        photoData = (d && typeof d === 'object') ? d.photo : d;
+                        if (photoData) {
+                            window.deliveryPhotos = window.deliveryPhotos || {};
+                            window.deliveryPhotos[photoKey] = photoData;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("delivery photo load error", e);
+                }
+            }
+
             if (!photoData) {
                 alert("사진 데이터를 불러올 수 없습니다.");
                 return;
             }
-            const modal = document.getElementById("customer-photo-modal");
-            const modalImg = document.getElementById("customer-photo-modal-img");
-            if (modal && modalImg) {
-                modalImg.src = photoData;
-                modal.style.display = "flex";
-            }
+            modalImg.src = photoData;
+            modal.style.display = "flex";
         }
 
         function closeCustomerPhotoModal() {
