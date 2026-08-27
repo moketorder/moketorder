@@ -6233,7 +6233,14 @@
                                  아랫줄에 날짜와 금액을 한 줄로 마주 놓는다.
                                  금액이 뱃지와 자리를 다투지 않아 좁은 화면에서도 안 눌린다. -->
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:20px;">
-                                <div style="font-size:11px; color:#999; flex-shrink:0;">주문일시</div>
+                                <!-- [수정] 배달·픽업 딱지를 '주문일시' 오른쪽으로 올렸다.
+                                     날짜 앞에 있으면 날짜가 그만큼 밀려 좁은 화면에서 먼저 잘렸다. -->
+                                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                                    <span style="font-size:11px; color:#999;">주문일시</span>
+                                    ${isDeliveryCard
+                                        ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">배달</span>'
+                                        : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">픽업</span>'}
+                                </div>
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
                                     <!-- 차례는 'N건 취소 → 취소완료 → 배달완료 → 완료사진 → 주문취소'.
                                          먼저 빠진 것(취소)을 알려 주고, 그 다음 나머지가 어떻게 됐는지,
@@ -6272,9 +6279,6 @@
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px;">
                                 <!-- 날짜는 제목처럼 크게, 시각은 그 오른쪽에 작게 붙인다. -->
                                 <div style="flex:1; min-width:0; font-size:16px; font-weight:800; color:${allCanceled ? '#94a3b8' : 'var(--item-black)'}; display:flex; align-items:center; gap:6px;">
-                                    ${isDeliveryCard
-                                        ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">배달</span>'
-                                        : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; flex-shrink:0; font-weight:900;">픽업</span>'}
                                     <!-- [수정] 날짜와 시각은 따로 묶어 밑선(baseline)을 맞춘다.
                                          가운데맞춤으로 두면 글자 크기가 달라 시각이 위로 떠 보였다. -->
                                     <span style="min-width:0; display:flex; align-items:baseline; gap:6px;">
