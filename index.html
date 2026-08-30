@@ -10411,6 +10411,28 @@
             refreshProductListAfterCartChange();
         }
 
+        /* [용량절감] 상품 설명(desc)은 상품 목록에 딸려 오지 않고 product_desc 서랍에 따로 있다.
+           예전에는 목록만 보고 나가는 손님도 260개 상품의 설명(199KB)을 전부 받았다.
+           이제 상세를 열 때 그 상품 것 하나(평균 1KB)만 받는다.
+             · 예전 자리(p.desc)에 값이 남아 있으면 그대로 쓴다 — 옮기는 중에도 화면이 비지 않게.
+             · 한 번 받은 설명은 기억해 두어 같은 상품을 다시 열어도 또 받지 않는다. */
+        async function gLoadProductDesc(p) {
+            if (!p) return '';
+            if (typeof p.desc === 'string' && p.desc.trim()) return p.desc;   // 예전 자리 우선(안전장치)
+            if (typeof p.__desc === 'string') return p.__desc;                // 이미 받아 둔 것
+            const key = fSafeKey(p.name);
+            if (!key) return '';
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}product_desc/${encodeURIComponent(key)}.json`);
+                if (res.ok) {
+                    const v = await res.json();
+                    p.__desc = (typeof v === 'string') ? v : '';
+                    return p.__desc;
+                }
+            } catch (e) { console.error('상품 설명 불러오기 실패:', e); }
+            return '';
+        }
+
         async function openDetail(name) {
             const p = productsData.find(i => i.name === name);
             if (!p) return;
@@ -10440,7 +10462,13 @@
                     : '')
                 + gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
-            document.getElementById('detail-desc').innerText = p.desc || "상세 설명이 없습니다.";
+            // 설명은 따로 받아 온다. 나머지 화면은 기다리지 않고 먼저 그린다.
+            document.getElementById('detail-desc').innerText = "";
+            gLoadProductDesc(p).then(t => {
+                if (activeProductName !== p.name) return;   // 그 사이 다른 상품을 열었으면 덮어쓰지 않는다
+                const el = document.getElementById('detail-desc');
+                if (el) el.innerText = t || "상세 설명이 없습니다.";
+            });
             const slider = document.getElementById('slider-area');
             const counter = document.getElementById('detail-counter');
             const guide = document.getElementById('slide-guide');
