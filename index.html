@@ -3466,8 +3466,21 @@
             }
         }
 
-        setInterval(fetchProductListStatus, 10000);
-        fetchProductListStatus();
+        /* [용량절감] 상태값 주기 확인.
+           여기서 보는 값들은 내용이 4바이트뿐인데 요청 한 번에 응답 헤더만 291바이트가 붙는다.
+           10초마다 부르면 탭 하나가 하루 17,280번(약 6MB)을 쓴다.
+             · 간격을 60초로 늘리고
+             · 화면이 가려져 있으면(다른 탭·앱으로 넘어감) 아예 부르지 않는다.
+             · 다시 보이는 순간 한 번 불러 최신값을 맞춘다.
+           보고 있는 동안의 최신성은 그대로면서 통신량은 크게 준다. */
+        const STATUS_POLL_MS = 60000;
+        function gStartStatusPolling(fn) {
+            fn();
+            setInterval(() => { if (!document.hidden) fn(); }, STATUS_POLL_MS);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) fn(); });
+        }
+
+        gStartStatusPolling(fetchProductListStatus);
 
         // [신규] 토요일 평일 가동 여부 제어 로직 (첫 로드 시 후다닥 점프 현상 방지를 위해 localStorage 동기 캐시 우선 로드)
         let isSaturdayAsWeekday = localStorage.getItem('moket_saturday_as_weekday') === 'true';
@@ -3547,8 +3560,7 @@
             }
         }
 
-        setInterval(fetchSaturdayWeekdayStatus, 10000);
-        fetchSaturdayWeekdayStatus();
+        gStartStatusPolling(fetchSaturdayWeekdayStatus);
 
 
                         /* [수정] fromFeeConfirm — 배달비 안내창에서 '확인'을 눌러 이어서 부른 경우에만 true.
@@ -10068,16 +10080,31 @@
         //  구간이 '기준금액부터 일정 간격마다 일정액씩'인 등차면 두 줄로 줄여 보여주고,
         //  그렇지 않으면 설정된 구간을 그대로 나열한다.
         function gAgencyFeeTable(p) {
-            const tiers = (Array.isArray(p && p.agencyFeeTiers) ? p.agencyFeeTiers : [])
-                .map(t => ({ from: parseInt(t.from) || 0, fee: parseInt(t.fee) || 0 }))
-                .sort((a, b) => a.from - b.from);
-            if (tiers.length === 0) return ``;
-
             const row = (label, value) =>
                 `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:3px 0;">` +
                 `<span style="color:#7f93a3;">${label}</span>` +
                 `<span style="font-weight:800; color:#0284c7; font-variant-numeric:tabular-nums; white-space:nowrap;">${value}</span>` +
                 `</div>`;
+
+            /* [용량절감] 예전에는 agencyFeeTiers(구간표)를 그대로 읽어 적었다.
+               그런데 그 구간표는 agencyFeeRule(기준금액·기본료·단위·단위당추가액) 네 숫자에서
+               그대로 만들어지는 값이라, 상품마다 같은 내용을 7배 크기로 중복 저장하고 있었다
+               (상품 자료 507KB 중 89KB). 규칙이 있으면 규칙만으로 같은 안내를 적는다.
+               규칙이 없는 예전 상품은 아래에서 예전처럼 구간표를 읽는다. */
+            {
+                const r = gAgencyRule(p);
+                if (r && r.stepFee > 0 && r.threshold > 0) {
+                    return gAgencyFeeTableBox(
+                        row(`${r.threshold.toLocaleString()}원 미만`, `${r.baseFee.toLocaleString()}원`) +
+                        row(`${r.threshold.toLocaleString()}원 이상`, `${r.step.toLocaleString()}원당 +${r.stepFee.toLocaleString()}원`)
+                    );
+                }
+            }
+
+            const tiers = (Array.isArray(p && p.agencyFeeTiers) ? p.agencyFeeTiers : [])
+                .map(t => ({ from: parseInt(t.from) || 0, fee: parseInt(t.fee) || 0 }))
+                .sort((a, b) => a.from - b.from);
+            if (tiers.length === 0) return ``;
 
             let rows = ``;
             const step = tiers.length >= 3 ? tiers[2].from - tiers[1].from : 0;
@@ -10100,8 +10127,14 @@
                 }).join('');
             }
 
-            // 평소엔 접어두고 누르면 펼쳐진다. 대행료 금액은 위에 이미 나와 있으므로
-            // 계산 방식이 궁금한 사람만 열어보면 된다.
+            return gAgencyFeeTableBox(rows);
+        }
+
+        // 안내 상자 껍데기. 규칙으로 적을 때와 구간표로 적을 때가 같은 모양이 되도록 한 곳에 둔다.
+        // 평소엔 접어두고 누르면 펼쳐진다. 대행료 금액은 위에 이미 나와 있으므로
+        // 계산 방식이 궁금한 사람만 열어보면 된다.
+        function gAgencyFeeTableBox(rows) {
+            if (!rows) return ``;
             return `<details style="margin-bottom:8px; background:#f0f9ff; border:1px solid #cfe6f5; border-radius:10px; padding:8px 11px;">` +
                 `<summary style="cursor:pointer; list-style:none; font-size:12px; font-weight:800; color:#0284c7; display:flex; align-items:center;">` +
                 `<span>대행료 계산 방식</span><span style="margin-left:auto; font-size:11px; opacity:0.75;">보기</span>` +
