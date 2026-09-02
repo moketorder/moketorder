@@ -5052,6 +5052,11 @@
             }
         }
 
+        /* [신규] 다음 우편번호는 손님이 지번을 골라도 도로명주소를 함께 넘겨준다.
+           아파트를 가리는 열쇠로 도로명주소를 쓰기로 해서(이름은 적는 사람마다 달라 어긋난다),
+           검색으로 고른 그 순간의 도로명주소를 여기에 챙겨 뒀다가 저장할 때 같이 담는다. */
+        let _pickedAddress = { full: '', road: '' };
+
         // [주소 검색]
         function searchAddress() {
             new daum.Postcode({
@@ -5077,6 +5082,7 @@
                         }
                     }
 
+                    _pickedAddress = { full: addr + extraAddr, road: String(data.roadAddress || '') };
                     document.getElementById("input-address").value = addr + extraAddr;
                     document.getElementById("input-address-detail").focus();
                 }
@@ -5115,6 +5121,17 @@
             localStorage.setItem('moket_user_name', name);
             localStorage.setItem('moket_user_phone', normP(phone));
             localStorage.setItem('moket_user_address', address);
+            /* [신규] 도로명주소도 같이 담는다.
+               검색으로 고른 주소 그대로일 때만 딸려 온다.
+               손으로 고쳤으면 어느 건물인지 장담할 수 없어 비워 둔다. */
+            (function () {
+                const prevAddr = String(localStorage.getItem('moket_user_address_prev') || '');
+                let road = String(localStorage.getItem('moket_user_road_address') || '');
+                if (_pickedAddress.full && address.trim() === _pickedAddress.full.trim()) road = _pickedAddress.road;
+                else if (address.trim() !== prevAddr.trim()) road = '';
+                localStorage.setItem('moket_user_road_address', road);
+                localStorage.setItem('moket_user_address_prev', address);
+            })();
             localStorage.setItem('moket_user_address_detail', addressDetail);
             localStorage.setItem('moket_user_entrance', entrance);
             localStorage.setItem('moket_user_refund_account', refundAccount); // [신규] 환불계좌(선택)
@@ -11956,6 +11973,7 @@
                 const userAddress = isDelivery ? (localStorage.getItem('moket_user_address') || "") : "";
                 const userAddressDetail = isDelivery ? (localStorage.getItem('moket_user_address_detail') || "") : "";
                 const userEntrance = isDelivery ? (localStorage.getItem('moket_user_entrance') || "") : "";
+                const userRoadAddress = isDelivery ? (localStorage.getItem('moket_user_road_address') || "") : "";
 
                 const payload = {
                     // [삭제] header:'order' — 구글 시트로 보내던 시절의 표시. 지금은 읽는 곳이 없다.
@@ -11963,6 +11981,8 @@
                     // [수정] 하이픈·별표가 섞인 채로 저장돼 전화·문자가 안 걸리던 건이 있었다. 숫자 11자리로 정리해 담는다.
                     phone: normP(phone),
                     address: userAddress,
+                    // [신규] 아파트를 가리는 열쇠. 손님이 지번으로 골라도 함께 담긴다.
+                    roadAddress: userRoadAddress,
                     addressDetail: userAddressDetail,
                     entrance: userEntrance,
                     shippingMethod: shippingMethod,
