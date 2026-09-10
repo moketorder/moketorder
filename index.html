@@ -1823,16 +1823,16 @@
             </div>
 
             <!-- [복구] 기존 입력 필드 (로그인 모드일 때는 CSS로 숨겨짐) -->
-            <div class="input-group"><strong>주문자명</strong><input id="input-name" type="text" class="modal-input"
+            <div class="input-group"><strong>주문자명 <span style="color:#e11d48; font-weight:800; font-size:0.85em;">(필수)</span></strong><input id="input-name" type="text" class="modal-input"
                     placeholder="닉네임 + 핸드폰번호 뒤 네자리">
                 <div class="input-hint">오픈채팅방 닉네임과 같게 설정 해 주세요.</div>
             </div>
-            <div class="input-group"><strong>연락처</strong><input id="input-phone" type="tel" class="modal-input"
+            <div class="input-group"><strong>연락처 <span style="color:#e11d48; font-weight:800; font-size:0.85em;">(필수)</span></strong><input id="input-phone" type="tel" class="modal-input"
                     placeholder="010-0000-0000">
                 <div class="input-hint">정확한 주문 확인을 위해 연락처를 입력 해 주세요.</div>
             </div>
             <div class="input-group" style="margin-bottom: 20px;">
-                <strong>주소</strong>
+                <strong>주소 · 상세주소 <span style="color:#e11d48; font-weight:800; font-size:0.85em;">(필수)</span></strong>
                 <div style="display:flex; gap:8px; margin-top:8px;">
                     <input id="input-address" type="text" class="modal-input" placeholder="주소 입력 (검색 또는 직접 입력)"
                         style="margin-top:0; flex:1;">
@@ -1840,7 +1840,9 @@
                         style="margin-top:0; width:75px; height:42px; font-size:15px; border-radius: var(--common-radius); flex-shrink:0;">검색</button>
                 </div>
                 <input id="input-address-detail" type="text" class="modal-input" placeholder="상세주소(동, 호수)를 입력해 주세요">
+                <div class="input-hint">처음 가입하실 때는 주소와 동·호수를 꼭 넣어 주세요.</div>
                 <input id="input-entrance" type="text" class="modal-input" placeholder="공동현관 비밀번호 (예: #1234*)">
+                <div class="input-hint" style="color:#e11d48; font-weight:700;">배달 주문시 필수로 입력해주세요.</div>
             </div>
             <!-- [신규] 환불계좌 (선택 입력) -->
             <div class="input-group" style="margin-bottom: 20px;">
@@ -1871,7 +1873,7 @@
                 개인정보처리방침
             </a>
             <button id="profile-submit-btn" class="btn-common btn-primary" onclick="saveProfile()">회원가입</button>
-            <button class="btn-common btn-close" onclick="closeModal('profile-modal')">닫기</button>
+            <button id="profile-close-btn" class="btn-common btn-close" onclick="closeModal('profile-modal')">닫기</button>
             <button id="btn-kakao-logout" onclick="logoutKakao()"
                 style="display:none; margin-top:25px; background:none; border:none; color:#999; font-size:13px; text-decoration:none; width:100%; cursor:pointer;">카카오
                 로그아웃</button>
@@ -3325,6 +3327,7 @@
 
             const modal = document.getElementById('profile-modal');
             if (modal) modal.classList.remove('login-forced');
+            gSetProfileClosable(true);   // [신규] 둘러보기로 들어왔으니 가입 화면에 붙잡지 않는다
             closeModal('profile-modal');
             checkScrollLock();
             showToast('로그인 없이 둘러보기로 들어왔습니다.');
@@ -3359,6 +3362,10 @@
                         modal.style.display = 'flex';
                         checkScrollLock();
                     }
+                }
+                /* [신규] 로그인은 했는데 가입을 안 마친 손님 — 못 닫는 가입 화면으로 붙잡는다 */
+                else if (kakaoInfo && isLoginEntryEnabled && !gIsGuestView() && !gJoinDone()) {
+                    gForceJoin();
                 }
             } catch (e) { console.error("로그인 설정 로드 실패:", e); }
         }
@@ -3592,9 +3599,25 @@
 
             // [사다드림] 상품 배달 가능하도록 배달 불가 체크 로직 삭제
 
-            const addr = document.getElementById('input-address').value;
-            if (!addr || addr.trim() === "") {
-                showSystemModal("배달 받으실 주소를 먼저 입력해 주세요.", "alert", () => {
+            /* [수정] 배달주문을 누른 이 자리에서 셋을 한꺼번에 본다.
+               예전에는 여기서 주소 한 칸만 보고, 동·호수와 공동현관 비밀번호는
+               배달비 안내와 주문 확인 창을 다 지난 뒤 맨 마지막에야 물어봤다.
+               주소는 있는데 비밀번호가 없는 손님이 헛걸음을 했다.
+               값은 주문에 실려 나가는 것과 같은 곳(저장해 둔 값)에서 읽는다. */
+            const dAddr = localStorage.getItem('moket_user_address') || "";
+            const dDetail = localStorage.getItem('moket_user_address_detail') || "";
+            const dEnt = localStorage.getItem('moket_user_entrance') || "";
+            const missDeliv = [];
+            if (!dAddr.trim()) missDeliv.push('주소');
+            if (!dDetail.trim()) missDeliv.push('상세주소');
+            if (!dEnt.trim()) missDeliv.push('공동현관 비밀번호');
+
+            if (missDeliv.length) {
+                showSystemModal(`배달 주문시 <b style="color:#e11d48;">${missDeliv.join(' · ')}</b>를 입력해주세요.`, "alert", () => {
+                    /* [신규] 수령방법 선택 창은 닫아 준다.
+                       저장하고 나면 장바구니로 돌아가, 금액을 보고 구매하기를 다시 누르게 된다.
+                       고른 것을 그대로 둔 채 뒤에서 기다리게 하면 어디까지 했는지 헷갈린다. */
+                    closeModal('shipping-overlay');
                     const pm = document.getElementById('profile-modal');
                     document.getElementById('profile-modal-title').innerText = "매장 배달 주소 입력";
                     const sbt = document.getElementById('profile-submit-btn');
@@ -4999,6 +5022,7 @@
             if (id === 'profile-modal') {
                 document.getElementById('profile-modal-title').innerText = "주문자 변경";
                 document.getElementById('profile-submit-btn').innerText = "변경하기";
+                gSetProfileClosable(gJoinDone() || gIsGuestView());   // [신규] 아직 가입 전이면 여기서도 못 닫는다
                 // 관리자 모드인 경우 상태 UI 즉시 업데이트 강제
                 if (typeof updateDeliveryUI === 'function') updateDeliveryUI();
                 if (typeof updateLoginEntryUI === 'function') updateLoginEntryUI();
@@ -5018,6 +5042,19 @@
         }
 
         function closeModal(id) {
+            /* [신규] 가입을 안 마친 손님은 가입 화면을 닫을 수 없다.
+               창을 닫는 길이 단추 말고도 여럿이라, 길목마다 막기보다 여기 한 곳에서 붙잡는다.
+                 · 카카오 로그인 화면(login-forced)은 로그인을 마치면 스스로 가입 화면으로 넘어가니 뺀다
+                 · '로그인 없이 둘러보기'(강성민 열 번)로 들어온 창은 그대로 닫힌다
+                 · 사장님이 로그인 강제를 꺼 두면 예전처럼 닫힌다 */
+            if (id === 'profile-modal') {
+                const pm = document.getElementById('profile-modal');
+                if (pm && !pm.classList.contains('login-forced')
+                    && isLoginEntryEnabled && !gIsGuestView() && !gJoinDone()) {
+                    showToast('회원가입을 먼저 마쳐 주세요.');
+                    return;
+                }
+            }
             const el = document.getElementById(id);
             if (el) {
                 el.style.display = 'none';
@@ -5034,7 +5071,42 @@
         }
 
         // [신규] 오프라인/로컬 파일 모드 여부를 동적으로 판정하여 수동 주소 입력 활성화 제어 (USER 요청)
+        /* ===== [신규] 가입을 마쳐야 안쪽 화면을 볼 수 있게 한다 =====
+           지금까지 문을 막는 잣대는 카카오 이름 하나뿐이었다. 그래서 로그인만 하고
+           [회원가입]을 안 누른 채 닫기를 눌러도 상품을 담고 픽업 주문까지 넣을 수 있었고,
+           이름도 연락처도 없는 주문이 들어왔다.
+           이제 이름과 연락처가 있어야 문이 열린다. 주소는 여기서 보지 않는다 —
+           예전부터 픽업만 하시던 분들까지 한꺼번에 붙잡아 두게 되기 때문이다.
+           (새로 가입하는 분은 어차피 [회원가입]에서 주소를 받는다) */
+        function gJoinDone() {
+            const p = String(localStorage.getItem('moket_user_phone') || '');
+            const nm = String(localStorage.getItem('moket_user_name') || '').trim();
+            return !!nm && gIsValidPhone(p);
+        }
+
+        // 가입 화면의 닫기 단추를 보이거나 감춘다. 감추면 다 적기 전에는 못 빠져나간다.
+        function gSetProfileClosable(ok) {
+            const cb = document.getElementById('profile-close-btn');
+            if (cb) cb.style.display = ok ? '' : 'none';
+        }
+
+        function gForceJoin() {
+            const modal = document.getElementById('profile-modal');
+            if (!modal) return;
+            modal.classList.remove('login-forced');
+            const t = document.getElementById('profile-modal-title'); if (t) t.innerText = "MOKET 모켓 회원가입";
+            const sbt = document.getElementById('profile-submit-btn'); if (sbt) sbt.innerText = "회원가입";
+            const kb = document.getElementById('btn-kakao-login'); if (kb) kb.style.display = "none";
+            gSetProfileClosable(false);
+            loadProfile();
+            checkAddressInputMode();
+            modal.style.display = 'flex';
+            checkScrollLock();
+        }
+
         function checkAddressInputMode() {
+
+
             const addressInput = document.getElementById('input-address');
             if (!addressInput) return;
 
@@ -5198,8 +5270,31 @@
             const refundAccount = document.getElementById('input-refund-account')?.value || ""; // [신규] 환불계좌(선택)
             const greeting = document.getElementById('menu-greeting');
 
-            if (!name.trim() || !phone.trim()) {
-                showSystemModal("주문자명과 연락처를 입력해주세요.", 'alert');
+            /* [신규] 처음 가입할 때는 주소와 동·호수까지 받는다.
+               지금까지는 이름·연락처만 보고 넘어가서, 새 손님이 배달을 시키려는 그때에야
+               주소를 물어보게 됐다. 손님 명부에도 주소가 빈 줄이 쌓였다.
+               이미 가입한 손님이 이름만 고치는 것은 예전대로 막지 않는다. */
+            const isFirstJoin = !String(localStorage.getItem('moket_user_phone') || '').trim();
+
+            /* [수정] 빈 칸을 한 번에 알려 준다.
+               예전에는 이름·연락처가 먼저 걸려서, 그걸 채우고 다시 눌러야 주소가 빈 것을 알 수 있었다. */
+            const miss = [];
+            if (!name.trim()) miss.push({ what: '주문자명', id: 'input-name' });
+            if (!phone.trim()) miss.push({ what: '연락처', id: 'input-phone' });
+            if (isFirstJoin && !address.trim()) miss.push({ what: '주소', id: 'input-address' });
+            if (isFirstJoin && !addressDetail.trim()) miss.push({ what: '상세주소', id: 'input-address-detail' });
+
+            if (miss.length) {
+                showSystemModal(
+                    `필수 항목을 입력해 주세요.<br><br><b style="color:#e11d48;">${miss.map(m => m.what).join(' · ')}</b>`,
+                    'alert', () => {
+                        const el = document.getElementById(miss[0].id);
+                        if (!el) return;
+                        el.scrollIntoView({ block: 'center' });
+                        // 주소는 손으로 못 적고 검색으로만 고르게 돼 있어, 검색창을 바로 띄워 준다
+                        if (el.readOnly) { try { searchAddress(); } catch (e) { } }
+                        else el.focus();
+                    });
                 return;
             }
 
@@ -5262,6 +5357,7 @@
                 ageGroup: String(localStorage.getItem('moket_user_age') || '')
             });
 
+            gSetProfileClosable(true);   // [신규] 가입을 마쳤으니 이제 닫기를 다시 쓸 수 있다
             closeModal('profile-modal');
             const confirmModal = document.getElementById('save-confirm-modal');
             confirmModal.style.display = 'flex';
@@ -5409,6 +5505,7 @@
                                     document.getElementById('profile-modal-title').innerText = "MOKET 모켓 회원가입";
                                     document.getElementById('profile-submit-btn').innerText = "회원가입";
                                     document.getElementById('btn-kakao-login').style.display = "none";
+                                    gSetProfileClosable(false);   // [신규] 가입을 마쳐야 넘어간다
 
                                     modal.style.display = 'flex';
                                     checkScrollLock();
@@ -11123,6 +11220,7 @@
 
                 const name = nameNode.value;
                 const phone = phoneNode.value;
+
                 const currentDay = now.getDay();
 
                 // [추가] 주말 및 공휴일 안내 모달 (USER 요청: 일반 상품이 포함된 경우에만 주말 안내 표시)
@@ -11617,8 +11715,16 @@
                     const detail = localStorage.getItem('moket_user_address_detail') || "";
                     const ent = localStorage.getItem('moket_user_entrance') || "";
  
-                    if (!addr.trim() || !detail.trim() || !ent.trim()) {
-                        showSystemModal("배달 주소 정보를 모두 입력해 주세요.", 'alert', () => {
+                    /* [수정] 무엇이 빠졌는지 짚어 준다.
+                       예전에는 셋 중 무엇이 없어도 '배달 주소 정보를 모두 입력해 주세요.' 한 마디라,
+                       비밀번호 하나만 없는 손님도 주소를 통째로 다시 봐야 하는 줄 알았다. */
+                    const missDel = [];
+                    if (!addr.trim()) missDel.push('주소');
+                    if (!detail.trim()) missDel.push('상세주소');
+                    if (!ent.trim()) missDel.push('공동현관 비밀번호');
+
+                    if (missDel.length) {
+                        showSystemModal(`배달 주문시 <b style="color:#e11d48;">${missDel.join(' · ')}</b>를 입력해주세요.`, 'alert', () => {
                             const pm = document.getElementById('profile-modal');
                             document.getElementById('profile-modal-title').innerText = "배달 상세 주소 입력";
                             const sbt = document.getElementById('profile-submit-btn'); if (sbt) sbt.innerText = "저장하기";
