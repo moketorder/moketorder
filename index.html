@@ -2085,6 +2085,18 @@
                     style="text-align:left; font-size:13px; margin: 0 0 12px 0; color:#455464; line-height:1.5; padding:0; font-weight:700; border-top: 1px solid #eee; padding-top: 12px;">
                     <!-- 수령방법에 따라 동적 생성 -->
                 </div>
+                <!-- [신규] 요청사항 — 이 주문에만 붙는 한마디. 손님이 마지막으로 찬찬히 보는 자리에 둔다.
+                     주문할 때마다 비워 둔다. 지난번 말이 남아 있으면 엉뚱한 주문에 딸려 간다. -->
+                <div style="text-align:left; margin-bottom:14px;">
+                    <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:5px;">
+                        <span style="font-size:13px; font-weight:800; color:#455464;">📝 요청사항</span>
+                        <span style="font-size:12px; font-weight:700; color:#9aa5b1;">(선택)</span>
+                        <span id="order-note-count" style="margin-left:auto; font-size:11.5px; font-weight:700; color:#c0c7cf;">0 / 100</span>
+                    </div>
+                    <textarea id="order-note" rows="2" maxlength="100" placeholder="예: 문 앞에 놓아 주세요"
+                        oninput="gPaintNoteCount()"
+                        style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d7dde3; border-radius:10px; font-size:14px; font-weight:700; font-family:inherit; line-height:1.5; resize:none; outline:none;"></textarea>
+                </div>
                 <label style="margin-bottom:15px; font-weight:700; font-size:14px; color:#455464; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="confirm-notice-check"
                         style="width:18px; height:18px; margin:0; cursor:pointer;">
@@ -4279,6 +4291,25 @@
             }
         }
 
+        /* [신규] 요청사항 — 글자 수를 세어 보여 주고, 창을 열 때마다 비운다.
+           지난번에 적은 말이 남아 있으면 손님이 못 보고 지나쳐 엉뚱한 주문에 딸려 간다. */
+        function gPaintNoteCount() {
+            const el = document.getElementById('order-note');
+            const c = document.getElementById('order-note-count');
+            if (el && c) c.innerText = `${String(el.value || '').length} / 100`;
+        }
+
+        function gClearOrderNote() {
+            const el = document.getElementById('order-note');
+            if (el) el.value = '';
+            gPaintNoteCount();
+        }
+
+        function gReadOrderNote() {
+            const el = document.getElementById('order-note');
+            return String((el && el.value) || '').trim().slice(0, 100);
+        }
+
         function startFinalOrderProcess() {
             const noticeCheck = document.getElementById('confirm-notice-check');
             if (noticeCheck && !noticeCheck.checked) {
@@ -5208,6 +5239,17 @@
                 const s = await res.json();
                 if (!s) return 0;
 
+                /* [신규] 남의 정보를 끌어오지 않도록 한 번 더 맞춰 본다.
+                   손님 정보의 서랍 이름은 대개 카카오 번호지만, 손님이 적은 번호로 담긴 줄도 섞여 있다.
+                   그래서 어떤 번호가 A의 카카오 번호이면서 B가 잘못 적어 둔 번호일 수 있다.
+                   그 줄에 카카오 번호가 적혀 있으면 지금 로그인한 번호와 같을 때만 쓴다.
+                   (카카오 번호가 없는 옛 줄은 견줄 것이 없으므로 예전처럼 그대로 쓴다) */
+                const theirKakao = normP(String((s && s.kakaoPhone) || ''));
+                if (theirKakao && theirKakao !== key) {
+                    console.warn('[손님 정보] 카카오 번호가 달라 불러오지 않습니다.');
+                    return 0;
+                }
+
                 const MAP = [
                     ['moket_user_name', 'name'],
                     ['moket_user_address', 'address'],
@@ -5308,6 +5350,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(next)
                 });
+                /* [신규] 가게 쪽 손님 관리가 이 자료를 이 기기에 담아 두고 쓴다.
+                   바뀌었다고 표식을 찍어 줘야 다음에 열 때 새로 받는다. */
+                fetch(`${FIREBASE_DB_URL}customers_updated.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
+                }).catch(e => { /* 표식이 실패해도 저장은 이미 끝났다 */ });
 
                 // 변경 기록 — 처음 들어온 손님이면 '가입' 한 줄, 아니면 바뀐 갈래마다 한 줄
                 const rows = (!before)
@@ -9595,7 +9642,21 @@
                     headers: { 'if-match': etag, 'Content-Type': 'application/json' },
                     body: JSON.stringify(cur - qty)
                 });
-                if (w.ok) return { ok: true, remain: remain - qty };
+                if (w.ok) {
+                    /* [신규] 이 주문으로 마지막 한 개까지 나갔으면 '다 팔린 날'을 적어 둔다.
+                       가게에서는 이 날을 잣대로 그 물건이 얼마나 빨리 나갔는지 잰다.
+                       기다리지 않는다 — 기록이 실패해도 주문은 이미 끝났다. */
+                    if (remain - qty <= 0) {
+                        const rec = (() => {
+                            const d = new Date();
+                            return { at: d.getTime(), date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` };
+                        })();
+                        fetch(`${FIREBASE_DB_URL}stock_soldout/${encodeURIComponent(adjKey)}.json`, {
+                            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec)
+                        }).catch(e => console.warn('품절 기록 저장 실패(주문에는 지장 없음):', e));
+                    }
+                    return { ok: true, remain: remain - qty };
+                }
                 if (w.status !== 412) throw new Error(`재고 반영 실패 ${w.status}`);
                 // 412 = 그 사이 누가 바꿨다. 다시 읽어서 처음부터 센다.
                 await new Promise(r => setTimeout(r, 60 + Math.random() * 140));
@@ -10900,6 +10961,7 @@
         function openConfirm() {
             const noticeCheck = document.getElementById('confirm-notice-check');
             if (noticeCheck) noticeCheck.checked = false;
+            gClearOrderNote();   // [신규] 요청사항은 주문할 때마다 새로 적는다
 
             if (Object.keys(cart).length === 0) {
                 showSystemModal("상품이 없습니다. 상품을 선택해 주세요.", 'alert');
@@ -12304,8 +12366,14 @@
                 const userEntrance = isDelivery ? (localStorage.getItem('moket_user_entrance') || "") : "";
                 const userRoadAddress = isDelivery ? (localStorage.getItem('moket_user_road_address') || "") : "";
 
+                /* [신규] 요청사항은 주문 한 건에 하나지만, 주문은 상품마다 한 줄로 쪼개져 저장된다.
+                   줄마다 같이 담아 둔다. 가게 쪽(카드·인쇄·손님 카드)이 전부 줄을 읽어 화면을 만들기 때문에,
+                   따로 서랍을 두면 읽는 곳마다 한 번씩 더 다녀와야 한다. 글자 백 자라 부담도 없다. */
+                const orderNote = gReadOrderNote();
+
                 const payload = {
                     // [삭제] header:'order' — 구글 시트로 보내던 시절의 표시. 지금은 읽는 곳이 없다.
+                    note: orderNote,
                     name: name,
                     // [수정] 하이픈·별표가 섞인 채로 저장돼 전화·문자가 안 걸리던 건이 있었다. 숫자 11자리로 정리해 담는다.
                     phone: normP(phone),
