@@ -5023,6 +5023,7 @@
                 document.getElementById('profile-modal-title').innerText = "주문자 변경";
                 document.getElementById('profile-submit-btn').innerText = "변경하기";
                 gSetProfileClosable(gJoinDone() || gIsGuestView());   // [신규] 아직 가입 전이면 여기서도 못 닫는다
+                gFillProfileInputs();   // [신규] 저장해 둔 값으로 칸을 맞춘다
                 // 관리자 모드인 경우 상태 UI 즉시 업데이트 강제
                 if (typeof updateDeliveryUI === 'function') updateDeliveryUI();
                 if (typeof updateLoginEntryUI === 'function') updateLoginEntryUI();
@@ -5061,6 +5062,9 @@
                 // [추가] 높아졌던 Z-Index 초기화
                 if (id === 'profile-modal') el.style.zIndex = "";
 
+                // [신규] 가입 창을 닫을 때는 적다 만 글자를 지우고 저장해 둔 값으로 되돌린다
+                if (id === 'profile-modal') gFillProfileInputs();
+
                 // [추가] 사다드림 주문 완료 후 계좌창을 닫을 때만 페이지 새로고침
                 if (id === 'bank-modal' && window.isSadaOrderFinished) {
                     window.isSadaOrderFinished = false;
@@ -5078,7 +5082,23 @@
            이제 이름과 연락처가 있어야 문이 열린다. 주소는 여기서 보지 않는다 —
            예전부터 픽업만 하시던 분들까지 한꺼번에 붙잡아 두게 되기 때문이다.
            (새로 가입하는 분은 어차피 [회원가입]에서 주소를 받는다) */
+        /* [신규] 가입 칸을 저장해 둔 값으로 되돌린다.
+           손님이 고치다가 저장을 안 하고 닫아도, 적던 글자가 칸에 그대로 남아 있었다.
+           주문에 실리는 이름·연락처와 지난 주문을 찾는 번호를 이 칸에서 읽기 때문에,
+           저장하지 않은 값이 다음 주문에 그대로 따라 나갈 수 있었다.
+           loadProfile 은 값이 있을 때만 채워서 빈 값으로 되돌리지 못하므로, 여기서는 언제나 덮어쓴다. */
+        function gFillProfileInputs() {
+            const put = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
+            put('input-name', localStorage.getItem('moket_user_name'));
+            put('input-phone', localStorage.getItem('moket_user_phone'));
+            put('input-address', localStorage.getItem('moket_user_address'));
+            put('input-address-detail', localStorage.getItem('moket_user_address_detail'));
+            put('input-entrance', localStorage.getItem('moket_user_entrance'));
+            put('input-refund-account', localStorage.getItem('moket_user_refund_account'));
+        }
+
         function gJoinDone() {
+
             const p = String(localStorage.getItem('moket_user_phone') || '');
             const nm = String(localStorage.getItem('moket_user_name') || '').trim();
             return !!nm && gIsValidPhone(p);
@@ -5172,7 +5192,56 @@
              · 무엇이 어떻게 바뀌었는지는 customer_logs/{날짜} 에 남는다 (30일치).
              · 저장이 안 돼도 주문서는 그대로 쓸 수 있게 한다. 기록 때문에 일이 막히면 안 된다.
            ============================================================ */
+        /* [신규] 카카오 로그인 뒤, 우리 쪽에 남아 있는 손님 정보를 불러온다.
+           폰을 바꾸거나 앱을 지웠다 깔면 이 기기에는 아무것도 없다. 그런데 우리는
+           그 손님의 이름·주소를 알고 있다. 다시 적게 하는 것은 번거롭다.
+             · 이 기기에 비어 있는 칸만 채운다. 이미 적힌 값은 건드리지 않는다
+             · 서버에 그 번호가 없거나 못 읽어도 그냥 빈칸으로 둔다. 가입은 그대로 된다
+             · 찾는 열쇠는 카카오 번호다. 아직 손님이 연락처를 적기 전이라 이것뿐이다 */
+        async function gPullCustomerProfile(rawPhone) {
+            try {
+                const key = normP(rawPhone || localStorage.getItem('kakao_original_phone') || '');
+                if (!gIsValidPhone(key)) return 0;
+
+                const res = await fetch(`${FIREBASE_DB_URL}customers/${key}.json?t=${Date.now()}`);
+                if (!res.ok) return 0;
+                const s = await res.json();
+                if (!s) return 0;
+
+                const MAP = [
+                    ['moket_user_name', 'name'],
+                    ['moket_user_address', 'address'],
+                    ['moket_user_address_detail', 'addressDetail'],
+                    ['moket_user_entrance', 'entrance'],
+                    ['moket_user_road_address', 'roadAddress'],
+                    ['moket_user_refund_account', 'refundAccount'],
+                    ['moket_user_gender', 'gender'],
+                    ['moket_user_age', 'ageGroup'],
+                    ['kakao_real_name', 'realName']
+                ];
+                let filled = 0;
+                MAP.forEach(([k, field]) => {
+                    const here = String(localStorage.getItem(k) || '').trim();
+                    const there = String((s && s[field]) || '').trim();
+                    if (!here && there) { localStorage.setItem(k, there); filled++; }
+                });
+
+                /* 연락처는 예전에 손님이 적어 두었던 그 번호를 되살린다.
+                   카카오 번호를 들이밀지는 않는다 — 적는 번호는 손님이 정하는 것이다. */
+                const savedPhone = normP((s && s.phone) || '');
+                if (!String(localStorage.getItem('moket_user_phone') || '').trim() && gIsValidPhone(savedPhone)) {
+                    localStorage.setItem('moket_user_phone', savedPhone); filled++;
+                }
+                if (filled) console.log(`[손님 정보] 서버에서 ${filled}칸 불러옴`);
+                return filled;
+            } catch (e) {
+                console.warn('손님 정보 불러오기 실패(가입에는 지장 없음):', e);
+                return 0;
+            }
+        }
+
         async function gSaveCustomerProfile(info) {
+
             try {
                 const key = String((info && info.phone) || '').replace(/\D/g, '');
                 if (!/^01\d{8,9}$/.test(key)) return;      // 번호가 온전할 때만 남긴다
@@ -5462,7 +5531,7 @@
                     console.log('Kakao login success:', authObj);
                     Kakao.API.request({
                         url: '/v2/user/me',
-                        success: function (res) {
+                        success: async function (res) {
                             console.log('User info retrieved:', res);
                             const kakaoName = res.kakao_account?.profile?.nickname;
                             const kakaoPhone = res.kakao_account?.phone_number; // 권한 있을 경우만 들어옴
@@ -5495,7 +5564,11 @@
 
                                 document.getElementById('input-name').value = '';
 
+                                // [신규] 우리 쪽에 남아 있는 정보로 빈 칸을 채운다 (이미 적힌 값은 그대로)
+                                const pulled = await gPullCustomerProfile(kakaoPhone);
+
                                 loadProfile(); // UI 갱신 (인증됨 표시 등)
+                                if (pulled) showToast('저장해 두셨던 정보를 불러왔습니다.');
 
                                 closeModal('profile-modal');
 
@@ -5505,7 +5578,7 @@
                                     document.getElementById('profile-modal-title').innerText = "MOKET 모켓 회원가입";
                                     document.getElementById('profile-submit-btn').innerText = "회원가입";
                                     document.getElementById('btn-kakao-login').style.display = "none";
-                                    gSetProfileClosable(false);   // [신규] 가입을 마쳐야 넘어간다
+                                    gSetProfileClosable(gJoinDone());   // [신규] 가입을 마쳐야 넘어간다 (불러온 정보로 이미 찼으면 열어 준다)
 
                                     modal.style.display = 'flex';
                                     checkScrollLock();
@@ -5528,7 +5601,34 @@
 
         // [카카오 로그아웃]
         // [카카오 탈퇴/연결끊기]
+        /* [신규] 카카오 로그아웃.
+           단추는 예전부터 있었는데 부르는 함수가 없어서, 눌리면 아무 일도 안 하고 오류만 났다.
+           탈퇴(카카오 탈퇴하기)와는 다르다. 여기서는 카카오 토큰만 버리고 이 기기에 남은 회원정보를 지운다.
+           서버의 주문과 손님 정보는 그대로다 — 다시 로그인하면 지난 주문이 그대로 보인다. */
+        function logoutKakao() {
+            showSystemModal("로그아웃 하시겠습니까?\n이 기기에 저장된 회원정보가 지워집니다.", 'confirm', function () {
+                let done = false;
+                const finish = () => {
+                    if (done) return;
+                    done = true;
+                    try { localStorage.clear(); } catch (e) { }
+                    try { sessionStorage.clear(); } catch (e) { }
+                    location.reload();
+                };
+                // 카카오가 대답이 없어도 기기 자료는 지운다. 로그아웃이 중간에 멈추면 안 된다.
+                setTimeout(finish, 2000);
+                try {
+                    if (typeof Kakao !== 'undefined' && Kakao.isInitialized() && Kakao.Auth.getAccessToken()) {
+                        Kakao.Auth.logout(finish);
+                        return;
+                    }
+                } catch (e) { console.warn('카카오 로그아웃 실패(기기 자료는 지운다):', e); }
+                finish();
+            });
+        }
+
         function unlinkKakao() {
+
             showSystemModal("⚠️ 카카오 서비스 연결을 끊고 앱을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없으며 앱 데이터가 초기화됩니다.", "confirm", function () {
                 const forceClear = () => {
                     localStorage.clear();
