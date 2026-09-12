@@ -2725,8 +2725,14 @@
                     currentMainTab = 'reserve';
                 }
 
-                // [수정] 사다드림 탭은 상품이 없어도 항상 노출 (공동구매 / 사다드림 두 칸 고정)
-                let html = `
+                /* [수정] 사다드림 탭은 상품이 없어도 항상 노출 (공동구매 / 사다드림 두 칸 고정)
+                   [신규] 추석선물은 철 따라 쓰는 칸이라, 그 탭으로 지정한 상품이 있을 때만 나온다.
+                    철이 지나면 상품만 내리면 탭도 따라 사라진다. */
+                // [수정] 추석선물을 맨 앞에 둔다. 철에만 세우는 칸이라 그때는 그것부터 보여야 한다.
+                let html = gHasChuseokProduct()
+                    ? `<button class="main-tab-btn ${currentMainTab === 'chuseok' ? 'active' : ''}" data-tab="chuseok" onclick="switchMainTab('chuseok')">추석선물</button>`
+                    : '';
+                html += `
                     <button class="main-tab-btn ${currentMainTab === 'reserve' ? 'active' : ''}" data-tab="reserve" onclick="switchMainTab('reserve')">공동구매</button>
                     <button class="main-tab-btn ${currentMainTab === 'sada' ? 'active' : ''}" data-tab="sada" onclick="switchMainTab('sada')">사다드림</button>
                 `;
@@ -2916,6 +2922,7 @@
                 group: '예약판매', items: [
                     { key: 'reserve', label: '공동구매' },
                     { key: 'sada', label: '사다드림' },
+                    { key: 'chuseok', label: '추석선물' },
                     { key: 'costco', label: '코스트코' }
                 ]
             }
@@ -8323,6 +8330,12 @@
                 return;
             }
 
+            // [신규] '추석선물'도 같은 방식 — 날짜로 나누지 않고 그 탭 상품만 모아 보여 준다
+            if (currentMainTab === CHUSEOK_TAB) {
+                renderList('추석선물');
+                return;
+            }
+
             if (currentMainTab === 'reserve') {
                 filterAreaDates.style.display = 'flex';
                 if (dateCaption) dateCaption.style.display = 'flex';
@@ -8547,10 +8560,25 @@
 
         // [신규] 목록 키(targetKey)가 주문관리의 '분류탭 설정' 값 중 어느 것에 해당하는지 알려준다.
         //  주문관리에 저장하는 값과 같은 문자열을 돌려주므로 그대로 비교하면 된다.
+        /* [신규] 추석선물 — 예약판매 안의 철 따라 쓰는 칸.
+           사다드림처럼 상품에 붙는 표시가 따로 있지는 않고, 주문관리의 '분류탭 설정'에서
+           이 칸으로 지정한 상품만 모인다. 지정한 상품이 하나도 없으면 탭 자체가 안 나온다. */
+        const CHUSEOK_TAB = 'chuseok';
+        function gIsChuseokProduct(p) {
+            return String((p && p.displayTab) || '').trim() === CHUSEOK_TAB;
+        }
+        function gHasChuseokProduct() {
+            const list = (typeof visibleProducts !== 'undefined' && Array.isArray(visibleProducts) && visibleProducts.length)
+                ? visibleProducts
+                : (Array.isArray(productsData) ? productsData : []);
+            return list.some(gIsChuseokProduct);
+        }
+
         function gTabKeyOfTarget(targetKey) {
             const k = String(targetKey || '').trim();
             if (!k) return '';
             if (k === '사다드림') return 'sada';
+            if (k === '추석선물') return CHUSEOK_TAB;
             if (k === 'costco' || k.includes('코스트코')) return 'costco';
             if (k.startsWith('onsite-')) return k;                       // onsite-frozen / -refrigerated / -room
             if (k === 'today-reserve') return 'today-reserve';
@@ -8828,6 +8856,8 @@
                 });
             } else if (targetKey === '사다드림') {
                 filteredData = visibleProducts.filter(gIsSadaProduct);
+            } else if (targetKey === '추석선물') {
+                filteredData = visibleProducts.filter(gIsChuseokProduct);
             } else if (String(targetKey).startsWith('onsite-')) {
                 // [신규] 상시판매 — 음식 종류별 분류. 상품에 지정된 분류(displayTab)로 나눈다.
                 //  분류를 아직 안 정한 상품은 '기타' 탭에 모아 사라지지 않게 한다.
@@ -8944,6 +8974,8 @@
                                         if (p.matchKey !== targetKey) return false;
                                         // [신규] 공동구매 날짜 탭에서도 사다드림은 제외 (별도 대분류 탭에서만 노출)
                                         if (currentMainTab === 'reserve' && gIsSadaProduct(p)) return false;
+                                        // [신규] 추석선물도 제 탭에서만 보인다
+                                        if (currentMainTab === 'reserve' && gIsChuseokProduct(p)) return false;
                                         const s = String(p.matchKey).trim();
                                         const isVeg = p.name.includes('[야채]') || p.name.includes('[야채구매]') || p.name.includes('[채소]') || p.name.includes('[채소구매]') || s.includes("야채") || s.includes("채소");
                                         const isFruit = p.name.includes('[과일]') || p.name.includes('[과일구매]') || s.includes("과일");
@@ -9126,7 +9158,9 @@
             filteredData.forEach(p => {
                 // [추가] '전체보기'일 때 날짜별/카테고리별 박스 생성 (특정 날짜 선택시에도 박스 생성)
                 // [수정] 사다드림 탭도 날짜별로 묶어서 배달 예정일이 보이게 한다 (날짜가 다르면 합배송 불가)
-                if ((currentMainTab === 'reserve' || currentMainTab === 'sada' || targetKey === '전체상품_현장' || _searchQ) && p.matchKey !== lastGroupKey) {
+                /* [수정] 추석선물 탭도 날짜별로 묶는다. 선물세트는 받는 날이 정해져 있어서
+                   언제 오는지가 값보다 먼저 궁금하다. 사다드림과 같은 규칙으로 둔다. */
+                if ((currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || targetKey === '전체상품_현장' || _searchQ) && p.matchKey !== lastGroupKey) {
                     // 새 그룹 박스 생성
                     currentGroupBox = document.createElement('div');
                     currentGroupBox.className = "product-group-box";
@@ -9135,13 +9169,13 @@
                     const header = document.createElement('div');
                     header.style = "padding:15px 18px; font-size:16px; font-weight:900; color:var(--item-black); border-bottom:1px solid #f0f0f0; background:#fcfdfe; display:flex; align-items:center;";
 
-                    const iconSvg = (currentMainTab === 'reserve' || currentMainTab === 'sada' || _searchQ)
+                    const iconSvg = (currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || _searchQ)
                         ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px; color:var(--moket-green);"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`
                         : ``;
 
                     let prefix = '';
                     let dateHtml = p.displayDate || p.matchKey;
-                    if (currentMainTab === 'reserve' || currentMainTab === 'sada' || _searchQ) {
+                    if (currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || _searchQ) {
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(p.matchKey);
                         if (isDate) {
                             prefix = '픽업/배달 예정일 : ';
