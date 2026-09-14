@@ -3689,7 +3689,7 @@
             const nameVal = document.getElementById('input-name')?.value || "";
             const phoneVal = document.getElementById('input-phone')?.value || "";
             if (nameVal && phoneVal) {
-                const cleanPhone = phoneVal.replace(/\D/g, "");
+                const cleanPhone = gKeyPhone(phoneVal);   // [수정] 주문내역은 카카오 번호로 찾는다
                 const cacheKey = `history_cache_${nameVal}_${cleanPhone}`;
                 const cached = localStorage.getItem(cacheKey);
 
@@ -5062,6 +5062,7 @@
                 document.getElementById('profile-submit-btn').innerText = "변경하기";
                 gSetProfileClosable(gJoinDone() || gIsGuestView());   // [신규] 아직 가입 전이면 여기서도 못 닫는다
                 gFillProfileInputs();   // [신규] 저장해 둔 값으로 칸을 맞춘다
+                gSyncProfileFromServer();   // [신규] 서버 값과도 맞춘다 (손님이 적고 있는 칸은 안 건드린다)
                 // 관리자 모드인 경우 상태 UI 즉시 업데이트 강제
                 if (typeof updateDeliveryUI === 'function') updateDeliveryUI();
                 if (typeof updateLoginEntryUI === 'function') updateLoginEntryUI();
@@ -5236,6 +5237,185 @@
              · 이 기기에 비어 있는 칸만 채운다. 이미 적힌 값은 건드리지 않는다
              · 서버에 그 번호가 없거나 못 읽어도 그냥 빈칸으로 둔다. 가입은 그대로 된다
              · 찾는 열쇠는 카카오 번호다. 아직 손님이 연락처를 적기 전이라 이것뿐이다 */
+        /* ===== [신규] 손님 정보 맞추기 — 나중에 고친 쪽을 남긴다 =====
+           손님이 고치면 서버로 올라오고, 가게가 고쳐도 서버에 적힌다. 그런데 손님 기기는
+           서버를 다시 보지 않아서, 가게가 고친 주소가 손님 화면에 안 넘어가고
+           손님이 다음에 저장하면 기기의 옛 값이 가게가 고친 것을 덮어썼다.
+
+           그래서 칸마다 '언제 고쳤나'를 양쪽에 적어 두고, 다르면 나중 것을 남긴다.
+             · 서버: customers/{번호}.fieldAt.{칸} = 시각, fieldBy.{칸} = 가게|손님
+             · 기기: localStorage moket_profile_field_at = { 칸: 시각 }
+           시각이 둘 다 없는 옛 자료는 예전처럼 기기 값을 그대로 둔다. */
+        const PROFILE_SYNC_FIELDS = [
+            ['name', 'moket_user_name', '이름'],
+            ['contactPhone', 'moket_user_phone', '연락처'],   // [신규] 손님이 적은 번호 — 열쇠(카카오 번호)와 따로 논다
+            ['address', 'moket_user_address', '주소'],
+            ['addressDetail', 'moket_user_address_detail', '상세주소'],
+            ['entrance', 'moket_user_entrance', '현관비번'],
+            ['refundAccount', 'moket_user_refund_account', '환불계좌']
+        ];
+        const PROFILE_AT_KEY = 'moket_profile_field_at';
+        function gReadFieldAt() {
+            try { return JSON.parse(localStorage.getItem(PROFILE_AT_KEY) || '{}') || {}; } catch (e) { return {}; }
+        }
+        function gWriteFieldAt(o) {
+            try { localStorage.setItem(PROFILE_AT_KEY, JSON.stringify(o || {})); } catch (e) { }
+        }
+
+        // 폰에 적힌 손님 정보를 서버에 올릴 모양으로 모은다
+        function gProfileInfoFromDevice() {
+            const ls = k => String(localStorage.getItem(k) || '');
+            return {
+                name: ls('moket_user_name').trim(),
+                phone: normP(ls('moket_user_phone')),
+                address: ls('moket_user_address').trim(),
+                addressDetail: ls('moket_user_address_detail').trim(),
+                entrance: ls('moket_user_entrance').trim(),
+                refundAccount: ls('moket_user_refund_account').trim(),
+                roadAddress: ls('moket_user_road_address'),
+                realName: ls('kakao_real_name'),
+                kakaoName: ls('kakao_original_name'),
+                kakaoPhone: ls('kakao_original_phone'),
+                gender: ls('moket_user_gender'),
+                ageGroup: ls('moket_user_age')
+            };
+        }
+
+        /* ===== [변경] 손님 정보 맞추기 — 서버가 참값이다 =====
+           언제 맞추나
+             · 주문서를 열 때 · 앱으로 돌아올 때(1분에 한 번까지) · 개인정보 창을 열 때
+             · 주문하기를 누를 때(오래 기다리지 않는다) · 손님이 저장할 때 · 주문을 넣은 뒤
+           칸마다 정하는 법
+             · 값이 같으면 그대로 두고, 폰에 시각이 없으면 채운다
+             · 서버가 이기면(gServerWins) 폰을 서버 값으로 맞춘다
+             · 서버가 못 이기고 폰에 값이나 시각이 있으면 폰 값을 서버에 올린다
+             · 폰이 비어 있고 시각도 없으면 서버 값으로 채운다 (빈칸으로 서버를 지우지 않는다)
+           손님에게는 알리지 않는다. 서버를 못 읽으면 아무것도 안 한다. */
+        const PROFILE_INPUT_OF = {
+            moket_user_name: 'input-name', moket_user_phone: 'input-phone',
+            moket_user_address: 'input-address', moket_user_address_detail: 'input-address-detail',
+            moket_user_entrance: 'input-entrance', moket_user_refund_account: 'input-refund-account'
+        };
+
+        /* 서버 값이 폰 값을 이기나
+             · 서버에 시각이 없으면 못 이긴다
+             · 폰에 시각이 없는 옛 값은, 서버에 '실제로 고친 기록'(가게·손님)이 있을 때만 진다.
+               시각만 한꺼번에 넣어 둔 칸(누가 고쳤는지 없음)으로는 폰의 옛 값을 덮지 않는다
+             · 둘 다 시각이 있으면 서버가 같거나 나중일 때 이긴다 */
+        function gServerWins(sv, fld, dAt) {
+            const sAt = Number(sv && sv.fieldAt && sv.fieldAt[fld]) || 0;
+            if (!sAt) return false;
+            if (!dAt) return !!(sv.fieldBy && sv.fieldBy[fld]);
+            return sAt >= dAt;
+        }
+
+        // 여러 곳에서 한꺼번에 불러도 한 번만 돈다
+        let _gProfileSyncBusy = null;
+        function gSyncProfileFromServer() {
+            if (_gProfileSyncBusy) return _gProfileSyncBusy;
+            _gProfileSyncBusy = gSyncProfileRun().finally(() => { _gProfileSyncBusy = null; });
+            return _gProfileSyncBusy;
+        }
+        // 주문하기 앞에서 — 기다리되 오래 붙잡지 않는다. 서버가 느리면 폰 값으로 간다
+        function gSyncProfileQuick(ms) {
+            return Promise.race([
+                gSyncProfileFromServer().catch(() => 0),
+                new Promise(r => setTimeout(() => r(0), ms || 1500))
+            ]);
+        }
+
+        async function gSyncProfileRun() {
+            try {
+                const key = gKeyPhone();   // 손님 정보는 카카오 번호 서랍에 있다
+                if (!gIsValidPhone(key)) return 0;
+                const nowTs = Date.now();
+                const res = await fetch(`${FIREBASE_DB_URL}customers/${key}.json?t=${nowTs}`);
+                if (!res.ok) return 0;
+                const sv = await res.json();
+                const myKakao = normP(localStorage.getItem('kakao_original_phone') || '');
+
+                if (!sv) {
+                    /* 카카오 번호 서랍이 아직 없다. 적은 번호로 담긴 옛 손님이면 옮겨 둔다.
+                       옛 서랍에 다른 카카오 번호가 적혀 있으면 남의 것이라 옮기지 않는다(gSaveCustomerProfile 이 본다). */
+                    const typed = normP(localStorage.getItem('moket_user_phone') || '');
+                    if (gJoinDone() && gIsValidPhone(typed) && typed !== key) {
+                        const old = await fetch(`${FIREBASE_DB_URL}customers/${typed}.json?t=${nowTs}`)
+                            .then(r => r.ok ? r.json() : null).catch(() => null);
+                        if (old) { await gSaveCustomerProfile(gProfileInfoFromDevice()); return 0; }
+                    }
+                    // 견줄 것이 없다 — 폰에 값은 있는데 시각이 없는 칸을 채운다
+                    const devAt0 = gReadFieldAt();
+                    PROFILE_SYNC_FIELDS.forEach(([fld, lsKey]) => {
+                        if (!Number(devAt0[fld]) && String(localStorage.getItem(lsKey) || '').trim()) devAt0[fld] = nowTs;
+                    });
+                    gWriteFieldAt(devAt0);
+                    /* 가입을 마친 폰이면 서버에도 올린다. 새 가입이 아니므로 가입일은 적지 않는다
+                       (fromDevice 표시만 남긴다 — 손님관리 가입일은 첫 주문일로 보인다). */
+                    if (gJoinDone()) await gSaveCustomerProfile(Object.assign(gProfileInfoFromDevice(), { _fromDevice: true }));
+                    return 0;
+                }
+
+                /* [수정] 남의 줄을 끌어오지 않는다.
+                   서랍에 카카오 번호가 적혀 있으면, 이 폰의 카카오 번호와 같을 때만 쓴다.
+                   이 폰에 카카오 번호가 없으면(로그인 이전 손님·둘러보기) 적은 번호로 찾게 되는데,
+                   그 번호가 오타로 남의 카카오 번호와 같을 수 있어서 이때도 쓰지 않는다. */
+                const theirKakao = normP(String(sv.kakaoPhone || ''));
+                if (theirKakao && myKakao !== theirKakao) return 0;
+
+                const devAt = gReadFieldAt();
+                const changed = [];
+                let pushUp = false;
+
+                const takeServer = (fld, lsKey, sVal, dVal) => {
+                    const sAt = Number(sv.fieldAt && sv.fieldAt[fld]) || 0;
+                    localStorage.setItem(lsKey, sVal);
+                    devAt[fld] = sAt || nowTs;
+                    if (fld === 'address') {
+                        // 도로명주소는 주소에 딸려 다닌다
+                        localStorage.setItem('moket_user_address_prev', sVal);
+                        localStorage.setItem('moket_user_road_address', String(sv.roadAddress || ''));
+                    }
+                    changed.push({ lsKey, oldV: dVal, sVal });
+                };
+
+                PROFILE_SYNC_FIELDS.forEach(([fld, lsKey]) => {
+                    const sVal = String(sv[fld] || '').trim();
+                    const dVal = String(localStorage.getItem(lsKey) || '').trim();
+                    const sAt = Number(sv.fieldAt && sv.fieldAt[fld]) || 0;
+                    const dAt = Number(devAt[fld]) || 0;
+
+                    if (sVal === dVal) {
+                        if (dVal && !dAt) devAt[fld] = sAt || nowTs;   // 시각이 없으면 채운다
+                        return;
+                    }
+                    if (gServerWins(sv, fld, dAt)) { takeServer(fld, lsKey, sVal, dVal); return; }
+                    if (dVal || dAt) {                                // 폰 값을 올린다 (옛 값이면 이때 시각을 단다)
+                        if (!dAt) devAt[fld] = nowTs;
+                        pushUp = true;
+                        return;
+                    }
+                    takeServer(fld, lsKey, sVal, dVal);                // 폰이 비어 있다 → 서버 값으로 채운다
+                });
+
+                gWriteFieldAt(devAt);
+                // 화면 칸도 맞춘다. 손님이 지금 적고 있는 칸(저장된 값과 다른 칸)은 건드리지 않는다
+                changed.forEach(c => {
+                    const id = PROFILE_INPUT_OF[c.lsKey];
+                    const el = id ? document.getElementById(id) : null;
+                    if (el && String(el.value || '').trim() === c.oldV) el.value = c.sVal;
+                    if (c.lsKey === 'moket_user_name' && c.sVal) {
+                        const g = document.getElementById('menu-greeting');
+                        if (g) g.innerHTML = `<span class="name-badge">${c.sVal}</span>님`;
+                    }
+                });
+                if (pushUp && gJoinDone()) await gSaveCustomerProfile(gProfileInfoFromDevice());
+                return changed.length;
+            } catch (e) {
+                console.warn('손님 정보 맞추기 실패(주문에는 지장 없음):', e);
+                return 0;
+            }
+        }
+
         async function gPullCustomerProfile(rawPhone) {
             try {
                 const key = normP(rawPhone || localStorage.getItem('kakao_original_phone') || '');
@@ -5277,7 +5457,7 @@
 
                 /* 연락처는 예전에 손님이 적어 두었던 그 번호를 되살린다.
                    카카오 번호를 들이밀지는 않는다 — 적는 번호는 손님이 정하는 것이다. */
-                const savedPhone = normP((s && s.phone) || '');
+                const savedPhone = normP((s && (s.contactPhone || s.phone)) || '');   // [수정] 적어 둔 번호는 연락처 칸에
                 if (!String(localStorage.getItem('moket_user_phone') || '').trim() && gIsValidPhone(savedPhone)) {
                     localStorage.setItem('moket_user_phone', savedPhone); filled++;
                 }
@@ -5292,7 +5472,11 @@
         async function gSaveCustomerProfile(info) {
 
             try {
-                const key = String((info && info.phone) || '').replace(/\D/g, '');
+                /* [수정] 손님 정보의 열쇠는 카카오 번호다. 로그인 비번 같은 것이라 손님이 못 바꾼다.
+                   손님이 적은 번호는 전화·문자에 쓰는 '연락처'로 따로 담는다 — 이건 손님이 고칠 수 있다.
+                   카카오 번호가 없는 옛 손님은 로그인하기 전까지 적은 번호를 열쇠로 둔다. */
+                const typed = String((info && info.phone) || '').replace(/\D/g, '');
+                const key = gKeyPhone(typed);
                 if (!/^01\d{8,9}$/.test(key)) return;      // 번호가 온전할 때만 남긴다
 
                 const url = `${FIREBASE_DB_URL}customers/${key}.json`;
@@ -5302,11 +5486,42 @@
                     if (r.ok) before = await r.json();
                 } catch (e) { /* 못 읽어도 저장은 해 본다 */ }
 
+                /* [신규] 남의 서랍에 쓰지 않는다 — 서랍에 적힌 카카오 번호가 이 열쇠와 다르면 멈춘다.
+                   (카카오 번호가 없는 폰이 적은 번호가 오타로 남의 카카오 번호와 같을 때) */
+                if (before && normP(String(before.kakaoPhone || '')) && normP(String(before.kakaoPhone || '')) !== normP(localStorage.getItem('kakao_original_phone') || '')) return;
+
                 const now = new Date();
+
+                /* [신규] 적은 번호로 담겨 있던 옛 손님이 카카오로 로그인했다 → 카카오 번호 서랍으로 옮긴다.
+                   옮기는 것이지 새로 가입한 것이 아니다. 가입일·고친 시각을 그대로 들고 간다.
+                   옛 서랍에 다른 카카오 번호가 적혀 있으면 남의 것이므로 건드리지 않는다. */
+                let movedFrom = '';
+                if (!before && gIsValidPhone(typed) && typed !== key) {
+                    try {
+                        const oldUrl = `${FIREBASE_DB_URL}customers/${typed}.json`;
+                        const r0 = await fetch(oldUrl + '?t=' + Date.now());
+                        const old = r0.ok ? await r0.json() : null;
+                        const oldKakao = normP(String((old && old.kakaoPhone) || ''));
+                        if (old && (!oldKakao || oldKakao === key)) {
+                            const moved = Object.assign({}, old, {
+                                phone: key,
+                                contactPhone: normP(old.contactPhone || typed),
+                                movedFrom: Object.assign({}, old.movedFrom || {}, { [typed]: now.getTime() })
+                            });
+                            const pr = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(moved) });
+                            if (pr.ok) {
+                                await fetch(oldUrl, { method: 'DELETE' });
+                                before = moved;
+                                movedFrom = typed;
+                            }
+                        }
+                    } catch (e) { /* 못 옮겨도 아래에서 새 서랍에 저장한다 */ }
+                }
                 const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 const next = {
                     name: info.name || '',
                     phone: key,
+                    contactPhone: gIsValidPhone(typed) ? typed : '',   // [신규] 손님이 적은 번호
                     address: info.address || '',
                     addressDetail: info.addressDetail || '',
                     entrance: info.entrance || '',
@@ -5320,6 +5535,29 @@
                     updatedAt: now.getTime()
                 };
 
+                /* [신규] 칸마다 서버와 기기의 고친 시각을 견줘 나중 것을 남긴다.
+                   서버가 더 나중(가게가 고쳤다)이면 그 칸은 서버 값을 그대로 두고, 기기도 서버 값으로 맞춘다.
+                   기기가 더 나중(손님이 방금 고쳤다)이면 손님 값을 쓰고 시각을 함께 적는다. */
+                const _serverAt = (before && before.fieldAt && typeof before.fieldAt === 'object') ? before.fieldAt : {};
+                const _devAt = gReadFieldAt();
+                const _stampPatch = {};
+                PROFILE_SYNC_FIELDS.forEach(([fld, lsKey]) => {
+                    const sVal = String((before && before[fld]) || '').trim();
+                    const dVal = String(next[fld] || '').trim();
+                    if (sVal === dVal) return;
+                    const sAt = Number(_serverAt[fld]) || 0;
+                    const dAt = Number(_devAt[fld]) || 0;
+                    if (before && gServerWins(before, fld, dAt)) {   // [수정] 열 때와 같은 잣대
+                        next[fld] = sVal;                      // 서버 값을 남긴다
+                        try { localStorage.setItem(lsKey, sVal); } catch (e) { }
+                        _devAt[fld] = sAt;
+                    } else if (dAt) {
+                        _stampPatch[`fieldAt/${fld}`] = dAt;   // 손님이 고친 시각
+                        _stampPatch[`fieldBy/${fld}`] = '손님';
+                    }
+                });
+                gWriteFieldAt(_devAt);
+
                 // 바뀐 것만 골라 낸다. 하나도 안 바뀌었으면 쓰지 않는다.
                 const WATCH = [['name', '이름'], ['address', '주소'], ['addressDetail', '상세주소'],
                                ['entrance', '현관비번'], ['realName', '실명'],
@@ -5330,13 +5568,22 @@
                     const newV = String(next[f] || '').trim();
                     if (oldV !== newV) diffs.push({ what: label, from: oldV, to: newV });
                 });
+                {
+                    const oldC = String((before && before.contactPhone) || '').trim();
+                    const newC = String(next.contactPhone || '').trim();
+                    if (before && oldC && newC && oldC !== newC) diffs.push({ what: '연락처', from: oldC, to: newC });
+                }
+                const fillContact = !!(before && !String(before.contactPhone || '').trim() && next.contactPhone);
                 /* 가입으로 보는 것은 '이 번호가 처음 들어올 때'뿐이다.
                    정보를 고친 것을 가입으로 세면 새 손님 수가 부풀려진다.
                    이미 createdAt 이 있으면 아무리 고쳐도 가입이 아니다. */
-                const isNew = !before || !before.createdAt;
-                if (before && !diffs.length) return;
+                // [수정] 폰에서 올린 줄(fromDevice)은 가입일이 없어도 가입이 아니다
+                const isNew = !before || (!before.createdAt && !before.fromDevice);
+                if (before && !diffs.length && !fillContact) return;
+                const fromDevice = !before && !!(info && info._fromDevice);
                 // 가입한 때는 처음 한 번만 적고 다시는 안 건드린다 (PATCH 라 빠져 있어도 그대로 남는다)
-                if (isNew) next.createdAt = now.getTime();
+                if (fromDevice) next.fromDevice = now.getTime();
+                else if (isNew) next.createdAt = now.getTime();
 
                 /* [신규] 마지막으로 무엇을 바꿨는지 손님 줄에 한 개만 담아 둔다.
                    자세한 내력은 customer_logs 에 30일치 남지만, 그건 날짜로 흩어져 있어
@@ -5355,7 +5602,7 @@
                 await fetch(url, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(next)
+                    body: JSON.stringify(Object.assign({}, next, _stampPatch))   // [신규] 칸별 고친 시각도 함께
                 });
                 /* [신규] 가게 쪽 손님 관리가 이 자료를 이 기기에 담아 두고 쓴다.
                    바뀌었다고 표식을 찍어 줘야 다음에 열 때 새로 받는다. */
@@ -5365,8 +5612,9 @@
 
                 // 변경 기록 — 처음 들어온 손님이면 '가입' 한 줄, 아니면 바뀐 갈래마다 한 줄
                 const rows = (!before)
-                    ? [{ what: '가입', from: '', to: next.name || key }]
-                    : diffs;
+                    ? [{ what: fromDevice ? '폰에서 올림' : '가입', from: '', to: next.name || key }]
+                    : diffs.slice();
+                if (movedFrom) rows.unshift({ what: '카카오 번호로 옮김', from: movedFrom, to: key });
                 if (!rows.length) return;
                 const body = {};
                 rows.forEach((d, i) => {
@@ -5385,6 +5633,10 @@
             }
         }
         function saveProfile() {
+            /* [신규] 손님이 이번에 고친 칸을 가리려고, 덮어쓰기 전의 기기 값을 챙겨 둔다 */
+            const _profileBefore = {};
+            PROFILE_SYNC_FIELDS.forEach(([fld, lsKey]) => { _profileBefore[fld] = String(localStorage.getItem(lsKey) || '').trim(); });
+
             const name = document.getElementById('input-name').value;
             const phone = document.getElementById('input-phone').value;
             const address = document.getElementById('input-address').value;
@@ -5459,6 +5711,18 @@
 
             else {
                 greeting.innerHTML = `<span class="name-badge">주문자</span>님`;
+            }
+
+            /* [신규] 손님이 이번에 고친 칸에 지금 시각을 찍는다.
+               서버와 견줄 때 이 시각이 가게 쪽보다 나중이면 손님 값이 남는다. */
+            {
+                const devAt = gReadFieldAt();
+                const nowTs = Date.now();
+                PROFILE_SYNC_FIELDS.forEach(([fld, lsKey]) => {
+                    const after = String(localStorage.getItem(lsKey) || '').trim();
+                    if (after !== _profileBefore[fld]) devAt[fld] = nowTs;
+                });
+                gWriteFieldAt(devAt);
             }
 
             /* [신규] 손님 정보를 서버에도 남긴다 (customers/{전화번호}).
@@ -5620,6 +5884,7 @@
 
                                 // [신규] 우리 쪽에 남아 있는 정보로 빈 칸을 채운다 (이미 적힌 값은 그대로)
                                 const pulled = await gPullCustomerProfile(kakaoPhone);
+                                gRecordVisit();   // [신규] 로그인하고 들어온 것도 접속으로 센다
 
                                 loadProfile(); // UI 갱신 (인증됨 표시 등)
                                 if (pulled) showToast('저장해 두셨던 정보를 불러왔습니다.');
@@ -5724,7 +5989,7 @@
         //  (2) 지금 쓰는 연락처가 아닌 캐시는 다시 볼 일이 없으므로 지운다.
         function gCleanupHistoryCaches() {
             try {
-                const myPhone = String(localStorage.getItem('moket_user_phone') || '').replace(/\D/g, "");
+                const myPhone = gKeyPhone();   // [수정] 캐시 이름이 카카오 번호라 같은 번호로 견준다
                 const drop = [];
                 for (let i = 0; i < localStorage.length; i++) {
                     const k = localStorage.key(i);
@@ -7470,7 +7735,7 @@
 
                         const nameVal = document.getElementById('input-name').value;
                         const phoneVal = document.getElementById('input-phone').value;
-                        localStorage.setItem(`history_cache_${nameVal}_${phoneVal}`, JSON.stringify(fullHistoryData));
+                        localStorage.setItem(`history_cache_${nameVal}_${gKeyPhone(phoneVal)}`, JSON.stringify(fullHistoryData));
 
                         const mKey = matchKey || "no-date";
                         const itemKey = mKey + "|" + rawItemName;
@@ -11223,7 +11488,7 @@
             checkScrollLock();
         }
 
-        function openShippingSelection() {
+        async function openShippingSelection() {
             cutoffConfirmedStatus = false; // [추가] 주문 시작 시 마감 확인 상태 초기화
             holidayConfirmedStatus = false; // [추가] 주말/공휴일 확인 상태 초기화
             window.pendingFeeRefund = 0; // [신규] 배달비 차감액도 주문마다 다시 계산한다
@@ -11231,6 +11496,12 @@
                 showSystemModal("상품이 없습니다. 상품을 선택해 주세요.", 'alert');
                 return;
             }
+
+            /* [신규] 주문에 실릴 주소·현관비번을 서버와 맞춘 뒤 간다.
+               가게가 방금 고친 주소가 켜 둔 화면에 안 넘어가 옛 주소로 주문이 들어가는 일을 막는다.
+               배달 필수 칸 검사보다 먼저 해야, 가게가 채워 둔 비번을 다시 묻지 않는다.
+               서버가 느리면 1.5초만 기다리고 폰 값으로 간다 — 주문이 막히면 안 된다. */
+            await gSyncProfileQuick(1500);
 
             // [신규] 당일구매 상품과 예약구매 상품 혼합 주문 차단 (USER 요청)
             let hasTodayOnlyItem = false;
@@ -12375,7 +12646,7 @@
                     isSada: (it.isSada === true)     // [신규] 사다드림 여부 (로컬 주문내역에도 함께 보관)
                 }));
 
-                const cacheKey_hist = `history_cache_${name}_${phone}`;
+                const cacheKey_hist = `history_cache_${name}_${gKeyPhone(phone)}`;
                 if (!fullHistoryData || fullHistoryData.length === 0) {
                     const cached = localStorage.getItem(cacheKey_hist);
                     if (cached) fullHistoryData = JSON.parse(cached);
@@ -12647,6 +12918,30 @@
                 // 4. 로컬 상태 업데이트 및 완료 안내 (Firebase 기록 완료 시 바로 표시)
                 isHistoryProcessing = false;
 
+                /* [버그수정] 주문을 넣을 때도 손님 정보를 서버에 맞춰 둔다.
+                   손님 정보는 '저장' 단추를 누를 때만 올라갔다. 그런데 손님은 대개 한 번 가입하고
+                   다시는 저장을 안 누른 채 주문만 한다. 그래서 가게 쪽 손님 정보가 옛 값에 멈춰 있었다.
+                   (찐만두2710 — 손님 정보는 옛 주문에서 옮겨 온 현관 비번 1234*, 오늘 주문은 3927)
+                   주문에 실은 것과 같은 값을 올린다. 칸마다 나중 것을 남기는 규칙은 그대로라,
+                   가게가 더 나중에 고친 칸은 덮지 않는다. 기다리지 않는다 — 주문은 이미 끝났다. */
+                try {
+                    gSaveCustomerProfile({
+                        name: String(localStorage.getItem('moket_user_name') || '').trim(),
+                        phone: normP(localStorage.getItem('moket_user_phone') || ''),
+                        address: String(localStorage.getItem('moket_user_address') || '').trim(),
+                        addressDetail: String(localStorage.getItem('moket_user_address_detail') || '').trim(),
+                        entrance: String(localStorage.getItem('moket_user_entrance') || '').trim(),
+                        refundAccount: String(localStorage.getItem('moket_user_refund_account') || '').trim(),
+                        roadAddress: String(localStorage.getItem('moket_user_road_address') || ''),
+                        realName: String(localStorage.getItem('kakao_real_name') || ''),
+                        kakaoName: String(localStorage.getItem('kakao_original_name') || ''),
+                        kakaoPhone: String(localStorage.getItem('kakao_original_phone') || ''),
+                        gender: String(localStorage.getItem('moket_user_gender') || ''),
+                        ageGroup: String(localStorage.getItem('moket_user_age') || '')
+                    });
+                } catch (e) { /* 손님 정보 맞추기가 실패해도 주문에는 지장 없다 */ }
+                gRecordVisitOrdered();   // [신규] 접속 기록에 '주문함'
+
                 saveItems.forEach(it => {
                     if (it.name === "배달비") return;
                     const targetKey = it.matchKey || it.date;
@@ -12734,6 +13029,9 @@
             // 데이터 로드와 프로필 로드를 병렬로 시작
             loadData();
             loadProfile();
+            // [신규] 가게가 더 나중에 고친 손님 정보가 있으면 기기로 받아 온다 (기다리지 않는다)
+            gSyncProfileFromServer();
+            gRecordVisit();   // [신규] 접속 기록
 
             // 설정 상태 동기화 및 UI 반영
             fetchDeliveryStatus();
@@ -12799,6 +13097,98 @@
                 loadData(true);
             }
         });
+
+        /* ===== [신규] 접속 기록 =====
+           손님이 들어올 때 한 줄 남긴다. 무엇을 모으는지는 이것뿐이다.
+             visits/{날짜}/{카카오번호} = {
+               first   그날 처음 들어온 시각 (서버 시계)
+               last    그날 마지막으로 들어온 시각 (서버 시계)
+               count   그날 들어온 횟수 — 30분 넘게 쉬었다 오면 한 번 더 센다
+               hours   시간대별 횟수 { "09": 1, "20": 2 }
+               ordered 그날 주문했으면 true
+             }
+           · 손님 정보(customers)와 따로 담는다 — 손님관리가 통째로 받아 가는 양이 불지 않게
+           · 서버에서 읽지 않고 쓰기만 한다. 30분 안에 다시 오면 아무것도 안 쓴다
+           · 빼는 것: 카카오 로그인 전, 둘러보기(강성민 열 번), 관리자 모드
+             (가게 사람 번호는 여기 적지 않는다 — 누구나 볼 수 있는 화면이라. 볼 때 가게 쪽에서 뺀다)
+           · 기기·IP·위치 같은 것은 모으지 않는다. 기록이 실패해도 주문서는 그대로 쓴다 */
+        const VISIT_GAP = 30 * 60 * 1000;
+        const VISIT_LAST_KEY = 'moket_visit_last';   // 이 폰에서 마지막으로 쓰던 때
+        const VISIT_DAY_KEY = 'moket_visit_day';     // 이 폰이 그날 처음 기록을 남긴 날
+
+        function gVisitDay(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function gVisitKey() {
+            if (typeof gIsGuestView === 'function' && gIsGuestView()) return '';
+            if (typeof isAdminMode !== 'undefined' && isAdminMode) return '';
+            const kk = normP(localStorage.getItem('kakao_original_phone') || '');
+            return gIsValidPhone(kk) ? kk : '';
+        }
+        function gTouchActive() {
+            try { localStorage.setItem(VISIT_LAST_KEY, String(Date.now())); } catch (e) { }
+        }
+
+        async function gRecordVisit() {
+            try {
+                const key = gVisitKey();
+                if (!key) return;
+                const now = new Date();
+                const day = gVisitDay(now);
+                const last = Number(localStorage.getItem(VISIT_LAST_KEY)) || 0;
+                const sameDay = localStorage.getItem(VISIT_DAY_KEY) === day;
+                gTouchActive();
+                if (sameDay && now.getTime() - last < VISIT_GAP) return;   // 같은 접속으로 본다
+
+                const hh = String(now.getHours()).padStart(2, '0');
+                const body = {
+                    last: { '.sv': 'timestamp' },
+                    count: { '.sv': { increment: 1 } },
+                    [`hours/${hh}`]: { '.sv': { increment: 1 } }
+                };
+                if (!sameDay) body.first = { '.sv': 'timestamp' };
+                const res = await fetch(`${FIREBASE_DB_URL}visits/${day}/${key}.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                if (res.ok) localStorage.setItem(VISIT_DAY_KEY, day);
+            } catch (e) { /* 기록이 실패해도 주문서는 그대로 */ }
+        }
+
+        // 주문을 넣었을 때 — 그날 줄에 '주문함'을 단다
+        function gRecordVisitOrdered() {
+            try {
+                const key = gVisitKey();
+                if (!key) return;
+                fetch(`${FIREBASE_DB_URL}visits/${gVisitDay(new Date())}/${key}.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordered: true })
+                }).catch(() => { });
+            } catch (e) { }
+        }
+
+        // 돌아올 때마다 본다(30분 안이면 쓰지 않는다). 나갈 때와 화면을 만질 때는 '쓰던 때'만 고친다
+        let _visitTouchAt = 0;
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') gRecordVisit(); else gTouchActive();
+        });
+        window.addEventListener('pageshow', (e) => { if (e.persisted) gRecordVisit(); });
+        document.addEventListener('pointerdown', () => {
+            const t = Date.now();
+            if (t - _visitTouchAt > 60000) { _visitTouchAt = t; gTouchActive(); }
+        }, { passive: true });
+
+        /* [신규] 앱으로 돌아올 때 손님 정보도 서버와 맞춘다.
+           켜 둔 채 쓰는 손님이 많아, 열 때 한 번만으로는 가게가 고친 값이 늦게 넘어간다.
+           자주 들락거려도 1분에 한 번까지만 읽는다. */
+        let lastProfileSyncTime = Date.now();
+        function gSyncProfileOnReturn() {
+            const now = Date.now();
+            if (now - lastProfileSyncTime < AUTO_LOAD_INTERVAL) return;
+            lastProfileSyncTime = now;
+            gSyncProfileFromServer();
+        }
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') gSyncProfileOnReturn(); });
+        window.addEventListener('pageshow', (e) => { if (e.persisted) gSyncProfileOnReturn(); });
+        window.addEventListener('focus', gSyncProfileOnReturn);
 
         // [추가] 포커스를 얻었을 때도 갱신 (일부 모바일 환경 대응)
         window.addEventListener('focus', () => {
