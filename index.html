@@ -3432,6 +3432,7 @@
         let isProductListEnabled = true;
 
         async function fetchProductListStatus() {
+            gRecordVisit();   // [신규] 화면을 보고 있는 동안의 1분 확인도 접속 신호로 센다 (10분 칸마다 한 번만 보냄)
             try {
                 const url = FIREBASE_DB_URL + "product_list_enabled.json?t=" + Date.now();
                 const res = await fetch(url);
@@ -5283,7 +5284,7 @@
 
         /* ===== [변경] 손님 정보 맞추기 — 서버가 참값이다 =====
            언제 맞추나
-             · 주문서를 열 때 · 앱으로 돌아올 때(1분에 한 번까지) · 개인정보 창을 열 때
+             · 주문서를 열 때 · 개인정보 창을 열 때
              · 주문하기를 누를 때(오래 기다리지 않는다) · 손님이 저장할 때 · 주문을 넣은 뒤
            칸마다 정하는 법
              · 값이 같으면 그대로 두고, 폰에 시각이 없으면 채운다
@@ -5324,26 +5325,30 @@
             ]);
         }
 
-        /* ===== [변경] 접속 기록 — 손님 정보 맞추기와 같이 센다 =====
-           따로 신호를 보내지 않는다. 손님 정보를 맞출 때(열 때·돌아올 때·개인정보 창·주문하기 직전·로그인 직후)
-           같이 세고, 30분 안에 다시 맞추면 한 번으로 묶는다(서버에 안 쓴다).
+        /* ===== [변경] 접속 기록 — 10분 칸 =====
+           하루를 10분 칸으로 나누고, 그 칸 안에 서버와 신호가 한 번이라도 오가면 그 칸에 '접속함'을 한 번만 적는다.
+             · 신호: 상품을 새로 받을 때(열 때·앱으로 돌아올 때·뒤로 가기·새로고침·주문 뒤)
+                     + 화면을 보고 있는 동안 1분마다 하는 상품목록 공개 여부 확인
+                     + 카카오 로그인 직후
+             · 같은 칸에서는 두 번 보내지 않는다 (한 시간에 최대 6번)
              visits/{날짜}/{카카오번호} = {
+               slots   접속한 10분 칸 { "0900": 1, "0910": 1, "2130": 1 }
                first   그날 처음 들어온 시각 (서버 시계)
-               last    그날 마지막으로 들어온 시각 (서버 시계)
-               count   그날 들어온 횟수 — 30분 넘게 쉬었다 오면 한 번 더 센다
-               hours   시간대별 횟수 { "09": 1, "20": 2 }
+               last    그날 마지막으로 신호가 있던 칸의 시각 (서버 시계)
                ordered 그날 주문했으면 true (주문을 넣은 뒤 단다)
              }
+             연속한 칸을 묶으면 '방문 한 번'이 된다 (예: 0900·0910·0920 → 방문 1번, 약 30분). 주문관리가 묶어서 보여 준다.
            · 손님 정보(customers)와 따로 담는다 — 손님관리가 통째로 받아 가는 양이 불지 않게
            · 빼는 것: 카카오 로그인 전, 둘러보기(강성민 열 번), 관리자 모드
              (가게 사람 번호는 여기 적지 않는다 — 누구나 볼 수 있는 화면이라. 볼 때 가게 쪽에서 뺀다)
-           · 기기·IP·위치 같은 것은 모으지 않는다. 기록이 실패해도 맞추기와 주문은 그대로 간다 */
-        const VISIT_GAP = 30 * 60 * 1000;
-        const VISIT_LAST_KEY = 'moket_visit_last';   // 이 폰에서 마지막으로 쓰던 때
-        const VISIT_DAY_KEY = 'moket_visit_day';     // 이 폰이 그날 처음 기록을 남긴 날
+           · 기기·IP·위치 같은 것은 모으지 않는다. 기록이 실패해도 주문서는 그대로 쓴다 */
+        const VISIT_SENT_KEY = 'moket_visit_slots';   // 이 폰이 오늘 이미 보낸 칸 { day, slots: [...] }
 
         function gVisitDay(d) {
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function gVisitSlot(d) {   // 21:37 → "2130"
+            return `${String(d.getHours()).padStart(2, '0')}${Math.floor(d.getMinutes() / 10)}0`;
         }
         function gVisitKey() {
             if (typeof gIsGuestView === 'function' && gIsGuestView()) return '';
@@ -5351,34 +5356,32 @@
             const kk = normP(localStorage.getItem('kakao_original_phone') || '');
             return gIsValidPhone(kk) ? kk : '';
         }
-        function gTouchActive() {
-            try { localStorage.setItem(VISIT_LAST_KEY, String(Date.now())); } catch (e) { }
-        }
 
-        // 맞추기가 부른다. 30분 안이면 '쓰던 때'만 고치고 서버에는 안 쓴다
+        // 신호가 있을 때 부른다. 이 칸을 이미 보냈으면 아무것도 안 한다
         async function gRecordVisit() {
             try {
                 const key = gVisitKey();
                 if (!key) return;
                 const now = new Date();
-                const day = gVisitDay(now);
-                const last = Number(localStorage.getItem(VISIT_LAST_KEY)) || 0;
-                const sameDay = localStorage.getItem(VISIT_DAY_KEY) === day;
-                gTouchActive();
-                if (sameDay && now.getTime() - last < VISIT_GAP) return;   // 같은 접속으로 본다
+                const day = gVisitDay(now), slot = gVisitSlot(now);
+                let sent = null;
+                try { sent = JSON.parse(localStorage.getItem(VISIT_SENT_KEY) || 'null'); } catch (e) { sent = null; }
+                if (!sent || sent.day !== day || sent.key !== key || !Array.isArray(sent.slots)) sent = { day, key, slots: [] };
+                if (sent.slots.includes(slot)) return;   // 이 칸은 이미 보냈다
+                const firstToday = sent.slots.length === 0;
+                sent.slots.push(slot);                    // 먼저 적어 둔다 — 1분 확인과 상품 갱신이 겹쳐도 두 번 안 보낸다
+                try { localStorage.setItem(VISIT_SENT_KEY, JSON.stringify(sent)); } catch (e) { }
 
-                const hh = String(now.getHours()).padStart(2, '0');
-                const body = {
-                    last: { '.sv': 'timestamp' },
-                    count: { '.sv': { increment: 1 } },
-                    [`hours/${hh}`]: { '.sv': { increment: 1 } }
-                };
-                if (!sameDay) body.first = { '.sv': 'timestamp' };
+                const body = { [`slots/${slot}`]: 1, last: { '.sv': 'timestamp' } };
+                if (firstToday) body.first = { '.sv': 'timestamp' };
                 const res = await fetch(`${FIREBASE_DB_URL}visits/${day}/${key}.json`, {
                     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
                 });
-                if (res.ok) localStorage.setItem(VISIT_DAY_KEY, day);
-            } catch (e) { /* 기록이 실패해도 맞추기는 그대로 */ }
+                if (!res.ok) {   // 못 보냈으면 다음 신호 때 다시 보내게 지운다
+                    sent.slots = sent.slots.filter(x => x !== slot);
+                    try { localStorage.setItem(VISIT_SENT_KEY, JSON.stringify(sent)); } catch (e) { }
+                }
+            } catch (e) { /* 기록이 실패해도 주문서는 그대로 */ }
         }
 
         // 주문을 넣었을 때 — 그날 줄에 '주문함'을 단다
@@ -5396,7 +5399,6 @@
             try {
                 const key = gKeyPhone();   // 손님 정보는 카카오 번호 서랍에 있다
                 if (!gIsValidPhone(key)) return 0;
-                gRecordVisit();   // [변경] 맞추는 김에 접속도 센다 (기다리지 않는다, 30분 안이면 안 씀)
                 const nowTs = Date.now();
                 const res = await fetch(`${FIREBASE_DB_URL}customers/${key}.json?t=${nowTs}`);
                 if (!res.ok) return 0;
@@ -5953,7 +5955,8 @@
 
                                 // [신규] 우리 쪽에 남아 있는 정보로 빈 칸을 채운다 (이미 적힌 값은 그대로)
                                 const pulled = await gPullCustomerProfile(kakaoPhone);
-                                gSyncProfileFromServer();   // [변경] 로그인 직후에도 맞춘다 — 접속도 이 안에서 센다
+                                gSyncProfileFromServer();   // [변경] 로그인 직후에도 맞춘다
+                                gRecordVisit();   // 로그인 직후는 상품 갱신이 안 돌아서 여기서 센다
 
                                 loadProfile(); // UI 갱신 (인증됨 표시 등)
                                 if (pulled) showToast('저장해 두셨던 정보를 불러왔습니다.');
@@ -7948,6 +7951,7 @@
         const AUTO_LOAD_INTERVAL = 60000;
 
         async function loadData(force = false) {
+            gRecordVisit();   // [신규] 상품을 새로 받을 때 접속도 센다 (기다리지 않는다, 같은 10분 칸이면 안 보냄)
             initMainTabs(false);
             const productArea = document.getElementById('product-list');
 
@@ -13099,7 +13103,7 @@
             loadData();
             loadProfile();
             // [신규] 가게가 더 나중에 고친 손님 정보가 있으면 기기로 받아 온다 (기다리지 않는다)
-            gSyncProfileFromServer();   // (접속 기록도 이 안에서 센다)
+            gSyncProfileFromServer();
 
             // 설정 상태 동기화 및 UI 반영
             fetchDeliveryStatus();
@@ -13166,28 +13170,9 @@
             }
         });
 
-        /* [신규] 접속을 30분 단위로 묶으려고 '마지막으로 쓰던 때'만 고친다 (서버에는 안 쓴다).
-           나갈 때와 화면을 만질 때 고친다. 세는 일은 손님 정보 맞추기 안에서 한다(gRecordVisit). */
-        let _visitTouchAt = 0;
-        document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') gTouchActive(); });
-        document.addEventListener('pointerdown', () => {
-            const t = Date.now();
-            if (t - _visitTouchAt > 60000) { _visitTouchAt = t; gTouchActive(); }
-        }, { passive: true });
 
-        /* [신규] 앱으로 돌아올 때 손님 정보도 서버와 맞춘다.
-           켜 둔 채 쓰는 손님이 많아, 열 때 한 번만으로는 가게가 고친 값이 늦게 넘어간다.
-           자주 들락거려도 1분에 한 번까지만 읽는다. */
-        let lastProfileSyncTime = Date.now();
-        function gSyncProfileOnReturn() {
-            const now = Date.now();
-            if (now - lastProfileSyncTime < AUTO_LOAD_INTERVAL) return;
-            lastProfileSyncTime = now;
-            gSyncProfileFromServer();
-        }
-        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') gSyncProfileOnReturn(); });
-        window.addEventListener('pageshow', (e) => { if (e.persisted) gSyncProfileOnReturn(); });
-        window.addEventListener('focus', gSyncProfileOnReturn);
+        /* [변경] 앱으로 돌아올 때마다 손님 정보를 맞추던 것은 뺐다.
+           주문하기 직전·개인정보 창·열 때·로그인 직후에 맞추므로, 주문에 옛 값이 실리지 않는다. */
 
         // [추가] 포커스를 얻었을 때도 갱신 (일부 모바일 환경 대응)
         window.addEventListener('focus', () => {
