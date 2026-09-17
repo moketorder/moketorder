@@ -62,6 +62,89 @@
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <script src="https://t1.kakaocdn.net/kakao_js_sdk/1.43.0/kakao.min.js"></script>
     <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <!-- ===== [신규 2026-09-17] 손님 파이어베이스 로그인 =====
+         카카오 로그인만으로는 파이어베이스가 "이 요청이 누구인지" 모른다. 그래서
+           카카오 로그인 → 서버 함수(kakaoLogin)가 카카오에 전화번호를 직접 확인 → 그 번호가 담긴 파이어베이스 증표
+         로 한 번 더 로그인해 둔다. 증표는 이 기기에 오래 남는다 (카카오 토큰이 만료돼도 계속 쓴다).
+         데이터베이스로 가는 요청에는 증표를 자동으로 붙인다. 규칙이 "자기 번호의 주문·손님 정보만" 을 가릴 수 있다.
+         상품 보기처럼 누구나 보는 자료는 증표가 없어도 그대로 된다. -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+    <script>
+    (function () {
+        const DB = 'https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/';
+        const FN = 'https://kakaologin-467232072804.asia-northeast3.run.app';
+        const CONFIG = {
+            apiKey: "AIzaSyAo0PrW2XaP_fq0FB5o452DLvj79Qpa_Sk",
+            authDomain: "moketdb.firebaseapp.com",
+            databaseURL: "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "moketdb",
+            storageBucket: "moketdb.firebasestorage.app",
+            messagingSenderId: "467232072804",
+            appId: "1:467232072804:web:58d9f5ba58a2c2a642eb71"
+        };
+        /* 주문관리·배달기사와 같은 사이트(moketorder.github.io)라서, 기본 앱을 쓰면 가게 사람의 구글 로그인과
+           손님 카카오 로그인이 한 브라우저 안에서 서로 덮어쓴다 (사장님 폰에서 주문서를 열면 주문관리 로그인이 풀림).
+           손님 로그인은 'customer' 라는 이름의 앱에 따로 담는다. */
+        const app = firebase.apps.find(a => a.name === 'customer') || firebase.initializeApp(CONFIG, 'customer');
+        const auth = app.auth();
+
+        let settle;
+        const firstState = new Promise(r => { settle = r; });   // 기기에 남은 증표를 다 읽어 들였는지
+        auth.onAuthStateChanged(() => settle());
+        const wait = (p, ms) => Promise.race([p, new Promise(r => setTimeout(r, ms))]);
+        const normP = p => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('82')) d = '0' + d.slice(2); return d; };
+
+        let signing = null;
+        const rawFetch = window.fetch.bind(window);
+        window.fetch = async function (input, init) {
+            const url = typeof input === 'string' ? input : '';
+            if (url.startsWith(DB) && !/[?&]auth=/.test(url)) {
+                await wait(firstState, 3000);
+                if (signing) await wait(signing, 8000);   // 막 로그인하는 중이면 증표가 나올 때까지 조금 기다린다
+                const u = auth.currentUser;
+                if (u) {
+                    try { input = url + (url.includes('?') ? '&' : '?') + 'auth=' + encodeURIComponent(await u.getIdToken()); } catch (e) { }
+                }
+            }
+            return rawFetch(input, init);
+        };
+
+        /* 카카오 로그인이 된 상태에서 파이어베이스에도 로그인한다.
+           돌려주는 값: 'ok' | 'no-kakao'(카카오 토큰이 없거나 만료 — 카카오 로그인을 다시 해야 함) | 'error' */
+        window.gFirebaseKakaoSignIn = function (expectedPhone) {
+            if (signing) return signing;
+            signing = (async () => {
+                try {
+                    await wait(firstState, 3000);
+                    const want = normP(expectedPhone);
+                    const u = auth.currentUser;
+                    if (u) {
+                        const r = await u.getIdTokenResult();
+                        if (!want || r.claims.phone === want) return 'ok';
+                        await auth.signOut();   // 다른 번호로 남아 있던 증표
+                    }
+                    const kt = (typeof Kakao !== 'undefined' && Kakao.isInitialized && Kakao.isInitialized()) ? Kakao.Auth.getAccessToken() : null;
+                    if (!kt) return 'no-kakao';
+                    const res = await rawFetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kakaoToken: kt }) });
+                    if (res.status === 401) return 'no-kakao';
+                    if (!res.ok) { console.warn('손님 로그인 증표 받기 실패:', res.status); return 'error'; }
+                    const j = await res.json();
+                    await auth.signInWithCustomToken(j.token);
+                    return 'ok';
+                } catch (e) {
+                    console.warn('손님 파이어베이스 로그인 실패:', e);
+                    return 'error';
+                } finally {
+                    setTimeout(() => { signing = null; }, 0);
+                }
+            })();
+            return signing;
+        };
+        window.gFirebaseHasUser = async function () { await wait(firstState, 3000); return !!auth.currentUser; };
+        window.gFirebaseSignOut = function () { return auth.signOut().catch(() => { }); };
+    })();
+    </script>
     <style>
         /* [1] 원본 주문서2.html 스타일 변수 및 레이아웃 완벽 보존 */
         :root {
@@ -1508,29 +1591,6 @@
             color: var(--moket-green);
         }
 
-        /* 관리자 모드 재고 수정 입력 필드 스타일 */
-        .admin-stock-input {
-            width: 50px !important;
-            color: #2196F3 !important;
-            border-bottom: 1.5px solid #2196F3 !important;
-            border-radius: 0 !important;
-            padding: 0 !important;
-            outline: none !important;
-            font-size: 18px !important;
-        }
-        .admin-stock-input::-webkit-outer-spin-button,
-        .admin-stock-input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        .admin-stock-input[type=number] {
-            -moz-appearance: textfield;
-        }
-        .qty-controls.admin-stock-edit.selected {
-            background: #e3f2fd !important;
-            border-color: #2196F3 !important;
-        }
-
         /* 푸터 */
         .footer {
             position: fixed;
@@ -1882,29 +1942,11 @@
                  버튼 id·동작은 그대로라 기존 로직은 손대지 않는다. -->
             <div id="admin-panel">
                 <div class="admin-panel-title">👨‍💻 사장님 설정</div>
-
-                <div class="admin-sec-title">배달</div>
-                <div class="admin-grid2">
-                    <button id="ADMIN_DELIVERY_ON" class="admin-btn" onclick="adminToggleDelivery(true)">🚚 배달 켜기</button>
-                    <button id="ADMIN_DELIVERY_OFF" class="admin-btn" onclick="adminToggleDelivery(false)">🚫 배달 끄기</button>
-                </div>
-                <button id="ADMIN_DELIVERY_FEE_ON" class="admin-btn wide" onclick="adminManageDeliveryFee()">💸 배달비 금액 설정</button>
-
-                <div class="admin-sec-title">영업일</div>
-                <div class="admin-grid2">
-                    <button id="ADMIN_SATURDAY_WEEKDAY_ON" class="admin-btn" onclick="adminToggleSaturdayWeekday(true)">🗓️ 토요일 영업</button>
-                    <button id="ADMIN_SATURDAY_WEEKDAY_OFF" class="admin-btn" onclick="adminToggleSaturdayWeekday(false)">🗓️ 토요일 휴무</button>
-                </div>
-                <button id="ADMIN_HOLIDAY_MANAGE" class="admin-btn wide" onclick="adminManageHolidays()">📅 임시 휴무일 관리</button>
-
-                <div class="admin-sec-title">손님 화면</div>
-                <div class="admin-grid2">
-                    <button id="ADMIN_PRODUCT_LIST_ON" class="admin-btn" onclick="adminToggleProductList(true)">📦 상품목록 공개</button>
-                    <button id="ADMIN_PRODUCT_LIST_OFF" class="admin-btn" onclick="adminToggleProductList(false)">🌑 상품목록 숨김</button>
-                </div>
-                <div class="admin-grid2">
-                    <button id="ADMIN_LOGIN_ON" class="admin-btn" onclick="adminToggleLoginEntry(true)">🔒 로그인 강제</button>
-                    <button id="ADMIN_LOGIN_OFF" class="admin-btn" onclick="adminToggleLoginEntry(false)">🔓 로그인 끄기</button>
+                <!-- [이동 2026-09-17] 배달·배달비·토요일·임시 휴무일·상품목록 공개·로그인 강제는
+                     주문관리 → 가게 관리 → 일반 관리로 옮겼다. 이 설정들은 이제 가게 로그인을 해야 바꿀 수 있어서
+                     로그인이 없는 주문서에서는 바꿀 수 없다. (읽어서 손님 화면에 반영하는 코드는 그대로 둔다) -->
+                <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px;">
+                    배달·휴무일·상품목록 공개·로그인 설정은<br><b>주문관리 → 가게 관리 → 일반 관리</b>에서 바꿉니다.
                 </div>
 
                 <button id="btn-unlink-kakao" onclick="unlinkKakao()"
@@ -2906,307 +2948,8 @@
             }
         }
 
-        // ===== [신규] 관리자 모드 — 상품별 분류탭(displayTab) 바꾸기 =====
-        //  주문관리에 들어가지 않고도 화면에서 바로 "이 상품은 이 탭" 을 고칠 수 있게 한다.
-        //  · 저장하는 값은 displayTab 하나뿐이다. 가격·재고·이름은 절대 건드리지 않는다.
-        //  · 고를 수 있는 값도 아래 목록 안으로 제한한다. (주문관리의 '분류탭 설정'과 같은 목록)
-        const ADMIN_TAB_GROUPS = [
-            {
-                group: '당일판매', items: [
-                    { key: 'today-fruit', label: '과일 / 야채' },
-                    { key: 'today-reserve', label: '오늘의 상품' }
-                ]
-            },
-            { group: '상시판매', items: ONSITE_CATS.map(c => ({ key: c.key, label: c.label })) },
-            {
-                group: '예약판매', items: [
-                    { key: 'reserve', label: '공동구매' },
-                    { key: 'sada', label: '사다드림' },
-                    { key: 'chuseok', label: '추석선물' },
-                    { key: 'costco', label: '코스트코' }
-                ]
-            }
-        ];
-
-        // 카드 버튼처럼 자리가 좁은 곳에 쓰는 짧은 이름 (묶음 이름은 빼고 분류만)
-        function gAdminTabShortLabel(key) {
-            if (!key) return '분류 없음';
-            for (const g of ADMIN_TAB_GROUPS) {
-                const hit = g.items.find(it => it.key === key);
-                if (hit) return (g.group === '상시판매') ? hit.label : `${g.group.replace('판매', '')} ${hit.label}`;
-            }
-            return '분류 없음';
-        }
-
-        function gAdminTabLabel(key) {
-            if (!key) return '지정 없음';
-            for (const g of ADMIN_TAB_GROUPS) {
-                const hit = g.items.find(it => it.key === key);
-                if (hit) return `${g.group} › ${hit.label}`;
-            }
-            return '지정 없음';
-        }
-
-        function closeAdminTabPicker() {
-            const el = document.getElementById('admin-tab-modal');
-            if (el) el.remove();
-            checkScrollLock();
-        }
-
-        function openAdminTabPicker(name, matchKey) {
-            if (!isAdminMode) return;
-            closeAdminTabPicker();
-
-            const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
-            if (!target) { showToast("상품을 찾지 못했습니다."); return; }
-            const cur = String(target.displayTab || "");
-
-            const row = (key, label) => {
-                const on = (cur === key);
-                return `<div onclick="adminSetDisplayTab('${escapeArg(name)}','${escapeArg(matchKey)}','${key}')"` +
-                    ` style="display:flex; align-items:center; gap:9px; padding:11px 12px; margin-bottom:6px; cursor:pointer; border-radius:10px;` +
-                    ` border:1.5px solid ${on ? 'var(--moket-green)' : '#e2e8f0'}; background:${on ? '#f1fbf5' : '#fff'};">` +
-                    `<span style="flex:0 0 auto; width:17px; height:17px; border-radius:50%; border:2px solid ${on ? 'var(--moket-green)' : '#cfd6dc'};` +
-                    ` background:${on ? 'var(--moket-green)' : '#fff'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:900;">${on ? '✓' : ''}</span>` +
-                    `<span style="font-size:14px; font-weight:800; color:var(--item-black);">${label}</span>` +
-                    `</div>`;
-            };
-
-            let body = row('', '지정 없음 (상품명·분류대로)');
-            ADMIN_TAB_GROUPS.forEach(g => {
-                body += `<div style="font-size:11.5px; font-weight:900; color:#8a97a3; letter-spacing:0.03em; margin:14px 0 6px;">${g.group}</div>`;
-                g.items.forEach(it => { body += row(it.key, it.label); });
-            });
-
-            const wrap = document.createElement('div');
-            wrap.id = 'admin-tab-modal';
-            wrap.className = 'modal-overlay';
-            wrap.style.display = 'flex';
-            wrap.style.zIndex = '10050';
-            wrap.onclick = (e) => { if (e.target === wrap) closeAdminTabPicker(); };
-            wrap.innerHTML =
-                `<div class="modal-content" style="width:92%; max-width:420px; max-height:84vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px;">` +
-                `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">` +
-                `<div style="font-size:17px; font-weight:900; color:var(--item-black);">🏷️ 분류탭 바꾸기</div>` +
-                `<span onclick="closeAdminTabPicker()" style="font-size:24px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
-                `</div>` +
-                `<div style="font-size:12.5px; font-weight:700; color:#8a97a3; line-height:1.5; margin-bottom:14px; word-break:keep-all; text-align:left;">${name}</div>` +
-                `<div style="text-align:left;">${body}</div>` +
-                `<button class="btn-common btn-close" onclick="closeAdminTabPicker()" style="margin-top:14px;">닫기</button>` +
-                `</div>`;
-            document.body.appendChild(wrap);
-            checkScrollLock();
-        }
-
-        async function adminSetDisplayTab(name, matchKey, newTab) {
-            if (!isAdminMode) return;
-            const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
-            if (!target) { showToast("상품을 찾지 못했습니다."); return; }
-            if (String(target.displayTab || "") === String(newTab || "")) { closeAdminTabPicker(); return; }
-
-            closeAdminTabPicker();
-            showToast("분류탭을 저장하는 중…");
-
-            try {
-                // 1) 저장할 자리(번호) 확인. 주문관리에서 상품을 지웠으면 번호가 밀렸을 수 있으므로
-                //    그 자리의 상품명이 실제로 같은지 먼저 보고, 다르면 전체에서 다시 찾는다.
-                let idx = target.__pubIdx;
-                let ok = false;
-                if (idx !== undefined && idx !== null) {
-                    const chk = await fetch(`${FIREBASE_DB_URL}published_products/${idx}.json?t=${Date.now()}`);
-                    if (chk.ok) {
-                        const cur = await chk.json();
-                        ok = !!(cur && String(cur.name || "").trim() === String(name).trim());
-                    }
-                }
-                if (!ok) {
-                    const all = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
-                    if (!all.ok) throw new Error("상품 목록을 읽지 못했습니다.");
-                    const list = await all.json() || [];
-                    const keys = Array.isArray(list) ? list.map((v, i) => [i, v]) : Object.entries(list);
-                    const hit = keys.find(([, v]) => v && String(v.name || "").trim() === String(name).trim()
-                        && String((v.matchKey || v.date || "")).trim() === String(matchKey).trim());
-                    if (!hit) throw new Error("서버에서 이 상품을 찾지 못했습니다.");
-                    idx = hit[0];
-                    target.__pubIdx = idx;
-                }
-
-                // 2) displayTab 한 값만 고쳐 쓴다
-                const res = await fetch(`${FIREBASE_DB_URL}published_products/${idx}.json`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ displayTab: newTab || "", updatedAt: Date.now() })
-                });
-                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
-
-                // 3) 다른 기기·손님 화면도 새로 받아가도록 갱신 시각을 올린다
-                await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`, {
-                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
-                }).catch(() => { });
-
-                // 4) 이 화면에도 바로 반영
-                target.displayTab = newTab || "";
-                const cached = productsData.find(p => p === target);
-                if (cached) cached.displayTab = newTab || "";
-                try { localStorage.setItem('moket_products_cache_v3', JSON.stringify(productsData)); } catch (e) { }
-                showToast(`분류탭을 '${gAdminTabLabel(newTab)}'(으)로 바꿨습니다.`);
-                initMainTabs(false);
-                renderList(gCurrentListKey());
-            } catch (e) {
-                console.error("분류탭 저장 실패:", e);
-                showSystemModal("분류탭을 저장하지 못했습니다.<br><br>" + String(e.message || e), 'alert');
-            }
-        }
-
-        async function adminEditStock(name, matchKey, originalStock, currentStock) {
-            if (!isAdminMode) return;
-            
-            const orig = (originalStock === undefined || originalStock === "" || isNaN(originalStock)) ? "" : parseInt(originalStock);
-            const promptVal = prompt(`[${name}] 상품의 현재 재고는 ${currentStock}개 입니다.\n변경할 새 재고 수량을 입력하세요 (숫자만 입력):`, currentStock);
-            if (promptVal === null) return; // 취소
-            
-            const newStock = parseInt(promptVal);
-            if (isNaN(newStock) || newStock < 0) {
-                showSystemModal("올바른 재고 숫자를 입력해 주세요.", 'alert');
-                return;
-            }
-            
-            const baseStock = (orig === "") ? 0 : orig;
-            const adj = newStock - baseStock;
-            
-            const safeName = fSafeKey(name);
-            const safeDate = fSafeKey(matchKey || "");
-            const adjKey = safeDate + "_" + safeName;
-            
-            try {
-                const res = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(adj)
-                });
-                
-                if (!res.ok) throw new Error("Firebase 업데이트 실패");
-                
-                showSystemModal("재고 수량이 성공적으로 변경되었습니다.", 'alert');
-                
-                // 로컬 productsData 업데이트
-                const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
-                if (target) {
-                    target.stock = newStock;
-                    if (target.originalStock === "") {
-                        target.originalStock = 0;
-                    }
-                }
-                
-                // 화면 갱신
-                renderProducts();
-            } catch (e) {
-                console.error(e);
-                showSystemModal("재고 수정 중 오류가 발생했습니다: " + e.toString(), 'alert');
-            }
-        }
-
-        async function adminChangeStock(btn, name, matchKey, originalStock, delta) {
-            if (!isAdminMode) return;
-            const input = btn.parentNode.querySelector('.admin-stock-input');
-            if (!input) return;
-            
-            let currentStock = parseInt(input.value);
-            if (isNaN(currentStock)) {
-                // 무제한일 경우 0부터 시작
-                currentStock = 0;
-            }
-            const newStock = Math.max(0, currentStock + delta);
-            input.value = newStock;
-            
-            await adminPerformStockUpdate(name, matchKey, originalStock, newStock, input);
-        }
-
-        async function adminUpdateStockInput(input) {
-            if (!isAdminMode) return;
-            const name = input.dataset.name;
-            const matchKey = input.dataset.matchkey;
-            const originalStock = input.dataset.originalStock;
-            
-            let newStock;
-            if (input.value.trim() === "") {
-                // 빈 칸일 경우 무제한(원래 재고 복구) 설정
-                newStock = (originalStock === undefined || originalStock === "" || isNaN(originalStock)) ? Infinity : parseInt(originalStock);
-            } else {
-                newStock = parseInt(input.value);
-                if (isNaN(newStock) || newStock < 0) {
-                    showToast("올바른 숫자를 입력해 주세요.");
-                    const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
-                    if (target) {
-                        input.value = (target.stock !== undefined && target.stock !== "" && isFinite(target.stock)) ? target.stock : "";
-                    }
-                    return;
-                }
-            }
-            
-            await adminPerformStockUpdate(name, matchKey, originalStock, newStock, input);
-        }
-
-        async function adminPerformStockUpdate(name, matchKey, originalStock, newStock, inputElement) {
-            const orig = (originalStock === undefined || originalStock === "" || isNaN(originalStock)) ? "" : parseInt(originalStock);
-            const baseStock = (orig === "") ? 0 : orig;
-            
-            // newStock이 Infinity(무제한)일 경우 Firebase 값을 "unlimited"로 저장
-            const adj = (newStock === Infinity) ? "unlimited" : (newStock - baseStock);
-            
-            const safeName = fSafeKey(name);
-            const safeDate = fSafeKey(matchKey || "");
-            const adjKey = safeDate + "_" + safeName;
-            
-            try {
-                if (inputElement) inputElement.disabled = true;
-                
-                const res = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(adj)
-                });
-                
-                if (!res.ok) throw new Error("Firebase 업데이트 실패");
-                
-                // 로컬 productsData 업데이트
-                const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
-                if (target) {
-                    target.stock = (newStock === Infinity) ? "" : newStock;
-                    if (target.originalStock === "") {
-                        target.originalStock = 0;
-                    }
-                }
-                
-                showToast("재고 수량이 성공적으로 변경되었습니다.");
-                
-                // 카드 내 재고 표시 즉시 업데이트
-                const card = inputElement.closest('.product-card');
-                if (card) {
-                    const stockStatusEl = card.querySelector('.stock-status');
-                    if (stockStatusEl) {
-                        if (newStock === Infinity) {
-                            stockStatusEl.innerText = "재고: 무제한 ✏️";
-                            stockStatusEl.style.color = "#2196F3";
-                            inputElement.value = "";
-                        } else {
-                            stockStatusEl.innerText = (newStock === 0 ? "품절" : "잔여") + `: ${newStock}개 ✏️`;
-                            stockStatusEl.style.color = newStock === 0 ? "#ff0000" : "#2196F3";
-                            inputElement.value = newStock;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-                showSystemModal("재고 수정 중 오류가 발생했습니다: " + e.toString(), 'alert');
-                const target = productsData.find(p => p.name === name && p.matchKey === matchKey);
-                if (target && inputElement) {
-                    inputElement.value = (target.stock !== undefined && target.stock !== "" && isFinite(target.stock)) ? target.stock : "";
-                }
-            } finally {
-                if (inputElement) inputElement.disabled = false;
-            }
-        }
+        // [삭제 2026-09-17] 관리자 모드의 상품 분류탭 바꾸기·재고 수정 — 주문관리 상품관리에 같은 기능이 있어 뺐다.
+        //  (로그인 없는 주문서에서 상품 목록을 고치지 못하게 해서, 규칙으로 상품 목록 쓰기를 잠글 수 있게 한다)
 
         // 페이지 로드 시 관리자 모드라면 버튼들 미리 노출
         window.addEventListener('load', () => {
@@ -3373,6 +3116,12 @@
 
                 // 로그인 화면 강제 여부에 따라 초기 모달 제어
                 //  [신규] '로그인 없이 둘러보기'로 들어온 창은 이 탭을 닫을 때까지 다시 막지 않는다.
+                /* [신규] 카카오로는 로그인돼 있는데 파이어베이스 증표가 없는 손님 (이번 판 전에 로그인한 손님)
+                   → 카카오 토큰이 살아 있으면 조용히 받아 두고, 만료됐으면 카카오 로그인을 한 번 다시 하게 한다 */
+                if (localStorage.getItem('kakao_original_name') && typeof gFirebaseKakaoSignIn === 'function' && !(await gFirebaseHasUser())) {
+                    const _fb = await gFirebaseKakaoSignIn(localStorage.getItem('kakao_original_phone') || '');
+                    if (_fb === 'no-kakao' && isLoginEntryEnabled && !gIsGuestView()) localStorage.removeItem('kakao_original_name');
+                }
                 const kakaoInfo = localStorage.getItem('kakao_original_name');
                 if (!kakaoInfo && isLoginEntryEnabled && !gIsGuestView()) {
                     const modal = document.getElementById('profile-modal');
@@ -4459,12 +4208,7 @@
                     const rawHolidays = Array.isArray(data) ? data : data.split(',').map(s => s.trim());
                     // [신규] 지난 날짜는 화면·판정에서 바로 뺀다. 서버 정리는 사장님(관리자 모드)이 열 때만 한다.
                     const newHolidays = gPruneHolidays(rawHolidays);
-                    if (isAdminMode && JSON.stringify(rawHolidays.slice().sort()) !== JSON.stringify(newHolidays)) {
-                        fetch(FIREBASE_DB_URL + "public_holidays.json", {
-                            method: 'PUT', body: JSON.stringify(newHolidays)
-                        }).then(r => { if (r.ok) console.log("지난 임시 휴무일을 목록에서 정리했습니다."); })
-                          .catch(e => console.error("휴무일 정리 실패:", e));
-                    }
+                    // [이동] 지난 날짜를 서버에서 지우는 일은 주문관리 '일반 관리'에서 휴무일을 저장할 때 한다
                     const hasChanged = JSON.stringify(publicHolidays) !== JSON.stringify(newHolidays);
                     publicHolidays = newHolidays;
                     localStorage.setItem('moket_public_holidays', JSON.stringify(publicHolidays));
@@ -5916,6 +5660,11 @@
                                 // [수정] 원본 정보는 별도 키에 영구 보관
                                 localStorage.setItem('kakao_original_name', kakaoName);
                                 if (kakaoPhone) localStorage.setItem('kakao_original_phone', kakaoPhone);
+                                // [신규] 파이어베이스에도 로그인해 둔다 (자기 주문·정보를 읽고 쓰는 증표). 기다려야 아래 불러오기가 증표를 쓴다
+                                if (kakaoPhone && typeof gFirebaseKakaoSignIn === 'function') {
+                                    const _fb = await gFirebaseKakaoSignIn(kakaoPhone);
+                                    if (_fb !== 'ok') console.warn('손님 파이어베이스 로그인:', _fb);
+                                }
                                 if (kakaoRealName) localStorage.setItem('kakao_real_name', kakaoRealName);
 
                                 // [성별 변환]
@@ -5982,9 +5731,10 @@
         function logoutKakao() {
             showSystemModal("로그아웃 하시겠습니까?\n이 기기에 저장된 회원정보가 지워집니다.", 'confirm', function () {
                 let done = false;
-                const finish = () => {
+                const finish = async () => {
                     if (done) return;
                     done = true;
+                    if (typeof gFirebaseSignOut === 'function') await gFirebaseSignOut();
                     try { localStorage.clear(); } catch (e) { }
                     try { sessionStorage.clear(); } catch (e) { }
                     location.reload();
@@ -6004,7 +5754,8 @@
         function unlinkKakao() {
 
             showSystemModal("⚠️ 카카오 서비스 연결을 끊고 앱을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없으며 앱 데이터가 초기화됩니다.", "confirm", function () {
-                const forceClear = () => {
+                const forceClear = async () => {
+                    if (typeof gFirebaseSignOut === 'function') await gFirebaseSignOut();
                     localStorage.clear();
                     sessionStorage.clear();
                     showSystemModal("앱 데이터가 성공적으로 초기화되었습니다.", "alert", () => location.reload());
@@ -7872,62 +7623,7 @@
             return;
         }
 
-        // 매주 노출 상품 자동 날짜 갱신 헬퍼 함수
-        function checkAndRunWeeklyProductsAutoUpdate(data) {
-            if (!data) return false;
-            
-            const now = new Date();
-            let isUpdated = false;
-            
-            const keys = Object.keys(data);
-            keys.forEach(key => {
-                const p = data[key];
-                if (p && (p.showWeekly === true || p.showWeekly === 'true')) {
-                    const s = String(p.date || p.matchKey || "").trim();
-                    const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
-                    if (dm) {
-                        let y, m, d;
-                        if (dm[1]) {
-                            y = parseInt(dm[1]); if (y < 100) y += 2000;
-                            m = parseInt(dm[2]); d = parseInt(dm[3]);
-                        } else {
-                            y = now.getFullYear();
-                            m = parseInt(dm[4]); d = parseInt(dm[5]);
-                        }
-                        
-                        let targetDate = new Date(y, m - 1, d, 15, 0, 0, 0); // 오후 3시 기준
-                        if (!isNaN(targetDate.getTime()) && now >= targetDate) {
-                            while (now >= targetDate) {
-                                targetDate.setDate(targetDate.getDate() + 7);
-                            }
-                            
-                            const newYear = targetDate.getFullYear();
-                            const newMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
-                            const newDay = String(targetDate.getDate()).padStart(2, '0');
-                            const newDateStr = `${newYear}-${newMonth}-${newDay}`;
-                            
-                            p.date = newDateStr;
-                            p.matchKey = newDateStr;
-                            p.updatedAt = Date.now();
-                            isUpdated = true;
-                            
-                            // Firebase 개별 PATCH 호출
-                            fetch(`${FIREBASE_DB_URL}published_products/${key}.json`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    date: newDateStr,
-                                    matchKey: newDateStr,
-                                    updatedAt: Date.now()
-                                })
-                            }).catch(err => console.error("매주 자동 갱신 실패:", err));
-                        }
-                    }
-                }
-            });
-            
-            return isUpdated;
-        }
+        // [삭제 2026-09-17] 매주 노출 상품의 날짜 넘기기는 주문관리에서만 한다 (손님 기기가 상품 목록을 고치지 않게)
 
         // [추가] 자동 새로고침 간격 제한 (1분)
         /* [신규] 화면을 보고 있는 동안 10분마다 상품 데이터가 바뀌었는지 확인한다.
@@ -8052,9 +7748,6 @@
                     publishedProducts = rawData;
                 } else if (pubRes && pubRes.ok) {
                     const pubData = await pubRes.json() || [];
-                    if (pubData) {
-                        checkAndRunWeeklyProductsAutoUpdate(pubData);
-                    }
                     publishedProducts = pubData || [];
                     rawData = JSON.parse(JSON.stringify(publishedProducts));
                     localStorage.setItem('moket_products_cache_v3', JSON.stringify(rawData));
@@ -9604,20 +9297,11 @@
                     `</div>` +
                     // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
                     //  아래 버튼줄에 따로 한 줄을 차지하면 카드가 길어지고 썸네일이 작아 보인다.
-                    // [신규] 관리자 모드에서는 그 줄 왼쪽에 분류탭 버튼을 나란히 붙인다. (손님 화면에는 없다)
-                    //  줄을 새로 만들지 않으므로 카드 길이가 늘지 않는다.
-                    (isAdminMode ? `<div style="display:flex; align-items:stretch; gap:6px; width:100%;">` +
-                        `<button onclick="openAdminTabPicker('${escapeArg(p.name)}','${escapeArg(p.matchKey || '')}')"` +
-                        ` style="flex:1 1 0; min-width:0; height:40px; padding:0 8px; box-sizing:border-box; align-self:flex-end;` +
-                        ` border:1.5px dashed #90caf9; background:#f5fbff; color:#1976d2; border-radius:8px;` +
-                        ` font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">` +
-                        `🏷️ ${gAdminTabShortLabel(p.displayTab)}</button>` : ``) +
-                    `<div class="qty-stepper wide" style="${isAdminMode ? 'flex:1 1 0; min-width:0;' : ''}${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
+                    `<div class="qty-stepper wide" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
                     `<button class="qty-step-btn" onclick="stepQty(this, -1)">-</button>` +
                     `<input class="qty-sel" value="1" readonly>` +
                     `<button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>` +
                     `</div>` +
-                    (isAdminMode ? `</div>` : ``) +
                     `</div></div>` +
                     `<div class="item-controls-bottom-v">` +
                     `<button class="btn-detail" onclick="openDetail('${escapeArg(p.name)}')">상세보기</button>` +
