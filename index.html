@@ -5691,9 +5691,21 @@
                                 gSyncProfileFromServer();   // [변경] 로그인 직후에도 맞춘다
 
                                 loadProfile(); // UI 갱신 (인증됨 표시 등)
-                                if (pulled) showToast('저장해 두셨던 정보를 불러왔습니다.');
 
                                 closeModal('profile-modal');
+
+                                /* [수정] 이미 가입한 손님(이름·연락처가 있거나 서버에서 불러옴)은 가입 화면을 띄우지 않는다.
+                                   파이어베이스 로그인을 붙이면서 옛 손님도 카카오 로그인을 한 번 다시 하게 됐는데,
+                                   그때마다 "회원가입" 화면이 떠서 새로 가입하는 것처럼 보였다. */
+                                if (gJoinDone()) {
+                                    const _pm = document.getElementById('profile-modal');
+                                    if (_pm) _pm.classList.remove('login-forced');
+                                    checkScrollLock();
+                                    showToast(`${kakaoName}님, 다시 로그인되었습니다.`);
+                                    try { initMainTabs(); processAndRender(cachedProducts || productsData); } catch (e) { }
+                                    return;
+                                }
+                                if (pulled) showToast('저장해 두셨던 정보를 불러왔습니다.');
 
                                 showSystemModal(`반갑습니다 ${kakaoName}님!\n회원정보를 입력하고\n[회원가입]을 눌러주세요.`, 'alert', () => {
                                     const modal = document.getElementById('profile-modal');
