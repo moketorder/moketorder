@@ -5093,14 +5093,15 @@
                 if (!res.ok) return 0;
                 const sv = await res.json();
                 /* [신규] 탈퇴한 손님 — 옛 정보는 폰으로 가져오지 않는다.
-                   다시 가입하면 저장하면서 탈퇴 표시가 바로 풀리므로, 표시가 남아 있는데 이 폰에 정보가 있으면
-                   탈퇴 전에 쓰던 다른 폰이다 → 그 정보와 주문내역 저장분을 지우고 새로 가입하게 한다 */
+                   탈퇴하기 전에 로그인해 둔 폰(같은 카카오를 쓰던 다른 폰)이면 로그아웃처럼 모두 지우고
+                   처음 화면으로 보낸다 → 카카오 동의부터 다시 거쳐야 가입할 수 있다.
+                   탈퇴 뒤에 새로 로그인한 폰은 그대로 두고 빈 가입 창을 쓰게 한다. */
                 if (sv && sv.withdrawn) {
-                    if (gJoinDone() && !window.gJustJoined) {
-                        Object.keys(localStorage).forEach(k => {
-                            if (k.startsWith('moket_user_') || k.startsWith('history_cache_')
-                                || k === 'moket_order_history' || k === PROFILE_AT_KEY) localStorage.removeItem(k);
-                        });
+                    const loginAt = Number(localStorage.getItem('moket_login_at')) || 0;
+                    if (loginAt < (Number(sv.withdrawnAt) || 0)) {
+                        if (typeof gFirebaseSignOut === 'function') await gFirebaseSignOut();
+                        try { localStorage.clear(); } catch (e) { }
+                        try { sessionStorage.clear(); } catch (e) { }
                         location.reload();
                     }
                     return 0;
@@ -5506,7 +5507,6 @@
                예전에는 이 기기 안에만 있어서, 가입하거나 주소를 바꿔도 주문이 들어오기 전까지
                가게에서는 알 길이 없었다. 바뀐 값은 customer_logs 에 30일치 남는다.
                주문 줄은 여기서 건드리지 않는다 — 그건 그때 그리로 보냈다는 기록이다. */
-            window.gJustJoined = true;   // [신규] 방금 적은 정보 — 탈퇴 표시가 풀리기 전에 지우지 않게
             gSaveCustomerProfile({
                 name: name.trim(),
                 phone: normP(phone),
@@ -5638,6 +5638,7 @@
                             if (kakaoName) {
                                 // [수정] 원본 정보는 별도 키에 영구 보관
                                 localStorage.setItem('kakao_original_name', kakaoName);
+                                localStorage.setItem('moket_login_at', String(Date.now()));   // [신규] 탈퇴 전에 로그인한 폰인지 가리는 데 쓴다
                                 if (kakaoPhone) localStorage.setItem('kakao_original_phone', kakaoPhone);
                                 // [신규] 파이어베이스에도 로그인해 둔다 (자기 주문·정보를 읽고 쓰는 증표). 기다려야 아래 불러오기가 증표를 쓴다
                                 if (kakaoPhone && typeof gFirebaseKakaoSignIn === 'function') {
@@ -5755,7 +5756,7 @@
             if (t) new MutationObserver(gSyncUnlinkLink).observe(t, { childList: true, characterData: true, subtree: true });
         });
 
-        /* [신규] 탈퇴한 때. 손님 정보·주문 기록은 지우지 않고, 다시 가입하면 이때 전 주문을 가린다 */
+        /* [신규] 탈퇴한 때. 다시 가입하면 이때 전 주문을 가린다 */
         async function gWithdrawnAt(key) {
             try {
                 if (!gIsValidPhone(key)) return 0;
@@ -5794,11 +5795,12 @@
 
             showSystemModal(msg, "confirm", function () {
                 const forceClear = async () => {
-                    // [신규] 탈퇴 표시만 남긴다 (정보·주문은 지우지 않는다)
+                    // [수정] 손님 정보(개인정보)는 지우고 번호 자리에 탈퇴 표시와 탈퇴한 때만 남긴다.
+                    //  주문 기록은 법(전자상거래법)에 따라 남긴다. 탈퇴한 때는 다시 가입했을 때 그 전 주문을 가리는 데 쓴다.
                     if (gIsValidPhone(key)) {
                         try {
                             await fetch(`${FIREBASE_DB_URL}customers/${key}.json`, {
-                                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ withdrawn: true, withdrawnAt: Date.now() })
                             });
                             fetch(`${FIREBASE_DB_URL}customers_updated.json`, {
