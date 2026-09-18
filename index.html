@@ -235,21 +235,6 @@
             transform: translateY(-1px);
         }
 
-        /* [신규] 관리자(사장님) 설정 묶음 — 평소에는 감춰져 있고 관리자 모드에서만 보인다 */
-        #admin-panel {
-            display: none;
-            margin-top: 22px;
-            padding-top: 16px;
-            border-top: 1px dashed #ddd;
-            text-align: left;
-        }
-
-        .admin-panel-title {
-            font-size: 13px;
-            font-weight: 900;
-            color: #455464;
-            margin-bottom: 4px;
-        }
 
         .admin-sec-title {
             font-size: 11.5px;
@@ -1883,7 +1868,8 @@
             </div>
 
             <!-- [복구] 기존 입력 필드 (로그인 모드일 때는 CSS로 숨겨짐) -->
-            <div class="input-group"><strong>주문자명 <span style="color:#e11d48; font-weight:800; font-size:0.85em;">(필수)</span></strong><input id="input-name" type="text" class="modal-input"
+            <div class="input-group"><span id="btn-unlink-kakao" onclick="unlinkKakao()"
+                    style="display:none; float:right; margin-top:2px; font-size:12px; font-weight:600; color:#999; cursor:pointer;">회원탈퇴</span><strong>주문자명 <span style="color:#e11d48; font-weight:800; font-size:0.85em;">(필수)</span></strong><input id="input-name" type="text" class="modal-input"
                     placeholder="닉네임 + 핸드폰번호 뒤 네자리">
                 <div class="input-hint">오픈채팅방 닉네임과 같게 설정 해 주세요.</div>
             </div>
@@ -1937,21 +1923,6 @@
             <button id="btn-kakao-logout" onclick="logoutKakao()"
                 style="display:none; margin-top:25px; background:none; border:none; color:#999; font-size:13px; text-decoration:none; width:100%; cursor:pointer;">카카오
                 로그아웃</button>
-            <!-- [수정] 관리자 기능이 한 줄에 하나씩 길게 늘어서 있어 정신없던 것을,
-                 하는 일끼리 묶고 켜기/끄기는 좌우로 붙여 한눈에 보이게 정리했다.
-                 버튼 id·동작은 그대로라 기존 로직은 손대지 않는다. -->
-            <div id="admin-panel">
-                <div class="admin-panel-title">👨‍💻 사장님 설정</div>
-                <!-- [이동 2026-09-17] 배달·배달비·토요일·임시 휴무일·상품목록 공개·로그인 강제는
-                     주문관리 → 가게 관리 → 일반 관리로 옮겼다. 이 설정들은 이제 가게 로그인을 해야 바꿀 수 있어서
-                     로그인이 없는 주문서에서는 바꿀 수 없다. (읽어서 손님 화면에 반영하는 코드는 그대로 둔다) -->
-                <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px;">
-                    배달·휴무일·상품목록 공개·로그인 설정은<br><b>주문관리 → 가게 관리 → 일반 관리</b>에서 바꿉니다.
-                </div>
-
-                <button id="btn-unlink-kakao" onclick="unlinkKakao()"
-                    style="margin-top:14px; background:none; border:1px solid #e2e8f0; color:#aaa; font-size:11.5px; padding:8px; border-radius:var(--btn-radius); width:100%; cursor:pointer;">카카오 탈퇴하기</button>
-            </div>
         </div>
     </div>
     <div id="save-confirm-modal" class="modal-overlay"
@@ -2932,10 +2903,6 @@
                 if (isAdminMode) {
                     showSystemModal("관리자 기능이 활성화되었습니다.<br>(상품목록이 비공개여도 사장님께는 보입니다)", 'alert');
 
-                    // [수정] 버튼을 하나씩 켜지 않고, 묶어 둔 '사장님 설정' 판만 펼친다
-                    const _panel = document.getElementById('admin-panel');
-                    if (_panel) _panel.style.setProperty('display', 'block', 'important');
-
                     const modal = document.getElementById('profile-modal');
                     if (modal) modal.classList.remove('login-forced');
                 } else {
@@ -2951,13 +2918,6 @@
         // [삭제 2026-09-17] 관리자 모드의 상품 분류탭 바꾸기·재고 수정 — 주문관리 상품관리에 같은 기능이 있어 뺐다.
         //  (로그인 없는 주문서에서 상품 목록을 고치지 못하게 해서, 규칙으로 상품 목록 쓰기를 잠글 수 있게 한다)
 
-        // 페이지 로드 시 관리자 모드라면 버튼들 미리 노출
-        window.addEventListener('load', () => {
-            if (isAdminMode) {
-                const _panel = document.getElementById('admin-panel');
-                if (_panel) _panel.style.setProperty('display', 'block', 'important');
-            }
-        });
 
         // [신규] 배달 기능 실시간 로드 및 제어 로직
         let isDeliveryEnabled = false;
@@ -4804,6 +4764,7 @@
             if (id === 'profile-modal') {
                 document.getElementById('profile-modal-title').innerText = "주문자 변경";
                 document.getElementById('profile-submit-btn').innerText = "변경하기";
+                gSyncUnlinkLink();   // [신규] 회원탈퇴는 가입한 손님의 주문자 변경 창에서만
                 gSetProfileClosable(gJoinDone() || gIsGuestView());   // [신규] 아직 가입 전이면 여기서도 못 닫는다
                 gFillProfileInputs();   // [신규] 저장해 둔 값으로 칸을 맞춘다
                 gSyncProfileFromServer();   // [신규] 서버 값과도 맞춘다 (손님이 적고 있는 칸은 안 건드린다)
@@ -5131,6 +5092,19 @@
                 const res = await fetch(`${FIREBASE_DB_URL}customers/${key}.json?t=${nowTs}`);
                 if (!res.ok) return 0;
                 const sv = await res.json();
+                /* [신규] 탈퇴한 손님 — 옛 정보는 폰으로 가져오지 않는다.
+                   다시 가입하면 저장하면서 탈퇴 표시가 바로 풀리므로, 표시가 남아 있는데 이 폰에 정보가 있으면
+                   탈퇴 전에 쓰던 다른 폰이다 → 그 정보와 주문내역 저장분을 지우고 새로 가입하게 한다 */
+                if (sv && sv.withdrawn) {
+                    if (gJoinDone() && !window.gJustJoined) {
+                        Object.keys(localStorage).forEach(k => {
+                            if (k.startsWith('moket_user_') || k.startsWith('history_cache_')
+                                || k === 'moket_order_history' || k === PROFILE_AT_KEY) localStorage.removeItem(k);
+                        });
+                        location.reload();
+                    }
+                    return 0;
+                }
                 const myKakao = normP(localStorage.getItem('kakao_original_phone') || '');
 
                 if (!sv) {
@@ -5224,6 +5198,7 @@
                 if (!res.ok) return 0;
                 const s = await res.json();
                 if (!s) return 0;
+                if (s.withdrawn) return 0;   // [신규] 탈퇴한 손님 — 옛 정보를 채우지 않고 새로 가입하게 한다
 
                 /* [신규] 남의 정보를 끌어오지 않도록 한 번 더 맞춰 본다.
                    손님 정보의 서랍 이름은 대개 카카오 번호지만, 손님이 적은 번호로 담긴 줄도 섞여 있다.
@@ -5289,6 +5264,7 @@
                    (카카오 번호가 없는 폰이 적은 번호가 오타로 남의 카카오 번호와 같을 때) */
                 if (before && normP(String(before.kakaoPhone || '')) && normP(String(before.kakaoPhone || '')) !== normP(localStorage.getItem('kakao_original_phone') || '')) return;
 
+                const wasOut = !!(before && before.withdrawn);   // [신규] 탈퇴 뒤 다시 가입
                 const now = new Date();
 
                 /* [신규] 적은 번호로 담겨 있던 옛 손님이 카카오로 로그인했다 → 카카오 번호 서랍으로 옮긴다.
@@ -5346,7 +5322,7 @@
                     if (sVal === dVal) return;
                     const sAt = Number(_serverAt[fld]) || 0;
                     const dAt = Number(_devAt[fld]) || 0;
-                    if (before && gServerWins(before, fld, dAt)) {   // [수정] 열 때와 같은 잣대
+                    if (before && !wasOut && gServerWins(before, fld, dAt)) {   // [수정] 열 때와 같은 잣대
                         next[fld] = sVal;                      // 서버 값을 남긴다
                         try { localStorage.setItem(lsKey, sVal); } catch (e) { }
                         _devAt[fld] = sAt;
@@ -5378,7 +5354,8 @@
                    이미 createdAt 이 있으면 아무리 고쳐도 가입이 아니다. */
                 // [수정] 폰에서 올린 줄(fromDevice)은 가입일이 없어도 가입이 아니다
                 const isNew = !before || (!before.createdAt && !before.fromDevice);
-                if (before && !diffs.length && !fillContact) return;
+                if (before && !diffs.length && !fillContact && !wasOut) return;
+                if (wasOut) next.withdrawn = null;   // 탈퇴한 때(withdrawnAt)는 남긴다 — 그 전 주문을 가리는 데 쓴다
                 const fromDevice = !before && !!(info && info._fromDevice);
                 // 가입한 때는 처음 한 번만 적고 다시는 안 건드린다 (PATCH 라 빠져 있어도 그대로 남는다)
                 if (fromDevice) next.fromDevice = now.getTime();
@@ -5413,6 +5390,7 @@
                 const rows = (!before)
                     ? [{ what: fromDevice ? '폰에서 올림' : '가입', from: '', to: next.name || key }]
                     : diffs.slice();
+                if (wasOut) rows.unshift({ what: '재가입', from: '', to: next.name || key });
                 if (movedFrom) rows.unshift({ what: '카카오 번호로 옮김', from: movedFrom, to: key });
                 if (!rows.length) return;
                 const body = {};
@@ -5528,6 +5506,7 @@
                예전에는 이 기기 안에만 있어서, 가입하거나 주소를 바꿔도 주문이 들어오기 전까지
                가게에서는 알 길이 없었다. 바뀐 값은 customer_logs 에 30일치 남는다.
                주문 줄은 여기서 건드리지 않는다 — 그건 그때 그리로 보냈다는 기록이다. */
+            window.gJustJoined = true;   // [신규] 방금 적은 정보 — 탈퇴 표시가 풀리기 전에 지우지 않게
             gSaveCustomerProfile({
                 name: name.trim(),
                 phone: normP(phone),
@@ -5763,14 +5742,74 @@
             });
         }
 
-        function unlinkKakao() {
+        // [신규] 머리띠 오른쪽 위 '회원탈퇴' — 제목이 '주문자 변경'이고 가입을 마친 손님일 때만 보인다
+        function gSyncUnlinkLink() {
+            const a = document.getElementById('btn-unlink-kakao');
+            const t = document.getElementById('profile-modal-title');
+            if (!a || !t) return;
+            const ok = t.innerText.trim() === '주문자 변경' && gJoinDone() && !gIsGuestView();
+            a.style.display = ok ? 'block' : 'none';
+        }
+        window.addEventListener('load', () => {
+            const t = document.getElementById('profile-modal-title');
+            if (t) new MutationObserver(gSyncUnlinkLink).observe(t, { childList: true, characterData: true, subtree: true });
+        });
 
-            showSystemModal("⚠️ 카카오 서비스 연결을 끊고 앱을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없으며 앱 데이터가 초기화됩니다.", "confirm", function () {
+        /* [신규] 탈퇴한 때. 손님 정보·주문 기록은 지우지 않고, 다시 가입하면 이때 전 주문을 가린다 */
+        async function gWithdrawnAt(key) {
+            try {
+                if (!gIsValidPhone(key)) return 0;
+                const r = await fetch(`${FIREBASE_DB_URL}customers/${key}/withdrawnAt.json?t=${Date.now()}`);
+                return r.ok ? (Number(await r.json()) || 0) : 0;
+            } catch (e) { return 0; }
+        }
+        function gDropWithdrawn(data, at) {
+            if (!at || !data || typeof data !== 'object') return data;
+            const out = {};
+            Object.entries(data).forEach(([k, v]) => {
+                const t = +parseKRDate(v && v.timestamp);
+                if (!t || t >= at) out[k] = v;
+            });
+            return Object.keys(out).length ? out : null;
+        }
+
+        async function unlinkKakao() {
+            // [신규] 받지 않은 주문이 있으면 알려 주고 묻는다
+            const key = gKeyPhone();
+            let pending = 0;
+            try {
+                if (gIsValidPhone(key)) {
+                    const r = await fetch(`${FIREBASE_DB_URL}orders/${key}.json?t=${Date.now()}`);
+                    const d = gDropWithdrawn(r.ok ? await r.json() : null, await gWithdrawnAt(key));
+                    pending = Object.values(d || {}).filter(o => {
+                        const nm = String(o.item || '');
+                        return nm.trim() !== '배달비' && !nm.includes('[배달합산]')
+                            && !isOrderCancelled(o) && !isOrderReceived(o) && !isOrderDelivered(o);
+                    }).length;
+                }
+            } catch (e) { }
+            const msg = pending
+                ? `받지 않은 주문이 ${pending}건 있어요.<br>그래도 탈퇴하시겠어요?`
+                : '탈퇴하시겠어요?';
+
+            showSystemModal(msg, "confirm", function () {
                 const forceClear = async () => {
+                    // [신규] 탈퇴 표시만 남긴다 (정보·주문은 지우지 않는다)
+                    if (gIsValidPhone(key)) {
+                        try {
+                            await fetch(`${FIREBASE_DB_URL}customers/${key}.json`, {
+                                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ withdrawn: true, withdrawnAt: Date.now() })
+                            });
+                            fetch(`${FIREBASE_DB_URL}customers_updated.json`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
+                            }).catch(() => { });
+                        } catch (e) { }
+                    }
                     if (typeof gFirebaseSignOut === 'function') await gFirebaseSignOut();
                     localStorage.clear();
                     sessionStorage.clear();
-                    showSystemModal("앱 데이터가 성공적으로 초기화되었습니다.", "alert", () => location.reload());
+                    showSystemModal("탈퇴되었습니다.", "alert", () => location.reload());
                 };
 
                 if (typeof Kakao === 'undefined' || !Kakao.isInitialized() || !Kakao.Auth.getAccessToken()) {
@@ -5948,7 +5987,7 @@
                     return;
                 }
 
-                const fbData = await response.json();
+                const fbData = gDropWithdrawn(await response.json(), await gWithdrawnAt(cleanPhone));
                 console.log("[미픽업 확인] 파이어베이스 수신 데이터:", fbData);
 
                 if (!fbData || typeof fbData !== 'object') {
@@ -6140,7 +6179,7 @@
                 // [핵심] Firebase에서 직접 데이터 가져오기 (0초 로딩)
                 const res = await fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}.json`);
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = gDropWithdrawn(await res.json(), await gWithdrawnAt(cleanPhone));
                     if (data) {
                         // 객체 형태를 배열로 변환(실제 Firebase 키 __fbKey 보존)하고 최신순 정렬
                         // [버그수정] 키를 보존해야 취소/수정 시 재계산 키 불일치(쉼표·따옴표 등)로 인한 유령 노드 문제를 막음
