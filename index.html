@@ -6487,7 +6487,7 @@
 
                     let statusText = '', statusColor = '';
                     if (isProcessing) { statusText = '취소중...'; statusColor = '#666'; }
-                    else if (isCombined || isCancelled) { statusText = '취소완료'; statusColor = '#999'; }
+                    else if (isCombined || isCancelled) { statusText = (isCancelled && order.noShow) ? '강제취소' : '취소완료'; statusColor = (isCancelled && order.noShow) ? '#d32f2f' : '#999'; }
                     else if (isDelivered) { statusText = '배달완료'; statusColor = '#4CAF50'; }
                     else if (isReceived) { statusText = '픽업완료'; statusColor = '#4CAF50'; }
                     else if (isStocked) { statusText = '입고완료'; statusColor = 'var(--nego-orange)'; }
@@ -6749,6 +6749,7 @@
                 // [신규] 카드 머리에 취소 상태를 표시하기 위한 집계.
                 //  예전에는 펼쳐서 항목을 봐야 취소된 줄 알 수 있었다. (사장님이 취소한 건도 마찬가지)
                 let canceledCount = 0;
+                let noShowCount = 0;   // [신규] 가게가 노쇼로 정한 것 — 손님에게는 '강제취소'로 보인다
                 let totalCount = 0;
 
                 Object.values(group.pickupGroups).forEach(items => {
@@ -6756,7 +6757,7 @@
                         const isCombined = (order.item && order.item.includes('[배달합산]'));
                         const isCancelled = isOrderCancelled(order);
                         totalCount++;
-                        if (isCancelled) canceledCount++;
+                        if (isCancelled) { canceledCount++; if (order.noShow) noShowCount++; }
                         // 취소한 건은 빼고, 배달비는 함께 센다 (금액과 같은 기준)
                         if (!isCombined && !isCancelled) originalCount++;
                         const isProcessing = order.isProcessing === true;
@@ -6836,12 +6837,12 @@
                                          마지막에 눌러 볼 것을 두는 순서다. -->
                                     ${someCanceled ? `
                                         <span style="padding: 4px 8px; background:#fff5f5; color:#d32f2f; border:1px solid #ffd8d8; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                            ${canceledCount}건 취소
+                                            ${canceledCount}건 ${noShowCount === canceledCount ? '강제취소' : '취소'}
                                         </span>
                                     ` : ''}
                                     ${allCanceled ? `
-                                        <span style="padding: 4px 8px; background:#eef1f4; color:#64748b; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                            취소완료
+                                        <span style="padding: 4px 8px; ${noShowCount === canceledCount ? 'background:#fff5f5; color:#d32f2f; border:1px solid #ffd8d8;' : 'background:#eef1f4; color:#64748b; border:1px solid #e2e8f0;'} border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            ${noShowCount === canceledCount ? '강제취소' : '취소완료'}
                                         </span>
                                     ` : ''}
                                     <!-- 다 끝난 주문은 '취소완료'와 같은 모양으로 알린다.
@@ -6931,7 +6932,7 @@
                         let statusText = '';
                         let statusColor = '';
                         if (isProcessing) { statusText = '취소중...'; statusColor = '#666'; }
-                        else if (isCombined || isCancelled) { statusText = '취소완료'; statusColor = '#999'; }
+                        else if (isCombined || isCancelled) { statusText = (isCancelled && order.noShow) ? '강제취소' : '취소완료'; statusColor = (isCancelled && order.noShow) ? '#d32f2f' : '#999'; }
                         else if (isDelivered) { statusText = '배달완료'; statusColor = '#4CAF50'; }
                         else if (isReceived) { statusText = '픽업완료'; statusColor = '#4CAF50'; }
                         else if (isStocked) { statusText = '입고완료'; statusColor = 'var(--nego-orange)'; }
