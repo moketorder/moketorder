@@ -2462,7 +2462,7 @@
             const hour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+            const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
  
             if (type === 'today' && !isAdminMode) { // [수정] 관리자모드는 시간·휴일 상관없이 당일구매 탭 진입 허용
                 // 1. 주말 및 공휴일 당일구매 차단
@@ -2487,7 +2487,7 @@
 
                 // 2. 평일 15시 이후 당일판매 마감 차단 (오픈은 자정 0시)
                 if (hour >= 15) {
-                    const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
+                    const daysStr = isSundayAsWeekday ? "월요일 - 일요일" : (isSaturdayAsWeekday ? "월요일 - 토요일" : "월요일 - 금요일");
                     showSystemModal(
                         `<div style="line-height:1.75; word-break:keep-all;">` +
                         `<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일판매 주문 가능시간]</span>` +
@@ -2559,7 +2559,7 @@
             const hour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+            const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
             const isAfterCutoffOrHoliday = isHoliday || (hour >= 15);
             const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour < 15);
@@ -2795,7 +2795,7 @@
             let html = "";
             let kind = "";   // 안내 종류 (today / onsite / reserve / sada / costco)
 
-            const daysStr = (typeof isSaturdayAsWeekday !== 'undefined' && isSaturdayAsWeekday) ? '월~토' : '월~금';
+            const daysStr = (typeof isSundayAsWeekday !== "undefined" && isSundayAsWeekday) ? "월~일" : ((typeof isSaturdayAsWeekday !== "undefined" && isSaturdayAsWeekday) ? "월~토" : "월~금");
 
             if (currentDeliveryType === 'onsite') {
                 kind = 'onsite';
@@ -2836,7 +2836,7 @@
                     `오늘 받을 수 있는 상품들이에요`,
                     `<b style="color:#e65100;">오후 3시</b>까지 주문하면 <b style="color:#e65100;">오후 6시</b> 전에 받을 수 있어요`,
                     `<b style="color:#e65100;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
-                    `일요일·휴무일은 쉬어요`
+                    `${isSundayAsWeekday ? "휴무일은 쉬어요" : "일요일·휴무일은 쉬어요"}`
                 ]);
             } else if (currentDeliveryType === 'reserve') {
                 kind = 'reserve';
@@ -3220,6 +3220,27 @@
         // [신규] 토요일 평일 가동 여부 제어 로직 (첫 로드 시 후다닥 점프 현상 방지를 위해 localStorage 동기 캐시 우선 로드)
         let isSaturdayAsWeekday = localStorage.getItem('moket_saturday_as_weekday') === 'true';
 
+        // [신규] 일요일 영업 여부 (가게 관리 → 일반 관리에서 바꾼다). 적혀 있지 않으면 예전처럼 휴무다.
+        let isSundayAsWeekday = localStorage.getItem('moket_sunday_as_weekday') === 'true';
+
+        async function fetchSundayWeekdayStatus() {
+            try {
+                const res = await fetch(FIREBASE_DB_URL + "sunday_as_weekday.json?t=" + Date.now());
+                const status = await res.json();
+                const next = (status === true);
+                const hasChanged = (isSundayAsWeekday !== next);
+                isSundayAsWeekday = next;
+                localStorage.setItem('moket_sunday_as_weekday', next);
+                if (hasChanged) {
+                    initMainTabs();
+                    processAndRender(cachedProducts || productsData);
+                }
+            } catch (e) {
+                console.error("일요일 영업 설정 로드 실패:", e);
+            }
+        }
+        gStartStatusPolling(fetchSundayWeekdayStatus);
+
         async function fetchSaturdayWeekdayStatus() {
             try {
                 const res = await fetch(FIREBASE_DB_URL + "saturday_as_weekday.json?t=" + Date.now());
@@ -3323,7 +3344,7 @@
             const currentHour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+            const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
 
             // [사다드림] 상품 배달 가능하도록 배달 불가 체크 로직 삭제
 
@@ -3368,7 +3389,7 @@
             while (true) {
                 const chkDay = targetDateObj.getDay();
                 const dStr = `${targetDateObj.getFullYear()}-${String(targetDateObj.getMonth() + 1).padStart(2, '0')}-${String(targetDateObj.getDate()).padStart(2, '0')}`;
-                let isOff = (chkDay === 0 || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
+                let isOff = ((chkDay === 0 && !isSundayAsWeekday) || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
                 if (isOff) targetDateObj.setDate(targetDateObj.getDate() + 1);
                 else break;
             }
@@ -3846,7 +3867,7 @@
                 while (true) {
                     const chkDay = targetDateObj.getDay();
                     const dStr = `${targetDateObj.getFullYear()}-${String(targetDateObj.getMonth() + 1).padStart(2, '0')}-${String(targetDateObj.getDate()).padStart(2, '0')}`;
-                    let isOff = (chkDay === 0 || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
+                    let isOff = ((chkDay === 0 && !isSundayAsWeekday) || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
                     if (isOff) targetDateObj.setDate(targetDateObj.getDate() + 1);
                     else break;
                 }
@@ -3923,7 +3944,7 @@
             const currentHour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+            const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
             let hasCostco = false;
             let hasFV = false;
@@ -4249,7 +4270,7 @@
                 const isOff = holidayDraft.includes(key);
                 const isToday = (key === todayKey);
                 // [신규] 정기 휴무(일요일 · 토요일 평일작동 꺼짐)도 함께 칠해 그 달에 안 여는 날을 다 보이게 한다
-                const isRegularOff = (dow === 0) || (dow === 6 && !isSaturdayAsWeekday);
+                const isRegularOff = (dow === 0 && !isSundayAsWeekday) || (dow === 6 && !isSaturdayAsWeekday);
 
                 const baseColor = dow === 0 ? '#ff6b6b' : (dow === 6 ? '#5b8def' : 'var(--item-black)');
                 let bg = '#fff', fg = baseColor, bd = '1px solid #eef1f4';
@@ -4268,9 +4289,13 @@
             // 정기 휴무가 어떤 요일인지 밝혀둔다 (토요일은 '토요일 평일 작동' 설정에 따라 달라진다)
             const note = document.getElementById('holiday-regular-note');
             if (note) {
-                note.innerText = isSaturdayAsWeekday
-                    ? '정기 휴무는 일요일입니다. (토요일은 평일로 작동 중)'
-                    : '정기 휴무는 일요일과 토요일입니다.';
+                // [수정] 일요일도 영업으로 켤 수 있어 정기 휴무 요일을 그때그때 만든다
+                const offDays = [];
+                if (!isSundayAsWeekday) offDays.push("일요일");
+                if (!isSaturdayAsWeekday) offDays.push("토요일");
+                note.innerText = offDays.length
+                    ? `정기 휴무는 입니다.`
+                    : "정기 휴무 요일이 없습니다. (임시 휴무일만 쉽니다)";
             }
 
             // 고른 날짜 목록 (누르면 바로 뺄 수 있게)
@@ -4547,7 +4572,7 @@
         //  금액·요일은 실제 설정값(deliveryFee·토요일 영업)을 읽어 쓰므로 설정을 바꾸면 안내도 따라 바뀐다.
         function gCombinedDeliveryGuideBody() {
             const fee = (typeof deliveryFee !== 'undefined' ? deliveryFee : 3000);
-            const daysStr = (typeof isSaturdayAsWeekday !== 'undefined' && isSaturdayAsWeekday) ? '월~토' : '월~금';
+            const daysStr = (typeof isSundayAsWeekday !== "undefined" && isSundayAsWeekday) ? "월~일" : ((typeof isSaturdayAsWeekday !== "undefined" && isSaturdayAsWeekday) ? "월~토" : "월~금");
             const O = (t) => `<b style="color:var(--nego-orange);">${t}</b>`;   // 금액·핵심 결과(주황)
             const K = (t) => `<b style="color:var(--item-black);">${t}</b>`;     // 조건·이름(검정)
 
@@ -4588,7 +4613,7 @@
                 ]) +
 
                 card('🏪', '당일판매 · 예약판매', C_TAB[0], C_TAB[1], [
-                    `${K('당일판매')} — ${daysStr} ${O('오후 3시')}까지 주문하시면 그날 받으실 수 있어요 (일요일·휴무일은 쉬어요)`,
+                    `${K('당일판매')} — ${daysStr} ${O('오후 3시')}까지 주문하시면 그날 받으실 수 있어요 ${isSundayAsWeekday ? "(휴무일은 쉬어요)" : "(일요일·휴무일은 쉬어요)"}`,
                     `${K('예약판매')} — 정해진 날짜에 들어오는 상품이라 그날 받으실 수 있어요`,
                     `${K('상시판매')} — 늘 파는 상품이라 어느 쪽에 담으셔도 함께 나가요`
                 ]) +
@@ -8234,7 +8259,7 @@
                                 const now = new Date();
                                 const currentDay = now.getDay();
                                 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                                const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+                                const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
                                 if (isHoliday) {
                                     return false;
                                 }
@@ -8340,7 +8365,7 @@
                 const hourForCostco = nowForCostco.getHours();
                 const dayForCostco = nowForCostco.getDay();
                 const dStrForCostco = `${nowForCostco.getFullYear()}-${String(nowForCostco.getMonth() + 1).padStart(2, '0')}-${String(nowForCostco.getDate()).padStart(2, '0')}`;
-                const isHolidayForCostco = (dayForCostco === 0 || (dayForCostco === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStrForCostco));
+                const isHolidayForCostco = ((dayForCostco === 0 && !isSundayAsWeekday) || (dayForCostco === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStrForCostco));
                 const isAfterCutoffOrHolidayForCostco = isHolidayForCostco || (hourForCostco >= 15);
 
                 if (costcoFilters.length === 0 || isAfterCutoffOrHolidayForCostco) {
@@ -8819,7 +8844,7 @@
                                     const now = new Date();
                                     const currentDay = now.getDay();
                                     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                                    const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+                                    const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
                                     if (isHoliday) {
                                         return false;
                                     }
@@ -11393,7 +11418,7 @@
             const currentHour = now.getHours();
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+            const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
             const submitBtn = document.getElementById('btn-submit-order');
 
@@ -11435,7 +11460,7 @@
                     return;
                 }
                 if (currentHour >= 15) {
-                    const daysStr = isSaturdayAsWeekday ? '월요일 - 토요일' : '월요일 - 금요일';
+                    const daysStr = isSundayAsWeekday ? "월요일 - 일요일" : (isSaturdayAsWeekday ? "월요일 - 토요일" : "월요일 - 금요일");
                     showSystemModal(
                         `<div style="line-height:1.75; word-break:keep-all;">` +
                         `<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일판매 주문 가능시간]</span>` +
@@ -11510,7 +11535,7 @@
 
                 // [추가] 주말 및 공휴일 안내 모달 (USER 요청: 일반 상품이 포함된 경우에만 주말 안내 표시)
                 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+                const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
 
                 let hasAnyRegular = false;
                 for (const name in cart) {
@@ -11552,7 +11577,7 @@
                     return;
                 }
 
-                const isWeekendAfterCutoff = (currentDay === 6 && currentHour >= 15) || currentDay === 0;
+                const isWeekendAfterCutoff = (currentDay === 6 && currentHour >= 15) || (currentDay === 0 && !isSundayAsWeekday);
 
                 const allItems = [];
 
@@ -11607,7 +11632,7 @@
                 const tomorrowStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
                 const currentDayNum = now.getDay();
-                const isTodayOff = (currentDayNum === 0) || 
+                const isTodayOff = (currentDayNum === 0 && !isSundayAsWeekday) ||
                                    (currentDayNum === 6 && !isSaturdayAsWeekday) || 
                                    publicHolidays.includes(todayStr);
 
@@ -11708,7 +11733,7 @@
                                 const dStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
 
                                 let isOff = false;
-                                if (checkDay === 0) isOff = true; // 일요일 무조건 휴무
+                                if (checkDay === 0 && !isSundayAsWeekday) isOff = true;   // 일요일 (영업으로 켜 두면 평일처럼 본다)
                                 else if (checkDay === 6 && !isSaturdayAsWeekday) isOff = true; // 토요일 휴무 조건
                                 else if (publicHolidays.includes(dStr)) isOff = true; // 공휴일 휴무
 
@@ -11949,7 +11974,7 @@
                         const chkDay = targetDateObj.getDay();
                         const dStr = `${targetDateObj.getFullYear()}-${String(targetDateObj.getMonth() + 1).padStart(2, '0')}-${String(targetDateObj.getDate()).padStart(2, '0')}`;
                         let isOff = false;
-                        if (chkDay === 0) isOff = true;
+                        if (chkDay === 0 && !isSundayAsWeekday) isOff = true;
                         else if (chkDay === 6 && !isSaturdayAsWeekday) isOff = true; // 배달은 토요일 휴무
                         else if (publicHolidays.includes(dStr)) isOff = true;
 
@@ -12404,7 +12429,7 @@
                     while (true) {
                         const chkDay = d.getDay();
                         const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                        const isOff = (chkDay === 0 || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
+                        const isOff = ((chkDay === 0 && !isSundayAsWeekday) || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
                         if (isOff) {
                             d.setDate(d.getDate() + 1);
                         } else {
