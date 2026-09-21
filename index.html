@@ -2486,13 +2486,13 @@
                 }
 
                 // 2. 평일 15시 이후 당일판매 마감 차단 (오픈은 자정 0시)
-                if (hour >= 15) {
+                if (gTodayClosedNow(now)) {
                     const daysStr = isSundayAsWeekday ? "월요일 - 일요일" : (isSaturdayAsWeekday ? "월요일 - 토요일" : "월요일 - 금요일");
                     showSystemModal(
                         `<div style="line-height:1.75; word-break:keep-all;">` +
                         `<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일판매 주문 가능시간]</span>` +
                         `<b style="color:var(--item-black);">${daysStr}</b><br>` +
-                        `<b style="color:var(--nego-orange); font-size:1.05em;">00:00 - 15:00</b>` +
+                        (gTodayManual(new Date()) === 'closed' ? `<b style="color:var(--nego-orange); font-size:1.05em;">지금은 당일판매를 쉬고 있어요</b>` : `<b style="color:var(--nego-orange); font-size:1.05em;">${gTodayOpenLabel()} - ${gTodayCloseLabel()}</b>`) +
                         `</div>`, 'alert');
                     restoreTabActiveState();
                     return;
@@ -2561,8 +2561,8 @@
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const isHoliday = ((currentDay === 0 && !isSundayAsWeekday) || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
-            const isAfterCutoffOrHoliday = isHoliday || (hour >= 15);
-            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour < 15);
+            const isAfterCutoffOrHoliday = isHoliday || gTodayClosedNow(now);
+            const isFruitVegFirst = !isAfterCutoffOrHoliday;
 
             // 1. 첫 페이지 로드 시에만 기본 탭 설정
             if (isInitialPageLoad) {
@@ -2572,7 +2572,7 @@
                     currentDeliveryType = _saved.deliveryType;
                     if (_saved.mainTab) currentMainTab = _saved.mainTab;
                     if (_saved.listKey) window.lastRenderedTargetKey = _saved.listKey;
-                } else if (hour >= 15 || isHoliday) {
+                } else if (gTodayClosedNow(now) || isHoliday) {
                     currentDeliveryType = 'reserve';
                     currentMainTab = 'reserve'; // 15시 이후, 휴무일에는 예약배송으로 유도
                 } else {
@@ -2730,7 +2730,7 @@
                     if ((status === "비공개" || mKey === "비공개") && !isAdminMode) return false;
                     return mKey.includes("코스트코");
                 });
-                const isAfterCutoffOrHolidayForCostco = isHoliday || (hour >= 15);
+                const isAfterCutoffOrHolidayForCostco = isHoliday || gTodayAfterClose(now);
                 const showCostco = hasCostcoItems && !isAfterCutoffOrHolidayForCostco;
 
                 // [수정] 냉동·냉장·상온은 최상단 '상시판매' 탭으로 옮겨서 예약구매에서는 제외
@@ -2834,7 +2834,7 @@
                 // [수정] 문구를 짧게 다듬었다. 강조하던 '오후 3시'·'매일 새벽시장'은 그대로 색을 유지한다.
                 html = gTypeNoticeCard('🚚', '당일판매', '#e65100', '#fff3e0', [
                     `오늘 받을 수 있는 상품들이에요`,
-                    `<b style="color:#e65100;">오후 3시</b>까지 주문하면 <b style="color:#e65100;">오후 6시</b> 전에 받을 수 있어요`,
+                    `<b style="color:#e65100;">${gTodayCloseWords()}</b>까지 주문하면 <b style="color:#e65100;">오후 6시</b> 전에 받을 수 있어요`,
                     `<b style="color:#e65100;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
                     `${isSundayAsWeekday ? "휴무일은 쉬어요" : "일요일·휴무일은 쉬어요"}`
                 ]);
@@ -3220,6 +3220,57 @@
         // [신규] 토요일 평일 가동 여부 제어 로직 (첫 로드 시 후다닥 점프 현상 방지를 위해 localStorage 동기 캐시 우선 로드)
         let isSaturdayAsWeekday = localStorage.getItem('moket_saturday_as_weekday') === 'true';
 
+        /* [신규] 당일판매 여는·마감 시각과 수동 열기/닫기 (가게 관리 → 일반 관리에서 바꾼다).
+             · auto  : true 면 여는 시각~마감 시각에만 열린다 (휴무일은 따로 쉰다)
+             · manual: 'open' | 'closed' — 사장님이 누른 '지금 열기/닫기'.
+                        자동이 켜져 있으면 누른 그날만, 자동이 꺼져 있으면 바꿀 때까지 간다.
+           적혀 있지 않으면 예전처럼 00:00 ~ 15:00 자동이다. */
+        let gTodaySale = (() => { try { return JSON.parse(localStorage.getItem('moket_today_sale') || 'null'); } catch (e) { return null; } })()
+            || { auto: true, open: '00:00', close: '15:00' };
+        function gHMOf(s, def) { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); return m ? (+m[1]) * 60 + (+m[2]) : def; }
+        function gYmdOf(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        function gTodayManual(now) {
+            const s = gTodaySale || {};
+            if (s.manual !== 'open' && s.manual !== 'closed') return null;
+            if (s.auto !== false && s.manualDate !== gYmdOf(now)) return null;   // 자동이면 누른 그날만
+            return s.manual;
+        }
+        // 마감이 지났나 (지났으면 당일 주문은 다음 영업일로 넘어간다)
+        function gTodayAfterClose(now) {
+            now = now || new Date();
+            const m = gTodayManual(now);
+            if (m) return m === 'closed';
+            if ((gTodaySale || {}).auto === false) return false;
+            return (now.getHours() * 60 + now.getMinutes()) >= gHMOf(gTodaySale.close, 900);
+        }
+        // 아직 안 열렸나
+        function gTodayBeforeOpen(now) {
+            now = now || new Date();
+            if (gTodayManual(now)) return false;
+            if ((gTodaySale || {}).auto === false) return false;
+            return (now.getHours() * 60 + now.getMinutes()) < gHMOf(gTodaySale.open, 0);
+        }
+        function gTodayClosedNow(now) { return gTodayAfterClose(now) || gTodayBeforeOpen(now); }
+        function gTodayOpenLabel() { return String((gTodaySale || {}).open || '00:00'); }
+        function gTodayCloseLabel() { return String((gTodaySale || {}).close || '15:00'); }
+        // '오후 3시' 같은 말로 (분이 있으면 '오후 3시 30분')
+        function gTodayCloseWords() {
+            const t = gHMOf(gTodayCloseLabel(), 900), h = Math.floor(t / 60), mi = t % 60;
+            return `${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}시${mi ? ` ${mi}분` : ''}`;
+        }
+        async function fetchTodaySaleSetting() {
+            try {
+                const res = await fetch(FIREBASE_DB_URL + "today_sale.json?t=" + Date.now());
+                const v = await res.json();
+                const next = (v && typeof v === 'object') ? v : { auto: true, open: '00:00', close: '15:00' };
+                const changed = JSON.stringify(next) !== JSON.stringify(gTodaySale);
+                gTodaySale = next;
+                localStorage.setItem('moket_today_sale', JSON.stringify(next));
+                if (changed) { initMainTabs(); processAndRender(cachedProducts || productsData); }
+            } catch (e) { console.error("당일판매 시간 설정 로드 실패:", e); }
+        }
+        gStartStatusPolling(fetchTodaySaleSetting);
+
         // [신규] 일요일 영업 여부 (가게 관리 → 일반 관리에서 바꾼다). 적혀 있지 않으면 예전처럼 휴무다.
         let isSundayAsWeekday = localStorage.getItem('moket_sunday_as_weekday') === 'true';
 
@@ -3384,7 +3435,7 @@
 
             // [신규] 장바구니 상품의 배달 기준일 계산하여 해당 일자에 기존 주문이 있는지 확인
             let targetDateObj = new Date(now);
-            if (currentDeliveryType === 'reserve' || currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
+            if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);
 
             while (true) {
                 const chkDay = targetDateObj.getDay();
@@ -3829,7 +3880,7 @@
             if (currentDeliveryType === 'reserve') {
                 showModal = true;
                 msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span><span style="display:block; white-space:nowrap; font-size:0.9em;">구매상품중 가장늦은 입고일에 합배송 됩니다.</span>${maxDateStr ? `<span style="display:block; white-space:nowrap; margin-top:2px;">[배달예정일 : ${maxDateStr}]</span>` : ''}`;
-            } else if (currentHour >= 15) {
+            } else if (gTodayAfterClose(new Date())) {
                 if (hasAnyRegular) {
                     showModal = true;
                     msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>오후 3시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.`;
@@ -3862,7 +3913,7 @@
             function checkCombinedDelivery(noticeHtml) {
                 // [신규] 장바구니 상품의 배달 기준일 계산
                 let targetDateObj = new Date(now);
-                if (currentDeliveryType === 'reserve' || currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
+                if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);
 
                 while (true) {
                     const chkDay = targetDateObj.getDay();
@@ -4613,7 +4664,7 @@
                 ]) +
 
                 card('🏪', '당일판매 · 예약판매', C_TAB[0], C_TAB[1], [
-                    `${K('당일판매')} — ${daysStr} ${O('오후 3시')}까지 주문하시면 그날 받으실 수 있어요 ${isSundayAsWeekday ? "(휴무일은 쉬어요)" : "(일요일·휴무일은 쉬어요)"}`,
+                    `${K('당일판매')} — ${daysStr} ${O(gTodayCloseWords())}까지 주문하시면 그날 받으실 수 있어요 ${isSundayAsWeekday ? "(휴무일은 쉬어요)" : "(일요일·휴무일은 쉬어요)"}`,
                     `${K('예약판매')} — 정해진 날짜에 들어오는 상품이라 그날 받으실 수 있어요`,
                     `${K('상시판매')} — 늘 파는 상품이라 어느 쪽에 담으셔도 함께 나가요`
                 ]) +
@@ -8266,9 +8317,9 @@
 
                                 // 과일/야채 상품은 해당 날짜 자정(0시)부터 노출, 오후 3시(15시) 이후에는 미노출 처리
                                 const startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
-                                const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
+                                const cutoffDate = new Date(y, m - 1, d + 1, 0, 0, 0, 0);   // [수정] 마감 시각은 설정(gTodayAfterClose)으로 본다
                                 const nowTime = new Date();
-                                if (nowTime < startDate || nowTime >= cutoffDate) {
+                                if (nowTime < startDate || nowTime >= cutoffDate || gTodayAfterClose(nowTime)) {
                                     return false; // 15시 이후이므로 제외
                                 }
                             } else {
@@ -8366,7 +8417,7 @@
                 const dayForCostco = nowForCostco.getDay();
                 const dStrForCostco = `${nowForCostco.getFullYear()}-${String(nowForCostco.getMonth() + 1).padStart(2, '0')}-${String(nowForCostco.getDate()).padStart(2, '0')}`;
                 const isHolidayForCostco = ((dayForCostco === 0 && !isSundayAsWeekday) || (dayForCostco === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStrForCostco));
-                const isAfterCutoffOrHolidayForCostco = isHolidayForCostco || (hourForCostco >= 15);
+                const isAfterCutoffOrHolidayForCostco = isHolidayForCostco || gTodayAfterClose(new Date());
 
                 if (costcoFilters.length === 0 || isAfterCutoffOrHolidayForCostco) {
                     costcoTabBtn.style.display = 'none';
@@ -8851,9 +8902,9 @@
 
                                     // 과일/야채 상품은 해당 날짜 자정(0시)부터 노출, 오후 3시(15시) 이후에는 미노출 처리
                                     const startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
-                                    const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
+                                    const cutoffDate = new Date(y, m - 1, d + 1, 0, 0, 0, 0);   // [수정] 마감 시각은 설정(gTodayAfterClose)으로 본다
                                     const nowTime = new Date();
-                                    if (nowTime < startDate || nowTime >= cutoffDate) {
+                                    if (nowTime < startDate || nowTime >= cutoffDate || gTodayAfterClose(nowTime)) {
                                         return false; // 15시 이후이므로 제외
                                     }
                                 }
@@ -11459,13 +11510,13 @@
                     }
                     return;
                 }
-                if (currentHour >= 15) {
+                if (gTodayClosedNow(new Date())) {
                     const daysStr = isSundayAsWeekday ? "월요일 - 일요일" : (isSaturdayAsWeekday ? "월요일 - 토요일" : "월요일 - 금요일");
                     showSystemModal(
                         `<div style="line-height:1.75; word-break:keep-all;">` +
                         `<span style="display:block; margin-bottom:12px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[당일판매 주문 가능시간]</span>` +
                         `<b style="color:var(--item-black);">${daysStr}</b><br>` +
-                        `<b style="color:var(--nego-orange); font-size:1.05em;">00:00 - 15:00</b>` +
+                        (gTodayManual(new Date()) === 'closed' ? `<b style="color:var(--nego-orange); font-size:1.05em;">지금은 당일판매를 쉬고 있어요</b>` : `<b style="color:var(--nego-orange); font-size:1.05em;">${gTodayOpenLabel()} - ${gTodayCloseLabel()}</b>`) +
                         `</div>`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
@@ -11577,7 +11628,7 @@
                     return;
                 }
 
-                const isWeekendAfterCutoff = (currentDay === 6 && currentHour >= 15) || (currentDay === 0 && !isSundayAsWeekday);
+                const isWeekendAfterCutoff = (currentDay === 6 && gTodayAfterClose(new Date())) || (currentDay === 0 && !isSundayAsWeekday);
 
                 const allItems = [];
 
@@ -11636,7 +11687,7 @@
                                    (currentDayNum === 6 && !isSaturdayAsWeekday) || 
                                    publicHolidays.includes(todayStr);
 
-                const isTodayOffOrAfterCutoff = isTodayOff || (currentHour >= 15);
+                const isTodayOffOrAfterCutoff = isTodayOff || gTodayAfterClose(new Date());
 
                 // [추가] 공동구매 상품 입고일들 중 가장 늦은 날짜(maxReserveDate) 찾기
                 let maxReserveDate = null;
@@ -11966,7 +12017,7 @@
                 // 2. [배달전용] 날짜 검증 (USER 요청: 배달 날짜가 다른 상품 혼합 방지, 공휴일 스킵 적용)
                 if (shippingMethod === '배달주문') {
                     let targetDateObj = new Date(now);
-                    if (currentDeliveryType === 'reserve' || currentHour >= 15) {
+                    if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) {
                         targetDateObj.setDate(targetDateObj.getDate() + 1);
                     }
 
@@ -12154,7 +12205,7 @@
                         <!-- 입금 안내 -->
                         <div style="border-top:1px dashed #ffdfc0; margin-top:14px; padding-top:12px; display:flex; flex-direction:column; gap:6px; word-break:keep-all;">
                             <div style="font-size:15.5px; font-weight:800; color:var(--nego-orange); line-height:1.5;">
-                                ${(currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? '오후 3시까지 입금 부탁드립니다.' : '당일 24시까지 입금 부탁드립니다.'}
+                                ${(currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? `${gTodayCloseWords()}까지 입금 부탁드립니다.` : '당일 24시까지 입금 부탁드립니다.'}
                             </div>
                             <!-- [수정] 입금자명 안내는 사다드림만이 아니라 모든 입금 주문에 해당하므로 기본 안내로 뺐다 -->
                             <div style="font-size:13.5px; font-weight:700; color:#8a7461; line-height:1.6;">
@@ -12423,7 +12474,7 @@
                 const getNextBusinessDate = (ts) => {
                     let d = new Date(ts);
                     // 15시 이후 주문이거나 주말/휴무일인 경우 다음 날짜로 이동
-                    if (d.getHours() >= 15) {
+                    if (gTodayAfterClose(d)) {
                         d.setDate(d.getDate() + 1);
                     }
                     while (true) {
