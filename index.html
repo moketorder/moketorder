@@ -3232,7 +3232,11 @@
         function gTodayManual(now) {
             const s = gTodaySale || {};
             if (s.manual !== 'open' && s.manual !== 'closed') return null;
-            if (s.auto !== false && s.manualDate !== gYmdOf(now)) return null;   // 자동이면 누른 그날만
+            if (s.auto !== false) {
+                // [수정] 자동이 켜져 있으면 강제 열기·닫기는 다음 자동 시각(manualUntil)까지만 간다
+                if (s.manualUntil) { if (now.getTime() >= Number(s.manualUntil)) return null; }
+                else if (s.manualDate !== gYmdOf(now)) return null;   // 예전 방식으로 저장된 값 — 그날만
+            }
             return s.manual;
         }
         // 마감이 지났나 (지났으면 당일 주문은 다음 영업일로 넘어간다)
