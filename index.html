@@ -2416,7 +2416,7 @@
                이 판단은 검색에도 쓰인다. 여기서 걸러 주지 않으면, 원래는 상시판매인 특가 상품이
                당일판매 검색에도(여기서 false) 상시판매 검색에도(할인 상품은 당일 모드에서만 보이므로)
                걸리지 않아 어디서도 찾을 수 없게 된다. */
-            if (gDiscountRateOf(p) > 0) return currentDeliveryType === 'today';
+            if (gIsSaleToday(p)) return currentDeliveryType === 'today';
 
             if (currentDeliveryType === 'onsite') return !!gOnsiteTabCatOf(p);
             if (currentDeliveryType === 'today') return isFV || isDate;
@@ -2621,7 +2621,7 @@
                         if ((status === "비공개" || mk === "비공개") && !isAdminMode) return false;
                         const _shownAtAll = (p.show !== false && p.show !== 'false');
                         // [신규] 특가 상품이 하나라도 있으면 '오늘의 상품' 탭을 만든다 (날짜 상품이 없어도)
-                        const _isSale = (typeof gDiscountRateOf === 'function') && gDiscountRateOf(p) > 0;
+                        const _isSale = (typeof gIsSaleToday === 'function') && gIsSaleToday(p);
                         if (_isSale) return isAdminMode || _shownAtAll;
                         if (!isAdminMode) {
                             const isShowToday = p.showToday !== undefined
@@ -8799,7 +8799,7 @@
                    [주의] 아래 '상시판매 분류탭' 거르기보다 먼저 봐야 한다. 특가 상품 대부분은
                    원래 상시판매(onsite-…) 분류를 달고 있어서, 그쪽이 먼저 걸리면
                    당일판매 모드에서 통째로 빠져 '오늘의 상품'에도 검색에도 안 나온다. */
-                const _saleRate = gDiscountRateOf(p);
+                const _saleRate = gIsSaleToday(p) ? 1 : 0;
                 if (_saleRate > 0) {
                     if (currentDeliveryType !== 'today') return false;
                 } else if (currentDeliveryType !== 'onsite') {
@@ -8814,7 +8814,7 @@
                         /* [신규] 특가 상품은 '오늘 파는 것'이므로 당일 노출 여부(showToday)와
                            날짜(matchKey) 조건을 건너뛴다. 다만 사장님이 숨김(show:false)으로
                            내린 상품까지 살려내면 안 되므로 그것만은 그대로 지킨다. */
-                        const _isSale = gDiscountRateOf(p) > 0;
+                        const _isSale = gIsSaleToday(p);
                         if (_isSale) return _shownAtAll;
 
                         const isShowToday = p.showToday !== undefined ?
@@ -9184,10 +9184,10 @@
             if (!_searchQ) {
                 if (targetKey === 'today-reserve') {
                     visibleProducts.forEach(p => {
-                        if (gDiscountRateOf(p) > 0 && !filteredData.includes(p)) filteredData.push(p);
+                        if (gIsSaleToday(p) && !filteredData.includes(p)) filteredData.push(p);
                     });
                 } else {
-                    filteredData = filteredData.filter(p => gDiscountRateOf(p) <= 0);
+                    filteredData = filteredData.filter(p => !gIsSaleToday(p));
                 }
             }
 
@@ -9414,7 +9414,7 @@
                     (imgId ? `<img src="${getImgUrl(imgId, 300)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain;" onload="this.classList.add('loaded')" onerror="this.onerror=null; this.src=getImgUrl('${imgId}', 300, true); this.classList.add('loaded');">` : 'No Image') +
                     `<div class="thumb-notice">예시이미지입니다.</div>` +
                     // [신규] 할인 상품은 사진 위쪽에 '15% 할인!' 띠를 두른다 (아래 '예시이미지입니다.'와 짝)
-                    (gDiscountRateOf(p) ? `<div class="thumb-sale">${gDiscountRateOf(p)}% 할인!</div>` : '') +
+                    (gIsSale(p) ? `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>` : '') +
                     `</div>` +
                     `<div class="item-info-top">` +
                     // [수정] [오늘의추천]은 이름이 아니라 isRecommend 값으로 그린다 (gRecommendMark).
@@ -9423,11 +9423,11 @@
                     gSaleNote(p) +
                     // [신규] 할인 상품은 판매가 바로 위에 할인 전 금액을 작게 적어 준다.
                     (gOrigPriceLabel(p)
-                        ? `<div class="item-orig-price"><span class="off">${gDiscountRateOf(p)}% 할인</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`
+                        ? `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`
                         : '') +
                     `<div class="item-price-row">` +
                     gStorageBadge(p) +
-                    `<div class="item-price-val${gDiscountRateOf(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div>` +
+                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div>` +
                     `</div>` +
                     // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
                     //  아래 버튼줄에 따로 한 줄을 차지하면 카드가 길어지고 썸네일이 작아 보인다.
@@ -9503,8 +9503,21 @@
            '상세옵션 사용'이 꺼진 상품은 다른 상세옵션과 마찬가지로 할인도 적용하지 않는다. */
         function gDiscountRateOf(p) {
             if (!p || !gBool(p.useOptions, true) || !gBool(p.useDiscount)) return 0;
+            if (p.discountType === 'amount') return 0;   // [신규] 금액 할인은 아래 gDiscAmountOf 로 본다
             return Math.min(100, Math.max(0, parseInt(p.discountRate) || 0));
         }
+
+        /* [신규] 금액 할인과 두 가지 선택(오늘의 상품에 넣기 · [땡처리 특가] 문구).
+             · discountType : 'rate'(%) | 'amount'(원)   · discountAmount : 깎을 금액
+             · saleToToday / saleBadge : 적혀 있지 않으면 예전처럼 켜진 것으로 본다 */
+        function gDiscAmountOf(p) {
+            if (!p || !gBool(p.useOptions, true) || !gBool(p.useDiscount) || p.discountType !== 'amount') return 0;
+            return Math.max(0, parseInt(p.discountAmount) || 0);
+        }
+        function gIsSale(p) { return gDiscountRateOf(p) > 0 || gDiscAmountOf(p) > 0; }
+        function gIsSaleToday(p) { return gIsSale(p) && !(p.saleToToday === false || p.saleToToday === 'false'); }
+        function gSaleBadgeOn(p) { return gIsSale(p) && !(p.saleBadge === false || p.saleBadge === 'false'); }
+        function gDiscLabelOf(p) { return gDiscAmountOf(p) > 0 ? `${gDiscAmountOf(p).toLocaleString()}원 할인` : `${gDiscountRateOf(p)}% 할인`; }
 
         // 100원 단위로 버린다 (관리자 화면의 '예상 가격'과 똑같은 계산이라야 한다)
         function gDiscountedPrice(price, rate) {
@@ -9515,12 +9528,13 @@
         }
 
         function gApplyDiscount(p, amount) {
+            if (gDiscAmountOf(p) > 0) return Math.max(0, (parseInt(amount) || 0) - gDiscAmountOf(p));   // [신규] 금액 할인
             return gDiscountedPrice(amount, gDiscountRateOf(p));
         }
 
         // 할인 전 금액. 할인이 없거나 값이 0이면 빈 문자열 → 카드에 줄 자체가 안 나온다.
         function gOrigPriceLabel(p) {
-            if (gDiscountRateOf(p) <= 0) return '';
+            if (!gIsSale(p)) return '';
             const base = parseInt(p && p.price) || 0;
             const before = !gHasChoiceOptions(p) ? base : (base > 0 ? base : gMinOptionAdd(p));
             if (before <= 0) return '';
@@ -9723,13 +9737,13 @@
            이름이 곧 상품의 열쇠(재고 조정키·주문 기록·중복 차단)라서 이름을 건드리면
            지난 주문과 재고가 통째로 어긋나기 때문이다. */
         function gSaleMark(p, size) {
-            if (gDiscountRateOf(p) <= 0) return '';
+            if (!gSaleBadgeOn(p)) return '';   // [수정] '[땡처리 특가]' 문구는 고른 상품에만
             return `<span style="color:#e11d48; font-size: ${size || '0.9em'};">[땡처리 특가]</span><br>`;
         }
 
         // [신규] 특가 상품 안내 문구. 상품명 바로 아랫줄에 붙는다.
         function gSaleNote(p) {
-            if (gDiscountRateOf(p) <= 0) return '';
+            if (!gSaleBadgeOn(p)) return '';
             return `<div class="item-sale-note">(수량이 많지 않습니다.)</div>`;
         }
 
@@ -11037,17 +11051,17 @@
             // [수정] 할인 상품은 상세보기에서도 할인 전 금액을 위에 작게 적고, 판매가를 빨간색으로 바꾼다.
             //  글자 크기 22px의 0.6배로, 카드와 같은 비율을 쓴다.
             // [신규] 특가 상품은 상품명 아랫줄에 안내 문구를 붙인다 (상품카드와 같은 문구)
-            if (gDiscountRateOf(p)) {
+            if (gSaleBadgeOn(p)) {
                 document.getElementById('detail-title').insertAdjacentHTML('beforeend',
                     `<div style="margin-top:6px; font-size:16px; font-weight:700; color:#e11d48;">(수량이 많지 않습니다.)</div>`);
             }
             const _dPriceEl = document.getElementById('detail-price');
-            const _dRate = gDiscountRateOf(p);
+            const _dRate = gIsSale(p);
             _dPriceEl.style.color = _dRate ? '#e11d48' : 'var(--nego-orange)';
             _dPriceEl.innerHTML =
                 (gOrigPriceLabel(p)
                     ? `<div style="display:flex; align-items:baseline; gap:6px; font-size:17px; font-weight:900; margin-bottom:3px;">`
-                      + `<span style="color:#e11d48;">${_dRate}% 할인</span>`
+                      + `<span style="color:#e11d48;">${gDiscLabelOf(p)}</span>`
                       + `<span style="color:#9aa5b1; font-weight:700; text-decoration:line-through;">${gOrigPriceLabel(p)}</span></div>`
                     : '')
                 + gCardPriceLabel(p);
@@ -13021,11 +13035,14 @@
             const modalImg = document.getElementById("customer-photo-modal-img");
             if (!modal || !modalImg) return;
 
-            let photoData = window.deliveryPhotos ? window.deliveryPhotos[photoKey] : null;
+            // [수정] 기사가 사진을 새로 올리면 올린 시각이 바뀐다 — 그 시각까지 넣어 기억해야 새 사진이 뜬다
+            const _po = (fullHistoryData || []).find(o => (o.__fbKey || '') === photoKey);
+            const cacheKey = photoKey + '@' + ((_po && _po.deliveryPhotoTime) || '');
+            let photoData = window.deliveryPhotos ? window.deliveryPhotos[cacheKey] : null;
 
             if (!photoData && gHistoryPhoneKey && photoKey) {
                 try {
-                    const url = `${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(gHistoryPhoneKey)}/${encodeURIComponent(photoKey)}.json`;
+                    const url = `${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(gHistoryPhoneKey)}/${encodeURIComponent(photoKey)}.json?t=${Date.now()}`;
                     const res = await fetch(url);
                     if (res.ok) {
                         const d = await res.json();
@@ -13033,7 +13050,7 @@
                         photoData = (d && typeof d === 'object') ? d.photo : d;
                         if (photoData) {
                             window.deliveryPhotos = window.deliveryPhotos || {};
-                            window.deliveryPhotos[photoKey] = photoData;
+                            window.deliveryPhotos[cacheKey] = photoData;
                         }
                     }
                 } catch (e) {
