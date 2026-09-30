@@ -3389,7 +3389,8 @@
                 const _has = new Set(_gbList.map(gGbTabKind));
                 const _hasVeg = _gbList.some(p => gKindOf(p) === 'veg');
                 const _tabs = [['gb-all', '전체']];
-                if (_has.has('fruit')) _tabs.push(['gb-fruit', _hasVeg ? '과일·야채' : '과일']);
+                // [수정 2026-09-30] 과일은 주력 상품이라 상품이 없어도 탭을 늘 세운다 (없을 때는 목록에 안내가 나온다)
+                _tabs.push(['gb-fruit', _hasVeg ? '과일·야채' : '과일']);
                 if (_has.has('sada')) _tabs.push(['gb-sada', '사다드림']);
                 if (_has.has('group')) _tabs.push(['gb-group', '일반']);
                 if (_has.has('chuseok')) _tabs.push([CHUSEOK_TAB, '추석선물']);
@@ -10387,6 +10388,11 @@
                         subText = "과일은 평일 오전에 올라옵니다.";
                     }
                     emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:16px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(${subText})</span>`;
+                } else if (String(targetKey).startsWith('gb:fruit:')) {
+                    // [신규 2026-09-30] 공동구매 › 과일 탭이 비었을 때 — 예전 당일 과일 안내를 바탕으로
+                    emptyMsg.style = "text-align:center; padding:70px 20px; color:#8b9682; font-weight:700; font-size:17px; line-height:1.55;";
+                    const _sub = '과일은 매일 새벽에 올라와요 (일요일·공휴일 제외)';   // 사장님이 정한 한 문구 (설정 따라 바뀌지 않게)
+                    emptyMsg.innerHTML = `지금 주문할 수 있는 과일이 없어요<br><span style="font-size:14.5px; font-weight:600; color:#b6bcac; display:block; margin-top:8px;">${_sub}<br>새벽시장에서 골라 오면 바로 올려 드릴게요</span>`;
                 } else if (targetKey === '과일') {
                     emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(평일 오전에 상품이 올라옵니다.)</span>`;
                 } else {
