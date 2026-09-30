@@ -14023,7 +14023,11 @@
 
                         // [신규] 그 사이 마감됐는지 먼저 본다 (무제한 상품도 마감은 막는다)
                         const [_cl, _ex] = await Promise.all([gFetchLiveClosed(fGetAdjKey(it.matchKey || it.date, it.name)), gFetchLiveExpired(pData)]);
-                        if (_cl || _ex || gIsTodayGbClosed(pData)) {   // [수정 2026-09-30] 오늘 상품의 당일 마감도 막는다
+                        /* [신규 2026-09-30] 확정 직전에 숨김도 한 번 더 본다 (공동구매 상품만 — 상시판매는 따로 논다).
+                           주문서를 켜 둔 채 자정을 넘기면 어제 상품이 목록에선 사라져도 장바구니엔 남는데,
+                           당일 마감 검사는 '받는 날이 오늘'인 것만 보므로 날이 바뀐 상품이 그대로 주문됐다. */
+                        const _hid = !!pData && gIsGbProduct(pData) && !gGbVisible(pData);
+                        if (_cl || _ex || _hid || gIsTodayGbClosed(pData)) {   // [수정 2026-09-30] 오늘 상품의 당일 마감도 막는다
                             failed.push({ name: it.name, need: parseInt(it.qty) || 0, remain: 0, closed: true });
                             continue;
                         }
