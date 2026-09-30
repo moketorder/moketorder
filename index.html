@@ -4703,12 +4703,33 @@
             return String((el && el.value) || '').trim().slice(0, 100);
         }
 
-        function startFinalOrderProcess() {
+        // [신규] 로그인 증표가 풀려 서버가 주문을 거절한 경우(401·권한 없음)
+        function gIsLoginErr(err) {
+            return /\b40[13]\b|Permission denied|LOGIN_EXPIRED/i.test(String((err && err.message) || err || ''));
+        }
+        function gShowLoginExpired() {
+            showSystemModal('로그인이 풀렸어요.\n카카오 로그인을 한 번 다시 해 주세요.', 'alert', () => {
+                closeModal('confirm-overlay');
+                gOpenLoginForced();
+            });
+        }
+
+        async function startFinalOrderProcess() {
             const noticeCheck = document.getElementById('confirm-notice-check');
             if (noticeCheck && !noticeCheck.checked) {
                 showSystemModal("안내 내용을 확인하신 후 동의해주세요.", 'alert');
                 return;
             }
+            /* [신규] 주문을 넣기 직전에 로그인 증표를 확인한다.
+               증표가 풀린 손님(오래 켜 둔 화면, 사파리가 저장 자료를 지운 경우 등)은 상품은 보이지만
+               주문은 서버가 401로 거절해 '재고 반영 실패 401'이라는 알아듣기 힘든 말만 떴다.
+               풀렸으면 조용히 다시 받고, 그래도 안 되면 카카오 로그인을 다시 하게 한다. */
+            try {
+                if (localStorage.getItem('kakao_original_name') && typeof gFirebaseHasUser === 'function' && !(await gFirebaseHasUser())) {
+                    const r = await gFirebaseKakaoSignIn(localStorage.getItem('kakao_original_phone') || '');
+                    if (r !== 'ok') { gShowLoginExpired(); return; }
+                }
+            } catch (e) { console.warn('주문 전 로그인 확인 실패:', e); }
             // 전역 변수 cutoffConfirmedStatus와 holidayConfirmedStatus를 전달
             completeOrder(selectedShippingMethod, combinedDeliveryItems, cutoffConfirmedStatus, holidayConfirmedStatus);
         }
@@ -10338,7 +10359,8 @@
                     lastGroupKey = p.matchKey;
                 }
 
-                const imgId = p.images[0];
+                // [버그수정] 사진 없이 등록된 상품은 images 칸이 아예 없다 → 그대로 읽으면 목록 그리기가 통째로 멈췄다
+                const imgId = (Array.isArray(p.images) && p.images[0]) || '';
                 const thumbUrl = imgId ? getImgUrl(imgId, 300) : '';
 
                 // [수정] 현재 탭 배송 유형과 상품이 실제로 담겼을 때의 배송 탭 유형이 일치할 때만 화면 수량을 표시 (양방향 수량 연동 방지)
@@ -13188,7 +13210,9 @@
                     submitBtn.innerText = "주문확정";
                     submitBtn.style.opacity = "1";
                 }
-                if (err.message !== "EMPTY_CART" && err.message !== "INVALID_DATE" && err.message !== "MISSING_ADDRESS" && err.message !== "MIXED_DELIVERY_DATES") {
+                if (gIsLoginErr(err)) {
+                    gShowLoginExpired();
+                } else if (err.message !== "EMPTY_CART" && err.message !== "INVALID_DATE" && err.message !== "MISSING_ADDRESS" && err.message !== "MIXED_DELIVERY_DATES") {
                     showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
                 }
             }
@@ -13925,7 +13949,8 @@
                 window.isSadaDeliveryFeeAdded = false;
                 window.isReserveDeliveryFeeAdded = false;
                 document.getElementById('system-modal').style.display = 'none';
-                showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
+                if (gIsLoginErr(err)) gShowLoginExpired();
+                else showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
                 isHistoryProcessing = false;
                 if (submitBtn) {
                     submitBtn.disabled = false;
