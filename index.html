@@ -2177,9 +2177,9 @@
         .v3-btn i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
         .v3-btn-sub { color: #4f5b46; }
         .v3-btn-main { background: #4CAF20; border-color: #4CAF20; color: #fff; }
-        .v3-bank { font-size: 14px; font-weight: 700; color: #8b9682; }
+        .v3-bank { font-size: 17px; font-weight: 700; color: #4f5b46; }
         .v3-acct { margin-top: 3px; font-size: 26px; font-weight: 700; letter-spacing: -.5px; font-variant-numeric: tabular-nums; color: #16200f; }
-        .v3-holder { margin-top: 4px; font-size: 14.5px; font-weight: 600; color: #4f5b46; }
+        .v3-holder { margin-top: 6px; font-size: 17px; font-weight: 600; color: #16200f; }
         .v3-hint {
             margin-top: 12px; padding: 11px 13px; background: #eef7e7; border-radius: 8px;
             font-size: 14px; font-weight: 600; color: #3d8f19; line-height: 1.55; word-break: keep-all;
@@ -2282,6 +2282,19 @@
         #confirm-overlay label[for], #confirm-overlay label { font-weight: 600 !important; color: #16200f !important; }
         #confirm-footer-area .btn-common { height: 48px; font-size: 16px; }
 
+        /* 상세보기 아래 줄 — 폰에서도 닫기·수량·담기가 한 줄, 같은 높이로 */
+        .detail-foot {
+            padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid #eef1e9;
+            display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
+        }
+        .detail-foot > * { box-sizing: border-box; height: 46px; margin: 0 !important; min-width: 0; }
+        .detail-foot .btn-close { flex: 0 0 64px; width: 64px; font-size: 15px; padding: 0; }
+        .detail-foot .qty-stepper { flex: 0 0 auto; align-items: center; padding: 4px; gap: 0; border-radius: 10px; background: #f1f4ec; }
+        .detail-foot .qty-step-btn { width: 36px; height: 38px; font-size: 18px; border-radius: 8px; padding: 0; }
+        .detail-foot .qty-sel { width: 30px; height: 38px; font-size: 16px; }
+        .detail-foot #detail-add-btn { flex: 1 1 0; width: auto; font-size: 16px; font-weight: 700; border-radius: 10px; white-space: nowrap; }
+
         /* 입금 안내(주문 완료) */
         .pg { text-align: left; display: flex; flex-direction: column; }
         .pg-done { font-size: 18px; font-weight: 700; color: #16200f; text-align: center; margin-bottom: 14px; }
@@ -2306,6 +2319,8 @@
         /* 2. 상품 이름은 낱말 단위로 넘긴다 ("272 ↵ g" 처럼 끊기지 않게) */
         .item-name, .item-lead { word-break: keep-all !important; overflow-wrap: anywhere; }
         .item-lead .lead-sale { color: #e11d48; }
+        .item-lead .lead-fresh { color: #047857; }
+        .item-lead .lead-br { color: var(--nego-orange); }
         /* 3. 검색창 옆 판매유형 딱지 — 바로 위 탭과 같은 말이라 뺀다 */
         #search-scope-label { display: none !important; }
         /* 6. 상세보기 사진 위 안내는 '예시 이미지'와 장수만 남긴다 */
@@ -2482,12 +2497,12 @@
         <div class="modal-content v3-sheet">
             <div class="v3-sheet-top"><b>매장 위치</b><button type="button" class="v3-x" onclick="closeModal('location-modal')" aria-label="닫기">✕</button></div>
             <div class="v3-pad">
-                <div class="v3-addr">경기 하남시 미사강변한강로 60-1<br>상가 106호</div>
+                <div class="v3-addr">경기 하남시 미사강변한강로 60-1<br>미사강변푸르지오2차 상가 106호</div>
                 <div class="v3-btn-row">
                     <a class="v3-btn" href="https://map.naver.com/v5/search/MOKET 모켓" target="_blank"><i style="background:#03C75A"></i>네이버지도</a>
                     <a class="v3-btn" href="https://map.kakao.com/link/search/MOKET 모켓" target="_blank"><i style="background:#FEE500"></i>카카오맵</a>
                 </div>
-                <div class="v3-btn-row"><button type="button" class="v3-btn v3-btn-sub" onclick="copyToClipboard('경기도 하남시 미사강변한강로 60-1, 상가 106호', '주소가 복사되었습니다.')">주소 복사</button></div>
+                <div class="v3-btn-row"><button type="button" class="v3-btn v3-btn-sub" onclick="copyToClipboard('경기도 하남시 미사강변한강로 60-1, 미사강변푸르지오2차 상가 106호', '주소가 복사되었습니다.')">주소 복사</button></div>
             </div>
         </div>
     </div>
@@ -2603,16 +2618,14 @@
                 </div>
             </div>
             <!-- [ver3] 여기서 바로 담는다. 예전에는 닫기뿐이라 창을 닫고 목록에서 그 상품을 다시 찾아야 했다. -->
-            <div style="padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #eef1e9; display: flex; align-items: center; gap: 10px;">
-                <button class="btn-common btn-close" onclick="closeModal('detail-overlay')"
-                    style="margin-top: 0; flex: 0 0 72px; width: 72px; height: 44px; font-size: 15px;">닫기</button>
-                <div class="qty-stepper" id="detail-qty" style="flex: 0 0 auto; height: 44px;">
+            <div class="detail-foot">
+                <button class="btn-common btn-close" onclick="closeModal('detail-overlay')">닫기</button>
+                <div class="qty-stepper" id="detail-qty">
                     <button class="qty-step-btn" onclick="stepQty(this, -1)">-</button>
                     <input class="qty-sel" value="1" readonly>
                     <button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>
                 </div>
-                <button id="detail-add-btn" class="btn-common btn-primary" onclick="addFromDetail(this)"
-                    style="flex: 1; height: 44px; font-size: 16px; font-weight: 800; border-radius: 8px;">담기</button>
+                <button id="detail-add-btn" class="btn-common btn-primary" onclick="addFromDetail(this)">담기</button>
             </div>
         </div>
     </div>
@@ -2705,7 +2718,7 @@
             <div class="v3-sheet-top"><b>받는 방법</b><button type="button" class="v3-x" onclick="closeModal('shipping-overlay')" aria-label="닫기">✕</button></div>
             <div class="v3-pad ship-opts">
                 <button id="btn-delivery-order" type="button" class="ship-opt" onclick="handleDeliveryOrderClick()">
-                    <span class="ship-opt-txt"><span class="ship-opt-t">배달</span><span class="ship-opt-s" id="ship-opt-delivery-sub">15,000원 이상 무료 · 아니면 3,000원</span></span>
+                    <span class="ship-opt-txt"><span class="ship-opt-t">배달</span><span class="ship-opt-s" id="ship-opt-delivery-sub">15,000원 이상 무료 · 미만 3,000원</span></span>
                     <span class="ship-opt-arw">›</span>
                 </button>
                 <button type="button" class="ship-opt" onclick="selectPickup()">
@@ -10558,29 +10571,41 @@
                    (앞말은 4~40자, 그 안에 [ ] ( ) ! ? 가 없어야 한다. 뒤 이름은 4자 이상)
                 ①②가 같이 있어도 된다: '[사다드림] 한지민의 최애 떡볶이!! 신토불이 떡볶이' */
         function gNameSplit(name) {
+            // [수정] 대괄호는 따로 모은다(brs) — 예전처럼 색을 입혀 보여 주려고. (괄호)·수식어는 회색 줄(leads)로
+            const brs = [];
             const takeBr = (str) => {
                 const m = str.match(/^((?:\s*\[[^\]]*\]|\s*\([^)]*\))+)\s*/);
                 if (!m || str.length <= m[0].length) return { pre: '', rest: str };
-                return { pre: m[1].trim().replace(/\]\s*\[/g, ' · ').replace(/[\[\]]/g, ''), rest: str.slice(m[0].length) };
+                const paren = [];
+                (m[1].match(/\[[^\]]*\]|\([^)]*\)/g) || []).forEach(t => {
+                    if (t[0] === '[') { const v = t.slice(1, -1).trim(); if (v) brs.push(v); }
+                    else paren.push(t);
+                });
+                return { pre: paren.join(' '), rest: str.slice(m[0].length) };
             };
             const a = takeBr(String(name || '').trim());
             const lm = a.rest.match(/^([^!?[\]()]{4,40}[!?]+)\s+(.{4,})$/);
             const mid = lm ? lm[1].replace(/[!?\s]+$/, '') : '';
             const b = takeBr(lm ? lm[2].trim() : a.rest);
-            return { leads: [a.pre, mid, b.pre].filter(Boolean), main: b.rest };
+            return { brs, leads: [a.pre, mid, b.pre].filter(Boolean), main: b.rest };
         }
         function gNameParts(p) {
             const ns = gNameSplit(gDisplayName(p));
             // [신규] 주문관리에서 따로 적은 대괄호(nameTags)·수식어(nameLead). 예전 상품은 이름 안에 든 것을 떼어 쓴다
             const E = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-            const own = [...(Array.isArray(p.nameTags) ? p.nameTags : []), p.nameLead || ''].map(x => String(x || '').trim()).filter(Boolean).map(E);
-            const lead = [
-                gSaleBadgeOn(p) ? '<span class="lead-sale">땡처리 특가</span>' : '',
-                gIsRecommendProduct(p) ? '오늘의추천' : '',
-                gIsFreshProduct(p) ? '신선식품' : '',
-                ...own,
-                ...ns.leads
-            ].filter(Boolean).join(' · ');
+            const clean = arr => arr.map(x => String(x || '').trim().replace(/^\[|\]$/g, '').trim()).filter(Boolean);
+            // [수정] 대괄호 말머리는 예전처럼 색을 입힌다 — 특가 빨강, 신선식품 초록, 오늘의추천·그 밖의 대괄호 주황
+            const br = (t, cls) => `<span class="${cls}">[${E(t)}]</span>`;
+            const tags = [
+                gSaleBadgeOn(p) ? br('땡처리 특가', 'lead-sale') : '',
+                gIsRecommendProduct(p) ? br('오늘의추천', 'lead-br') : '',
+                gIsFreshProduct(p) ? br('신선식품', 'lead-fresh') : '',
+                ...clean(Array.isArray(p.nameTags) ? p.nameTags : []).map(t => br(t, 'lead-br')),
+                ...ns.brs.map(t => br(t, 'lead-br'))
+            ].filter(Boolean).join(' ');
+            // 수식어는 지금처럼 회색
+            const words = [p.nameLead ? E(String(p.nameLead).trim()) : '', ...ns.leads].filter(Boolean).join(' · ');
+            const lead = [tags, words].filter(Boolean).join(' ');
             return { lead, main: ns.main };
         }
         function gCardNameHtml(p) {
@@ -12521,7 +12546,7 @@
                 return;
             }
             const _shipSub = document.getElementById('ship-opt-delivery-sub');   // [ver3] 배달비는 설정값으로
-            if (_shipSub) _shipSub.textContent = `15,000원 이상 무료 · 아니면 ${Number(deliveryFee || 3000).toLocaleString()}원`;
+            if (_shipSub) _shipSub.textContent = `15,000원 이상 무료 · 미만 ${Number(deliveryFee || 3000).toLocaleString()}원`;
             document.getElementById('shipping-overlay').style.display = 'flex';
             checkScrollLock();
         }
