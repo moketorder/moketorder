@@ -2246,8 +2246,19 @@
         .ship-opt-arw { font-size: 20px; color: #8b9682; }
 
         /* 주문 확인 */
-        .modal-content.confirm-sheet { max-width: 440px; display: flex; flex-direction: column; max-height: 92vh; text-align: left; }
+        /* [수정] 예전에는 상품 목록만 따로 스크롤하고 아래 안내·요청사항·버튼(450px 남짓)을 고정해 두어,
+           작은 폰에서는 상품 목록이 한 줄도 안 보일 만큼 눌렸다. 이제 창이 통째로 스크롤되고,
+           확인 체크와 버튼만 아래에 붙어 늘 보인다. 높이는 주소창을 뺀 실제 보이는 높이(dvh)로 잰다. */
+        .modal-content.confirm-sheet { max-width: 440px; display: block; max-height: 92vh; max-height: 92dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; text-align: left; }
+        .confirm-sheet .v3-sheet-top { position: sticky; top: 0; z-index: 2; background: #fff; }
+        #confirm-product-wrapper { flex: none !important; overflow: visible !important; }
+        #confirm-footer-area .cf-actions {
+            position: sticky; bottom: 0; z-index: 2; background: #fff;
+            margin: 0 -16px -16px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid #eef1e9; box-shadow: 0 -6px 12px rgba(22, 32, 15, .05);
+        }
         #confirm-header-area { padding: 14px 16px 0; }
+        #confirm-header-area::after { content: ''; display: block; height: 1px; background: #eef1e9; margin-top: 12px; }
         .cf-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
         .cf-who b { font-weight: 700; color: #16200f; }
         .cf-phone { color: #8b9682; font-weight: 500; font-size: 14px; }
@@ -2260,18 +2271,21 @@
         .cf-group { padding: 10px 0 4px; }
         .cf-group + .cf-group { border-top: 1px solid #eef1e9; }
         .cf-date { font-size: 13px; font-weight: 700; color: #3d8f19; margin-bottom: 2px; }
+        .cf-date-word { font-weight: 600; color: #8b9682; margin-left: 2px; }
+        .cf-merge-note { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12.5px; font-weight: 500; color: #4f5b46; word-break: keep-all; }
+        .cf-merge-note span { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #fff; background: #3d8f19; padding: 2px 6px; border-radius: 5px; }
         .cf-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; }
         .cf-name { flex: 1; min-width: 0; font-weight: 600; color: #16200f; line-height: 1.4; word-break: keep-all; }
         .cf-lead { display: block; font-size: 12.5px; font-weight: 500; color: #8b9682; }
         .cf-qty { flex-shrink: 0; font-size: 14px; color: #8b9682; font-weight: 500; }
         .cf-sub { flex-shrink: 0; min-width: 72px; text-align: right; font-weight: 700; color: #16200f; font-variant-numeric: tabular-nums; }
-        #confirm-footer-area { padding: 0 16px 16px; border-top: 1px solid #e2e8da; }
-        #confirm-summary-area { margin: 0 0 4px !important; }
+        #confirm-footer-area { padding: 0 16px 16px; }
+        #confirm-summary-area { margin: 0 0 4px !important; border-top: 1px solid #eef1e9; }
         .cf-sum { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 0; }
         .cf-sum span { font-size: 16px; font-weight: 700; color: #16200f; }
         .cf-sum small { font-size: 13px; font-weight: 500; color: #8b9682; margin-left: 4px; }
         .cf-sum b { font-size: 21px; font-weight: 700; color: var(--nego-orange); font-variant-numeric: tabular-nums; }
-        #confirm-notice-area { border-top: 1px solid #eef1e9 !important; padding-top: 10px !important; }
+        #confirm-notice-area { border-top: 1px solid #e2e8da !important; margin: 0 -16px 12px !important; padding: 12px 16px 0 !important; }
         .cf-notes { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; font-weight: 500; color: #4f5b46; line-height: 1.5; word-break: keep-all; }
         .cf-notes > div { display: flex; gap: 10px; }
         .cf-notes > div > span:first-child { flex: 0 0 64px; font-weight: 700; color: #8b9682; font-size: 13px; }
@@ -2554,9 +2568,9 @@
     <div class="sticky-header-group">
         <!-- [신규] 배송 유형 대분류 탭 영역 -->
         <div class="delivery-type-tabs">
-            <button class="delivery-type-btn active" data-type="today" onclick="switchDeliveryType('today')">당일판매</button>
+            <!-- [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다 (안쪽 값은 reserve 그대로) -->
+            <button class="delivery-type-btn active" data-type="reserve" onclick="switchDeliveryType('reserve')">공동구매</button>
             <button class="delivery-type-btn" data-type="onsite" onclick="switchDeliveryType('onsite')">상시판매</button>
-            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">예약판매</button>
         </div>
     </div>
     <!-- [ver3] 여기부터(분류·날짜·검색)는 고정하지 않는다 — 판매유형 안내처럼 내리면 함께 올라가 사라진다 -->
@@ -2696,7 +2710,9 @@
                         oninput="gPaintNoteCount()"
                         style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d7dde3; border-radius:10px; font-size:14px; font-weight:700; font-family:inherit; line-height:1.5; resize:none; outline:none;"></textarea>
                 </div>
-                <label style="margin-bottom:15px; font-weight:700; font-size:14px; color:#4f5b46; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+                <!-- [수정] 확인 체크와 버튼은 창 맨 아래에 붙여 둔다. 창이 통째로 스크롤돼도 늘 보인다 -->
+                <div class="cf-actions">
+                <label style="margin-bottom:12px; font-weight:700; font-size:14px; color:#4f5b46; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="confirm-notice-check"
                         style="width:18px; height:18px; margin:0; cursor:pointer;">
                     <span>위 안내를 확인했어요</span>
@@ -2707,6 +2723,7 @@
                         style="margin-top: 0; flex: 1;">취소</button>
                     <button id="btn-submit-order" class="btn-common btn-primary" onclick="startFinalOrderProcess()"
                         style="margin-top: 0; flex: 1;">주문확정</button>
+                </div>
                 </div>
             </div>
         </div>
@@ -2902,7 +2919,7 @@
         let combinedDeliveryItems = [];
         let cutoffConfirmedStatus = false; // [추가] 11시 마감 안내 확인 여부
         let holidayConfirmedStatus = false; // [추가] 주말/공휴일 안내 확인 여부
-        let currentDeliveryType = 'today'; // [신규] 배송 유형 대분류 ('today' or 'reserve')
+        let currentDeliveryType = 'reserve'; // [수정 2026-09-30] 대분류 — 'reserve'(공동구매) 또는 'onsite'(상시판매). 'today'는 더 쓰지 않는다
         let currentMainTab = 'fruit-veg'; // [공동구매(reserve), 상시판매(on-site), 야채구매(vegetable)] - 당일배송 기본값인 과일로 시작
         let today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -3023,6 +3040,8 @@
                이 판단은 검색에도 쓰인다. 여기서 걸러 주지 않으면, 원래는 상시판매인 특가 상품이
                당일판매 검색에도(여기서 false) 상시판매 검색에도(할인 상품은 당일 모드에서만 보이므로)
                걸리지 않아 어디서도 찾을 수 없게 된다. */
+            // [수정 2026-09-30] 공동구매(당일+예약 합침)는 공동구매 목록에 들어가는 것 그대로
+            if (currentDeliveryType === 'reserve') return gGbVisible(p);
             if (gIsSaleToday(p)) return currentDeliveryType === 'today';
 
             if (currentDeliveryType === 'onsite') return !!gOnsiteTabCatOf(p);
@@ -3042,7 +3061,17 @@
         }
 
         function switchDeliveryType(type) {
+            if (type === 'today') type = 'reserve';   // [수정 2026-09-30] 당일판매는 공동구매로 합쳤다
             if (currentDeliveryType === type) return;
+            if (type === 'reserve' || type === 'onsite') {
+                currentDeliveryType = type;
+                currentMainTab = (type === 'onsite') ? ONSITE_CATS[0].key : 'gb-all';
+                window.gGbPickedDate = 'all';
+                initMainTabs();
+                processAndRender(productsData, true);
+                updateFooter();
+                return;
+            }
 
             // [신규] 당일구매와 예약구매는 함께 주문할 수 없으므로, 장바구니에 반대편 상품이 있으면
             //  담을 때가 아니라 '탭 진입' 자체를 막고 안내한다. (상시판매는 양쪽 모두와 함께 담을 수 있어 제한 없음)
@@ -3132,6 +3161,7 @@
                     deliveryType: currentDeliveryType,
                     mainTab: currentMainTab,
                     listKey: window.lastRenderedTargetKey || '',
+                    gbDate: window.gGbPickedDate || 'all',
                     at: Date.now()
                 }));
             } catch (e) { /* 저장 못 해도 기본 탭으로 열릴 뿐이라 무시 */ }
@@ -3179,13 +3209,17 @@
                     currentDeliveryType = _saved.deliveryType;
                     if (_saved.mainTab) currentMainTab = _saved.mainTab;
                     if (_saved.listKey) window.lastRenderedTargetKey = _saved.listKey;
-                } else if (gTodayClosedNow(now) || isHoliday) {
-                    currentDeliveryType = 'reserve';
-                    currentMainTab = 'reserve'; // 15시 이후, 휴무일에는 예약배송으로 유도
+                    if (_saved.gbDate) window.gGbPickedDate = _saved.gbDate;
                 } else {
-                    currentDeliveryType = 'today';
-                    currentMainTab = 'today-fruit'; // 평일 6시 ~ 15시 사이에는 당일배송으로 기본 시작
+                    // [수정 2026-09-30] 당일·예약을 합친 '공동구매'로 늘 시작한다
+                    currentDeliveryType = 'reserve';
+                    currentMainTab = 'gb-all';
                 }
+            }
+            // [신규 2026-09-30] 예전 값(당일판매·예전 공동구매 탭)은 합친 공동구매로 옮긴다
+            if (currentDeliveryType === 'today') currentDeliveryType = 'reserve';
+            if (currentDeliveryType === 'reserve' && !/^gb-/.test(String(currentMainTab)) && currentMainTab !== CHUSEOK_TAB) {
+                currentMainTab = (currentMainTab === 'sada') ? 'gb-sada' : 'gb-all';
             }
             
             // [수정] 코스트코 탭은 더 이상 쓰지 않는다. 예전에 그 탭을 보던 창이 남아 있으면 공동구매로 돌린다.
@@ -3348,15 +3382,20 @@
                 /* [수정] 사다드림 탭은 상품이 없어도 항상 노출 (공동구매 / 사다드림 두 칸 고정)
                    [신규] 추석선물은 철 따라 쓰는 칸이라, 그 탭으로 지정한 상품이 있을 때만 나온다.
                     철이 지나면 상품만 내리면 탭도 따라 사라진다. */
-                // [수정] 추석선물을 맨 앞에 둔다. 철에만 세우는 칸이라 그때는 그것부터 보여야 한다.
-                let html = gHasChuseokProduct()
-                    ? `<button class="main-tab-btn ${currentMainTab === 'chuseok' ? 'active' : ''}" data-tab="chuseok" onclick="switchMainTab('chuseok')">추석선물</button>`
-                    : '';
-                html += `
-                    <button class="main-tab-btn ${currentMainTab === 'reserve' ? 'active' : ''}" data-tab="reserve" onclick="switchMainTab('reserve')">공동구매</button>
-                    <button class="main-tab-btn ${currentMainTab === 'sada' ? 'active' : ''}" data-tab="sada" onclick="switchMainTab('sada')">사다드림</button>
-                `;
-                tabContainer.innerHTML = html;
+                /* [수정 2026-09-30] 공동구매(당일+예약 합침) — 위에 종류, 아래에 날짜.
+                   상품이 있는 종류만 탭을 세운다. 추석선물은 철에만 쓰는 칸이라 있을 때만 맨 뒤에 둔다.
+                   [수정 2026-09-30] 탭은 전체 · 과일 · 사다드림 · 일반 (사장님 요청) */
+                const _gbList = (typeof productsData !== 'undefined' ? productsData : []).filter(gGbVisible);
+                const _has = new Set(_gbList.map(gGbTabKind));
+                const _hasVeg = _gbList.some(p => gKindOf(p) === 'veg');
+                const _tabs = [['gb-all', '전체']];
+                if (_has.has('fruit')) _tabs.push(['gb-fruit', _hasVeg ? '과일·야채' : '과일']);
+                if (_has.has('sada')) _tabs.push(['gb-sada', '사다드림']);
+                if (_has.has('group')) _tabs.push(['gb-group', '일반']);
+                if (_has.has('chuseok')) _tabs.push([CHUSEOK_TAB, '추석선물']);
+                if (!_tabs.some(([k]) => k === currentMainTab)) currentMainTab = _tabs.length ? _tabs[0][0] : 'gb-all';
+                tabContainer.innerHTML = _tabs.map(([k, l]) =>
+                    `<button class="main-tab-btn ${currentMainTab === k ? 'active' : ''}" data-tab="${k}" onclick="switchMainTab('${k}')">${l}</button>`).join('');
             }
         }
 
@@ -3440,7 +3479,7 @@
                 // [수정] 문구를 짧게 다듬었다. 품절 안내의 빨간 강조는 그대로 둔다.
                 html = gTypeNoticeCard('', '상시판매', '#3d8f19', '#eef7e7', [
                     `늘 파는 상품이라 언제든 담으실 수 있어요`,
-                    `당일·예약 판매와 같이 주문하시면 함께 나가요`,
+                    `공동구매와 같이 주문하시면 함께 나가요`,
                     `<b style="color:#ff4d4d;">매장에서도 함께 판매해 품절될 수 있어요</b>`
                 ]);
             // [수정] 코스트코 구매대행 안내는 없앴다. (그 탭을 더 이상 쓰지 않음)
@@ -3448,7 +3487,7 @@
             //  예전에는 검색 중이면 감췄는데, 검색으로 사다드림을 찾아 바로 담는 손님은
             //  당일 입금·카드 불가 안내를 한 번도 못 보게 되는 문제가 있었다.
             //  (사다드림 탭은 목록이 비어 있어도 탭 자체가 사다드림이므로 항상 띄운다)
-            } else if (key === '사다드림' || hasSadaInList) {
+            } else if (key === '사다드림' || key.startsWith('gb:sada:') || (hasSadaInList && !key.startsWith('gb:'))) {
                 kind = 'sada';
                 // [수정] 입금 안내창에서 뺀 사다드림 안내(당일 입금·카드 불가)를 여기로 옮겼다.
                 //  상품을 고르는 시점에 알아야 하는 내용이라 목록 위가 더 맞는 자리.
@@ -3472,16 +3511,23 @@
                     `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
                     `${isSundayAsWeekday ? "휴무일은 쉬어요" : "일요일·휴무일은 쉬어요"}`
                 ]);
+            } else if (key.startsWith('gb:fruit:')) {
+                kind = 'fruit';
+                // [신규 2026-09-30] 공동구매 › 과일 탭 안내 — 예전 당일판매(과일) 안내를 바탕으로 쓴다
+                html = gTypeNoticeCard('', '과일', '#3d8f19', '#eef7e7', [
+                    `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
+                    `오늘 과일은 <b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 <b style="color:#3d8f19;">오후 6시</b> 전에 받을 수 있어요`,
+                    `${isSundayAsWeekday ? "휴무일은 쉬어요" : "일요일·휴무일은 쉬어요"}`
+                ]);
             } else if (currentDeliveryType === 'reserve') {
                 kind = 'reserve';
-                // [신규] 예약판매 특징
-                // [수정] 문구를 짧게 다듬었다. 합배송 안내의 강조는 그대로 둔다.
-                html = gTypeNoticeCard('', '예약판매', '#3d8f19', '#eef7e7', [
-                    `정해진 날짜에 입고되는 상품들이에요`,
-                    `위에 날짜를 고르시면 그날 상품만 보여요`,
+                // [수정 2026-09-30] 당일판매·예약판매를 합친 공동구매 안내
+                html = gTypeNoticeCard('', '공동구매', '#3d8f19', '#eef7e7', [
+                    `상품마다 받는 날이 정해져 있어요`,
+                    `오늘 상품은 <b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 오늘 받아요`,
                     `여러 날짜를 같이 담으면 <b style="color:#3d8f19;">가장 늦은 날로 합배송</b>돼요`,
-                    `신선식품은 무조건 해당 날짜에 픽업/배송돼요`
-                ]);
+                    `신선식품·사다드림은 해당 날짜에 픽업/배송돼요`
+                ].concat(hasSadaInList ? [`사다드림은 <b style="color:#3d8f19;">카드 결제가 안 돼요</b>`] : []));
             }
 
             // [수정] 접었다 펴는 처리를 모두 없앴다. 안내는 sticky 헤더 밖에 있어 스크롤하면
@@ -4077,7 +4123,7 @@
 
             // [신규] 장바구니 상품의 배달 기준일 계산하여 해당 일자에 기존 주문이 있는지 확인
             let targetDateObj = new Date(now);
-            if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);
+            if (gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);   // [수정 2026-09-30] 공동구매에 오늘 상품이 있어 탭으로 가르지 않는다
 
             while (true) {
                 const chkDay = targetDateObj.getDay();
@@ -4334,9 +4380,9 @@
                     showSystemModal(
                         feeModal(
                             `배달 최소주문금액 미달`,
-                            feeRow('사다드림 주문금액', sadaTotal) + feeRow('예약판매 주문금액', reserveTotal),
+                            feeRow('사다드림 주문금액', sadaTotal) + feeRow('공동구매 주문금액', reserveTotal),
                             feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.'),
-                            `사다드림과 예약판매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
+                            `사다드림과 공동구매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
                             `<span style="display:block; text-align:center; margin-top:8px;">배달비 ${feeAmount(deliveryFee)} × 2 = ${feeAmount(deliveryFee * 2)}</span>`
                         ),
                         'confirm',
@@ -4516,7 +4562,7 @@
             let msg = "";
  
             // [신규] 예약배송 모드일 때는 마감 시각 조건 없이 예약배송용 배달안내 팝업을 우선 활성화
-            if (currentDeliveryType === 'reserve') {
+            if (gHasFutureReserveInCart()) {   // [수정 2026-09-30] 뒷날 상품이 있을 때만
                 showModal = true;
                 msg = `<div class="sm-title">합배송 안내</div>담으신 상품 중 가장 늦은 입고일에 한 번에 배달됩니다.${maxDateStr ? `<br>배달 예정일 <b>${maxDateStr}</b>` : ''}`;
             } else if (gTodayAfterClose(new Date())) {
@@ -4552,7 +4598,7 @@
             function checkCombinedDelivery(noticeHtml) {
                 // [신규] 장바구니 상품의 배달 기준일 계산
                 let targetDateObj = new Date(now);
-                if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);
+                if (gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);   // [수정 2026-09-30] 공동구매에 오늘 상품이 있어 탭으로 가르지 않는다
 
                 while (true) {
                     const chkDay = targetDateObj.getDay();
@@ -4678,7 +4724,7 @@
 
             // [수정] 13시 마감 보정 팝업(과일, 야채, 기타 한정 경고) 전면 제거로 즉시 주문 확인으로 직진
             // 단, 예약배송 모드일 때는 픽업 서비스 안내 팝업을 우선 활성화
-            if (currentDeliveryType === 'reserve') {
+            if (gHasFutureReserveInCart()) {   // [수정 2026-09-30] 뒷날 상품이 있을 때만
                 const msg = `<span style="display:block;">[픽업 안내]</span>상품마다 입고일에 맞춰 찾아가실 수 있습니다.<br><br>주문할까요?`;
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
@@ -5062,6 +5108,7 @@
         function gIsClosedProduct(p) {
             if (!p) return false;
             if (gIsExpiredProduct(p)) return true;   // 노출일정의 마감 시각이 지났다
+            if (gIsTodayGbClosed(p)) return true;    // [신규 2026-09-30] 오늘 상품인데 당일 마감시각이 지났거나 휴무일
             const k = fGetAdjKey(p.matchKey || p.date, p.name);
             return gClosedMap[k] === true || gClosedMap[encodeURIComponent(k)] === true;
         }
@@ -5097,7 +5144,7 @@
             return { today: false, urgent: false, html: `${d.getMonth() + 1}/${d.getDate()}(${W}) ${clock} 마감 · <b>${dayDiff}일 남음</b>` };
         }
         function gDeadlineHtml(p, closed) {
-            const t = gExpireAt(p);
+            const t = gExpireAt(p) || gTodayGbCloseAt(p);   // [신규 2026-09-30] 오늘 상품은 당일 마감시각까지 카운트다운
             if (!t || closed) return '';
             const x = gDeadlineText(t);
             return `<div class="item-deadline${x.today ? ' is-today' : ''}${x.urgent ? ' is-urgent' : ''}" data-exp="${t}">${x.html}</div>`;
@@ -5383,9 +5430,8 @@
                 `<p>따로 주문해도 받는 날이 같으면 함께 나갑니다. 합쳐서 <b>15,000원</b>이 넘으면 먼저 낸 배달비를 돌려드립니다.</p>` +
                 `<p>매장 픽업은 상품이 들어온 날마다 따로 찾아가시면 됩니다.</p></div>` +
                 (forFold ? '' : `<div class="v3-grp"><h4>판매 방식</h4>` +
-                `<p class="kv"><span class="k">당일판매</span><span>${daysStr} <b>${gTodayCloseWords()}</b>까지 주문하면 그날 받습니다</span></p>` +
-                `<p class="kv"><span class="k">예약판매</span><span>정해진 날짜에 들어오는 상품입니다</span></p>` +
-                `<p class="kv"><span class="k">상시판매</span><span>늘 파는 상품이라 어느 쪽에 담아도 함께 나갑니다</span></p></div>`);
+                `<p class="kv"><span class="k">공동구매</span><span>상품마다 받는 날이 정해져 있습니다. 오늘 상품은 ${daysStr} <b>${gTodayCloseWords()}</b>까지 주문하면 그날 받습니다</span></p>` +
+                `<p class="kv"><span class="k">상시판매</span><span>늘 파는 상품이라 공동구매와 같이 담아도 함께 나갑니다</span></p></div>`);
         }
 
         function showCombinedDeliveryGuide() {
@@ -9257,9 +9303,8 @@
                             (p.show !== false && p.show !== 'false');
                         if (!isShowReserve) return false;
 
-                        // [신규] '오늘 날짜' 공동구매 상품은 예약 탭에서 제외 → 당일 탭 '공동구매'에서만 노출
-                        // (사다드림도 오늘 날짜면 동일하게 당일 탭에서만 노출. 미래 날짜 사다드림은 예약 탭 유지)
-                        const rmk = (p.matchKey || "").trim();
+                        // [수정 2026-09-30] '오늘 날짜 상품은 예약 탭에서 뺀다'는 규칙은 공동구매(합침)에서는 쓰지 않는다 — '오늘'에 나온다
+                        const rmk = (currentDeliveryType === 'reserve') ? '' : (p.matchKey || "").trim();
                         const rIsDate = dateRegex.test(rmk) && !rmk.includes("상시판매") && !rmk.includes("현장판매") && !rmk.includes("코스트코");
                         const rIsFV = /과일|야채|채소|기타/.test(rmk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
                         if (rIsDate && !rIsFV) {
@@ -9457,6 +9502,12 @@
             }
 
             let activeFilter = null;
+
+            // [신규 2026-09-30] 공동구매(당일+예약 합침)는 종류 탭 + 날짜 칩으로 따로 그린다
+            if (currentDeliveryType === 'reserve') {
+                gRenderGroupBuy(filterAreaDates, isUserAction);
+                return;
+            }
 
             if (currentDeliveryType === 'today') {
                 // 당일배송 과일에 야채가 포함되어 있는지 체크
@@ -9710,7 +9761,7 @@
             const styles = {
                 today: { text: '당일판매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' },
                 onsite: { text: '상시판매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' },
-                reserve: { text: '예약판매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' }
+                reserve: { text: '공동구매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' }
             };
             const s = styles[currentDeliveryType] || styles.reserve;
 
@@ -9808,7 +9859,7 @@
                    당일판매 모드에서 통째로 빠져 '오늘의 상품'에도 검색에도 안 나온다. */
                 const _saleRate = gIsSaleToday(p) ? 1 : 0;
                 if (_saleRate > 0) {
-                    if (currentDeliveryType !== 'today') return false;
+                    if (currentDeliveryType === 'onsite') return false;   // [수정 2026-09-30] 특가는 공동구매 '오늘'에 나온다
                 } else if (currentDeliveryType !== 'onsite') {
                     const _dt = gDisplayTabOf(p);
                     if (ONSITE_CATS.some(c => c.key === _dt)) return false;
@@ -9840,9 +9891,8 @@
                             (p.show !== false && p.show !== 'false');
                         if (!isShowReserve) return false;
 
-                        // [신규] '오늘 날짜' 공동구매 상품은 예약 탭에서 제외 → 당일 탭 '공동구매'에서만 노출
-                        // (사다드림도 오늘 날짜면 동일하게 당일 탭에서만 노출. 미래 날짜 사다드림은 예약 탭 유지)
-                        const rmk = (p.matchKey || "").trim();
+                        // [수정 2026-09-30] '오늘 날짜 상품은 예약 탭에서 뺀다'는 규칙은 공동구매(합침)에서는 쓰지 않는다 — '오늘'에 나온다
+                        const rmk = (currentDeliveryType === 'reserve') ? '' : (p.matchKey || "").trim();
                         const rIsDate = dateRegex.test(rmk) && !rmk.includes("상시판매") && !rmk.includes("현장판매") && !rmk.includes("코스트코");
                         const rIsFV = /과일|야채|채소|기타/.test(rmk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
                         if (rIsDate && !rIsFV) {
@@ -9919,8 +9969,9 @@
                                         return false; // 15시 이후이므로 제외
                                     }
                                 }
-                            } else {
+                            } else if (currentDeliveryType !== 'reserve') {
                                 // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
+                                // [수정 2026-09-30] 공동구매 탭에서는 숨기지 않는다 — 당일 마감시각이 지나면 '마감'으로 보인다
                                 const isReserveDate = gIsDateOnlyKey(s);
                                 if (isReserveDate) {
                                     const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
@@ -10033,6 +10084,12 @@
                     const st = String(p.storage || "").trim();
                     return s.includes("상온") || s.includes("실온") || st.includes("상온") || st.includes("실온");
                 });
+            } else if (String(targetKey).startsWith('gb:')) {
+                // [신규 2026-09-30] 공동구매 — 종류(all·group·fruit·sada·chuseok) × 날짜(all 또는 YYYY-MM-DD)
+                const [, _gk, _gd] = String(targetKey).split(':');
+                filteredData = visibleProducts.filter(p => gGbVisible(p)
+                    && (_gk === 'all' || gGbTabKind(p) === _gk)
+                    && (!_gd || _gd === 'all' || gGbDateOf(p) === _gd));
             } else if (targetKey === '사다드림') {
                 filteredData = visibleProducts.filter(gIsSadaProduct);
             } else if (targetKey === '추석선물') {
@@ -10168,7 +10225,8 @@
             //  · 이 탭으로 지정된 상품은 기존 규칙에 안 걸렸어도 넣는다.
             //  지정이 없는 상품(displayTab 빈 값)은 위에서 계산한 기존 결과 그대로다.
             //  검색 중에는 탭과 무관하게 찾는 것이 목적이므로 건드리지 않는다.
-            if (!_searchQ && !String(targetKey).startsWith('onsite-')) {
+            const _isGbKey = String(targetKey).startsWith('gb:');   // [신규 2026-09-30] 공동구매는 분류탭·특가를 gGbTabKind 에서 이미 반영했다
+            if (!_searchQ && !String(targetKey).startsWith('onsite-') && !_isGbKey) {
                 // [수정] 상시판매 분류 탭은 바로 위에서 이미 분류(displayTab)대로 걸렀으므로 건너뛴다.
                 const _tabKey = gTabKeyOfTarget(targetKey);
                 if (_tabKey) {
@@ -10188,7 +10246,7 @@
             /* [신규] 특가(할인) 상품은 '오늘의 상품' 탭에만 둔다.
                분류탭(displayTab)이 비어 있는 채로 저장된 상품도 있어서, 그 값에 기대지 않고
                할인율만 보고 판단한다. 검색 중에는 탭과 무관하게 찾는 것이 목적이라 건드리지 않는다. */
-            if (!_searchQ) {
+            if (!_searchQ && !_isGbKey) {
                 if (targetKey === 'today-reserve') {
                     visibleProducts.forEach(p => {
                         if (gIsSaleToday(p) && !filteredData.includes(p)) filteredData.push(p);
@@ -10205,6 +10263,10 @@
 
             // [정렬 적용] 재고 유무(품절 무조건 최하단) > 머릿말 > 일반 > 맺음말 > 날짜 > 이름 순
             filteredData.sort((a, b) => {
+                if (_isGbKey || (_searchQ && currentDeliveryType === 'reserve')) {
+                    const _da = gGbDateOf(a), _db = gGbDateOf(b);
+                    if (_da !== _db) return _da < _db ? -1 : 1;
+                }
                 const getStockVal = (p) => {
                     // 숫자가 아닌 문자열이나 빈 칸 등은 무제한(Infinity)으로 처리
                     if (p.stock === undefined || p.stock === "" || isNaN(p.stock)) return Infinity;
@@ -10311,7 +10373,7 @@
                 const emptyMsg = document.createElement('div');
                 emptyMsg.style = "text-align:center; padding:80px 20px; color:#8b9682; font-weight:700;";
                 if (_searchQ) {
-                    emptyMsg.innerHTML = `'${productSearchQuery.trim()}' 검색 결과가 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(현재 ${currentDeliveryType === 'today' ? '당일판매' : (currentDeliveryType === 'onsite' ? '상시판매' : '예약판매')} 탭에서 검색 중)</span>`;
+                    emptyMsg.innerHTML = `'${productSearchQuery.trim()}' 검색 결과가 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(현재 ${currentDeliveryType === 'onsite' ? '상시판매' : '공동구매'} 탭에서 검색 중)</span>`;
                 } else if (targetKey === 'today-fruit' || targetKey === 'today-fruit-only' || targetKey === 'today-veg-only') {
                     emptyMsg.style = "text-align:center; padding:80px 20px; color:#8b9682; font-weight:700; font-size:18px; line-height:1.5;";
                     const now = new Date();
@@ -10339,7 +10401,8 @@
                 // [수정] 사다드림 탭도 날짜별로 묶어서 배달 예정일이 보이게 한다 (날짜가 다르면 합배송 불가)
                 /* [수정] 추석선물 탭도 날짜별로 묶는다. 선물세트는 받는 날이 정해져 있어서
                    언제 오는지가 값보다 먼저 궁금하다. 사다드림과 같은 규칙으로 둔다. */
-                if ((currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || targetKey === '전체상품_현장' || _searchQ) && p.matchKey !== lastGroupKey) {
+                const _gKey = (currentDeliveryType === 'reserve') ? gGbDateOf(p) : p.matchKey;   // [신규 2026-09-30] 공동구매는 날짜로 묶는다
+                if ((currentDeliveryType === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || targetKey === '전체상품_현장' || _searchQ) && _gKey !== lastGroupKey) {
                     // 새 그룹 박스 생성
                     currentGroupBox = document.createElement('div');
                     currentGroupBox.className = "product-group-box";
@@ -10352,7 +10415,12 @@
                        예전에는 달력 그림 + '픽업/배달 예정일 : 9월30일(수)' 로 앞말이 길고 날짜가 주황이었다. */
                     let dateHtml = p.displayDate || p.matchKey;
                     let tail = '';
-                    if (currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || _searchQ) {
+                    if (currentDeliveryType === 'reserve' && _gKey) {
+                        // [신규 2026-09-30] 공동구매 — '9월 30일 수요일 · 오늘 · 픽업 · 배달'
+                        dateHtml = gLongDateLabel(formatDateWithDay(_gKey));
+                        tail = (_gKey === gTodayYmd() ? `<span style="margin-left:8px; font-size:12.5px; font-weight:800; color:#3d8f19;">오늘</span>` : '')
+                            + `<span style="margin-left:8px; font-size:12.5px; font-weight:700; color:#8b9682;">픽업 · 배달</span>`;
+                    } else if (currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || _searchQ) {
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(p.matchKey);
                         if (isDate) {
                             dateHtml = gLongDateLabel(dateHtml);
@@ -10369,7 +10437,7 @@
                     currentGroupBox.appendChild(itemContainer);
 
                     container.appendChild(currentGroupBox);
-                    lastGroupKey = p.matchKey;
+                    lastGroupKey = _gKey;
                 }
 
                 // [버그수정] 사진 없이 등록된 상품은 images 칸이 아예 없다 → 그대로 읽으면 목록 그리기가 통째로 멈췄다
@@ -10388,9 +10456,7 @@
 
                 // [신규] 예약배송 과일 상품 수량 무제한 처리
                 const isFruit = /과일/.test(p.matchKey || "") || /\[과일\]/.test(p.name || "");
-                if (currentDeliveryType === 'reserve' && isFruit) {
-                    stock = Infinity;
-                }
+                // [수정 2026-09-30] '예약 과일은 무제한' 규칙은 뺐다 — 공동구매로 합친 뒤 과일도 재고대로 판다
 
                 const isClosed = gIsClosedProduct(p);   // [신규] 주문관리에서 마감한 상품
                 const isSoldOut = stock <= 0 || isClosed;
@@ -10704,7 +10770,7 @@
         function gGetDeliveryDateKey(p) {
             const s = String((p && (p.matchKey || p.date)) || "").replace(/[.\/]/g, '-').trim();
             const m = s.match(/(\d{2,4})-(\d{1,2})-(\d{1,2})/);
-            if (!m) return "";
+            if (!m) return (p && typeof gGbDateOf === 'function' && gIsGbProduct(p)) ? gGbDateOf(p) : "";   // [수정 2026-09-30]
             let y = parseInt(m[1]); if (y < 100) y += 2000;
             return `${y}-${String(parseInt(m[2])).padStart(2, '0')}-${String(parseInt(m[3])).padStart(2, '0')}`;
         }
@@ -10724,6 +10790,8 @@
             if (!it) return 'other';
             if (gIsFeeRow(it.name)) return 'other';
             if (it.isSada === true) return 'sada';
+            if (it.kind === 'fruit' || it.kind === 'veg') return 'fruit';   // [신규 2026-09-30] 공동구매 종류
+            if (it.kind === 'sada') return 'sada';
             const mk = String(it.matchKey || it.date || '').trim();
             if (/과일|야채|채소/.test(mk)) return 'fruit';
             if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return 'group';
@@ -10782,7 +10850,148 @@
         //  사다드림과 신선식품이 여기에 든다. 둘 다 그날 드셔야 하는 물건이라
         //  더 늦은 날짜 상품과 한 차에 실어 보낼 수 없다.
         function gIsDateBoundProduct(p) {
+            // 과일도 제날 배달해야 하면 주문관리에서 '신선'을 켜 둔다 (2026-09-30 사장님 결정)
             return gIsSadaProduct(p) || gIsFreshProduct(p);
+        }
+
+        /* ===== [신규 2026-09-30] 공동구매(당일판매 + 예약판매 합침) =====
+           · 공동구매에 드는 상품: 날짜 공구 · 사다드림 · 날짜 없는 옛 당일 과일(오늘로 본다) · 오늘 특가
+           · 종류(kind): 주문관리가 저장한 값이 먼저, 없는 옛 상품은 사다드림·신선식품·이름·분류로 짐작
+           · 오늘 상품은 당일 마감시각이 지나거나 휴무일이면 '마감' (목록에는 남는다) */
+        const GB_KINDS = ['group', 'fruit', 'veg', 'sada', 'fresh'];
+        function gTodayYmd() { return gYmdOf(new Date()); }
+        function gYmdFrom(v) {
+            const m = String(v || '').replace(/[.\/]/g, '-').trim().match(/^(\d{2,4})-(\d{1,2})-(\d{1,2})$/);
+            if (!m) return '';
+            let y = parseInt(m[1]); if (y < 100) y += 2000;
+            return `${y}-${String(parseInt(m[2])).padStart(2, '0')}-${String(parseInt(m[3])).padStart(2, '0')}`;
+        }
+        // 날짜 없이 올라간 옛 당일 과일·야채·기타 (상시판매로 넘긴 것은 빼고)
+        function gIsLegacyTodayProduct(p) {
+            if (!p || p.kind) return false;
+            if (String(gDisplayTabOf(p) || '').startsWith('onsite-')) return false;
+            const mk = String(p.matchKey || '').trim();
+            return mk === '과일' || mk === '야채' || mk === '기타' || /^(과일|야채|기타)_예약$/.test(mk);
+        }
+        function gKindOf(p) {
+            if (!p) return 'group';
+            if (GB_KINDS.includes(p.kind)) return p.kind;
+            if (gIsSadaProduct(p)) return 'sada';
+            const dt = String(p.displayTab || '');
+            if (dt === 'sada') return 'sada';
+            const mk = String(p.matchKey || ''), nm = String(p.name || '');
+            if (/야채|채소/.test(mk) || /\[야채\]|\[채소\]/.test(nm)) return 'veg';
+            if (/과일/.test(mk) || /\[과일\]/.test(nm) || dt === 'today-fruit') return 'fruit';
+            return 'group';
+        }
+        function gIsGbProduct(p) {
+            if (!p || p.name === '배달비') return false;
+            if (gIsSaleToday(p)) return true;
+            const dt = String(gDisplayTabOf(p) || '');
+            if (dt.startsWith('onsite-')) return false;
+            const mk = String(p.matchKey || '').trim();
+            if (mk.includes('코스트코')) return false;
+            if (gIsSadaProduct(p) || gIsLegacyTodayProduct(p)) return true;
+            return gIsDateOnlyKey(mk);
+        }
+        // 공동구매 상품의 받는 날 (옛 당일 과일·날짜 없는 특가는 오늘)
+        function gGbDateOf(p) {
+            if (!p) return '';
+            const d = gYmdFrom(p.matchKey) || gYmdFrom(p.date);
+            if (d) return d;
+            return (gIsLegacyTodayProduct(p) || gIsSaleToday(p)) ? gTodayYmd() : '';
+        }
+        // 종류 탭: chuseok · sada · fruit(과일·야채) · group(공구·신선식품·특가)
+        function gGbTabKind(p) {
+            if (gIsChuseokProduct(p)) return 'chuseok';
+            const k = gKindOf(p);
+            if (k === 'sada') return 'sada';
+            if (k === 'fruit' || k === 'veg') return 'fruit';
+            return 'group';
+        }
+        // 공동구매 목록에 보이는 상품 (노출·비공개·날짜 지남까지 본다)
+        function gGbVisible(p) {
+            if (!p) return false;
+            const status = String(p.status || '').trim(), mk = String(p.matchKey || '').trim();
+            if ((status === '비공개' || mk === '비공개') && !isAdminMode) return false;
+            if (!isAdminMode) {
+                const sr = p.showReserve !== undefined ? (p.showReserve === true || p.showReserve === 'true') : (p.show !== false && p.show !== 'false');
+                if (!sr && !(gIsSaleToday(p) && p.show !== false && p.show !== 'false')) return false;
+            }
+            if (!gIsGbProduct(p)) return false;
+            /* [신규 2026-09-30] 날짜 없는 예전 과일은 어제까지 켜 둔 것이면 자정부터 숨긴다.
+               예전에는 날이 바뀐 뒤 주문관리를 처음 열 때에야 숨겨져, 그때까지 손님 화면에 '마감'으로 떠 있었다.
+               오늘 노출을 켜거나 고친 것(updatedAt 이 오늘)은 그대로 보인다 — 주문관리 자동 숨김과 같은 잣대. */
+            if (!isAdminMode && gIsLegacyTodayProduct(p)) {
+                const n = new Date();
+                if ((Number(p.updatedAt) || 0) < new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()) return false;
+            }
+            const d = gGbDateOf(p);
+            return !!d && d >= gTodayYmd();
+        }
+        // 오늘이 쉬는 날인지 (토·일 영업 설정, 임시휴무일)
+        function gIsOffDay(ymd) {
+            const d = new Date(ymd + 'T12:00:00'), w = d.getDay();
+            return (w === 0 && !isSundayAsWeekday) || (w === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(ymd);
+        }
+        // 오늘 받는 공동구매 상품인데 지금 주문할 수 없는지 (당일 마감시각 지남·아직 안 열림·휴무일)
+        function gIsTodayGbClosed(p) {
+            if (isAdminMode || !gIsGbProduct(p)) return false;
+            const t = gTodayYmd();
+            /* [신규 2026-09-30] 날짜 없는 예전 과일은 '오늘' 노출을 켜거나 고친 것만 오늘 상품이다.
+               어제 켜 둔 채 남은 것은 주문관리가 숨기기 전까지 '마감'으로 보여, 어제 과일이 다시 팔리지 않게 한다. */
+            if (gIsLegacyTodayProduct(p)) {
+                const n = new Date();
+                if ((Number(p.updatedAt) || 0) < new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()) return true;
+            }
+            if (gGbDateOf(p) !== t) return false;
+            return gTodayClosedNow(new Date()) || gIsOffDay(t);
+        }
+        // 오늘 상품의 당일 마감 시각(ms). 카드에 '마감까지 00:00:00'을 띄우는 데 쓴다
+        function gTodayGbCloseAt(p) {
+            if (!gIsGbProduct(p) || gGbDateOf(p) !== gTodayYmd() || gIsTodayGbClosed(p)) return 0;
+            if (gTodayManual(new Date()) || (gTodaySale || {}).auto === false) return 0;
+            const mi = gHMOf(gTodaySale.close, 900), d = new Date();
+            d.setHours(Math.floor(mi / 60), mi % 60, 0, 0);
+            return d.getTime();
+        }
+        // 장바구니에 오늘 받는 공동구매 상품이 있는지
+        function gCartHasTodayGb() {
+            const t = gTodayYmd();
+            for (const k in cart) {
+                if (!cart[k] || cart[k] <= 0) continue;
+                const p = gFindCartProduct(k);
+                if (p && gIsGbProduct(p) && gGbDateOf(p) === t) return true;
+            }
+            return false;
+        }
+        // 공동구매 화면 — 종류 탭은 initMainTabs 가 그리고, 여기서는 날짜 칩과 목록을 그린다
+        function gRenderGroupBuy(area, isUserAction) {
+            let kindKey = (currentMainTab === CHUSEOK_TAB) ? 'chuseok' : String(currentMainTab || '').replace(/^gb-/, '');
+            if (!['all', 'group', 'fruit', 'sada', 'chuseok'].includes(kindKey)) kindKey = 'all';
+            const list = (productsData || []).filter(p => gGbVisible(p) && (kindKey === 'all' || gGbTabKind(p) === kindKey));
+            const t = gTodayYmd();
+            const dates = [...new Set(list.map(gGbDateOf))].filter(Boolean).sort();
+            if (!window.gGbPickedDate || (window.gGbPickedDate !== 'all' && !dates.includes(window.gGbPickedDate))) window.gGbPickedDate = 'all';
+            if (dates.length >= 1) {   // [수정 2026-09-30] 날짜가 하나뿐이어도 칩을 보여 준다 (과일 탭 등 — 사장님 요청)
+                area.style.display = 'flex';
+                ['all'].concat(dates).forEach(d => {
+                    const btn = document.createElement('button');
+                    btn.className = 'date-btn' + (window.gGbPickedDate === d ? ' active' : '');
+                    btn.dataset.date = `gb:${kindKey}:${d}`;
+                    btn.innerText = d === 'all' ? '전체' : (d === t ? '오늘' : gShortDateLabel(formatDateWithDay(d)));
+                    btn.onclick = () => {
+                        window.gGbPickedDate = d;
+                        document.querySelectorAll('#date-filters .date-btn').forEach(b => b.classList.toggle('active', b === btn));
+                        renderList(btn.dataset.date);
+                        if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    };
+                    area.appendChild(btn);
+                });
+            } else {
+                window.gGbPickedDate = 'all';
+            }
+            renderList(`gb:${kindKey}:${window.gGbPickedDate}`);
         }
 
         // [신규] '오늘의추천' 상품인지 — 사다드림과 같은 방식.
@@ -11881,9 +12090,7 @@
             // [신규] 예약배송 과일 상품 수량 무제한 처리
             const p = productsData.find(pd => pd.name === gCartName(name));
             const isFruit = p && (/과일/.test(p.matchKey || "") || /\[과일\]/.test(p.name || ""));
-            if (currentDeliveryType === 'reserve' && isFruit) {
-                stock = Infinity;
-            }
+            // [수정 2026-09-30] '예약 과일은 무제한' 규칙은 뺐다
 
             // [수정] 당일구매 / 예약구매 혼합 차단은 담을 때가 아니라 탭 진입 시점(switchDeliveryType)에서 처리한다.
 
@@ -12086,7 +12293,7 @@
 
             // 예약구매 과일은 수량 무제한 (상품 목록과 동일 규칙)
             const isFruit = p && (/과일/.test(p.matchKey || "") || /\[과일\]/.test(p.name || ""));
-            if ((cartDeliveryType[name] || currentDeliveryType) === 'reserve' && isFruit) stock = Infinity;
+            // [수정 2026-09-30] '예약 과일은 무제한' 규칙은 뺐다
 
             const val = Math.max(0, (cart[name] || 0) + change);
             if (change > 0 && val > stock) {
@@ -12344,11 +12551,12 @@
             if (selectedShippingMethod === '배달주문') {
                 // [수정] 당일구매 탭이 열려 있어도 장바구니에 예약(공동구매) 상품이 섞였으면 예약 기준 안내로 표시
                 // [ver3] 긴 문장 목록을 '말머리 + 짧은 한 줄'로. 가장 중요한 것(입금)을 맨 위에 둔다
-                const payBy = (currentDeliveryType === 'reserve' || gHasFutureReserveInCart()) ? '오늘 밤 12시' : gTodayCloseWords();
+                // [수정 2026-09-30] 오늘 받는 공동구매 상품만 있으면 당일 마감시각까지, 뒷날 상품이 있으면 밤 12시까지
+                const payBy = (gHasFutureReserveInCart() || (currentDeliveryType !== 'onsite' && !gCartHasTodayGb())) ? '오늘 밤 12시' : gTodayCloseWords();
                 noticeArea.innerHTML = `
                     <div class="cf-notes">
                         <div><span>입금</span><span><b>${payBy}까지</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</span></div>
-                        <div><span>배달</span><span>도착하면 바로 확인해 주세요. 바깥에 오래 두면 상할 수 있어요.</span></div>
+                        <div><span>배달</span><span><b>오후 3시~6시</b> 사이에 순차적으로 배달돼요. 배달이 완료되면 <b>개별 문자로 알려드려요.</b></span></div>
                         <div><span>취소</span><span>주문서에서 상품이 내려간 뒤에는 취소가 어려워요.</span></div>
                         <div><span>일정</span><span>업체·물류 사정으로 날짜가 바뀌거나 취소될 수 있어요.</span></div>
                     </div>
@@ -12381,7 +12589,12 @@
                     let currentPrice = gCartPaidUnitPrice(product, itemName);
                     const lineTotal = gCartLineTotal(product, itemName);
 
-                    const date = product.displayDate;
+                    /* [수정] 묶음 머리를 상품의 날짜 칸 글자로만 정했더니, 날짜 칸에 '🌡️상온'·'🧊냉동'이
+                       남아 있는 일부 상시판매 상품만 따로 떨어져 나왔다. 상시판매는 보관 방식과 상관없이
+                       '상시판매' 한 묶음으로 모은다. 예약 상품은 그대로 날짜별로 묶는다. */
+                    const isOnsite = String(product.displayTab || '').startsWith('onsite')
+                        || ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(String(mKey).trim());
+                    const date = isOnsite ? '상시판매' : product.displayDate;
                     if (!grouped[date]) grouped[date] = [];
                     grouped[date].push({ ...product, qty: q, price: currentPrice, optionText: gCartOptionText(itemName), lineTotal: lineTotal });
                     totalSum += lineTotal;
@@ -12439,6 +12652,8 @@
             }
 
             const sortedDates = Object.keys(grouped).filter(d => d !== "배달비").sort((a, b) => {
+                // 상시판매 묶음은 날짜 묶음들 뒤에 둔다
+                if ((a === '상시판매') !== (b === '상시판매')) return a === '상시판매' ? 1 : -1;
                 const ka = grouped[a][0].matchKey;
                 const kb = grouped[b][0].matchKey;
                 const da = new Date(ka.replace(/\./g, '-')).getTime();
@@ -12450,10 +12665,77 @@
                 sortedDates.push("배달비"); // 배달비 항목은 항상 정렬 맨 마지막에 깔끔하게 배치
             }
 
+            /* [신규] 합배송 — 배달이면 주문을 저장할 때 사다드림을 뺀 모든 상품의 배달일을
+               담긴 예약 상품 중 가장 늦은 날로 맞춘다(아래 주문 저장 쪽 '합배송 처리'와 같은 잣대).
+               그런데 확인 창은 상품마다 제 날짜를 보여 줘서, 손님이 따로따로 오는 줄 알았다. */
+            const isSadaGroup = d => (grouped[d] || []).every(x => x.isSada === true || /사다드림/.test(String(x.name || '')) || x.name === '배달비');
+            let mergeDate = null;
+            if (selectedShippingMethod === '배달주문') {
+                const ymd = s => {
+                    const m = String(s || '').trim().match(/^(\d{2,4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+                    if (!m) return null;
+                    return `${m[1].length === 2 ? '20' + m[1] : m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                };
+                let maxDate = null;
+                for (const k in cart) {
+                    if (!(cart[k] > 0)) continue;
+                    const p = gFindCartProduct(k);
+                    const d = p && ymd(p.matchKey);
+                    if (d && (!maxDate || d > maxDate)) maxDate = d;
+                }
+                if (maxDate) {
+                    const now = new Date();
+                    const f = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const todayYmd = f(now);
+                    const tmr = new Date(now); tmr.setDate(now.getDate() + 1);
+                    const dow = now.getDay();
+                    const off = (dow === 0 && !isSundayAsWeekday) || (dow === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayYmd);
+                    const late = off || gTodayAfterClose(new Date());
+                    let u = maxDate;
+                    if (maxDate === todayYmd && late) u = f(tmr);
+                    if (u > todayYmd || !late) mergeDate = u;
+                }
+            }
+            /* [수정] 배달이면 사다드림을 뺀 상품(예약·상시 모두)을 실제로 함께 가는 날 한 묶음으로 모은다.
+               머리는 '10월1일(목) 배송일' 하나다. 사다드림은 저장할 때도 제 날짜로 가므로 따로 둔다.
+               묶음 열쇠는 사다드림 날짜 묶음과 글자가 겹칠 수 있어 따로 만든 이름을 쓴다. */
+            const MERGED = '__배송일__';
+            let mergedFrom = 0;   // 몇 묶음을 합쳤나 — 둘 이상이면 '합배송'이라고 날짜 위에 적는다
+            if (mergeDate) {
+                const merged = [];
+                sortedDates.filter(d => d !== '배달비' && !isSadaGroup(d)).forEach(d => {
+                    mergedFrom++;
+                    merged.push(...grouped[d]);
+                    delete grouped[d];
+                });
+                if (merged.length) {
+                    grouped[MERGED] = merged;
+                    const rest = sortedDates.filter(d => grouped[d]);
+                    sortedDates.length = 0;
+                    sortedDates.push(MERGED, ...rest);
+                }
+            }
+
+            /* [신규] 오늘 받는 묶음이면 날짜 뒤에 초록 '오늘'을 붙인다.
+               목록에서는 '오늘'이라고 보고 담았는데 확인 창에는 날짜만 있어 당일인지 헷갈렸다.
+               묶음 머리가 '9월 30일 (화)' 같은 말이라, 오늘 날짜도 같은 말로 바꿔 놓고 견준다. */
+            const _todayHead = String(formatDateWithDay(gTodayYmd())).replace(/\s/g, '');
+            const _todayTag = lab => (String(lab || '').replace(/\s/g, '') === _todayHead)
+                ? ' <span style="font-size:12px; font-weight:800; color:#3d8f19;">오늘</span>' : '';
+
             sortedDates.forEach(date => {
+                // 날짜 묶음은 그 날이 무슨 날인지 옆에 적는다 (픽업이면 픽업일, 배달이면 배송일)
+                const dayWord = selectedShippingMethod === '배달주문' ? '배송일' : '픽업일';
+                const _dateLabel = date === MERGED ? formatDateWithDay(mergeDate) : date;
+                const head = (date === MERGED || /\d+월\s*\d+일/.test(String(date || '')))
+                    ? `${_dateLabel}${_todayTag(_dateLabel)} <span class="cf-date-word">${dayWord}</span>`
+                    : (date || '');
+                const mergeNote = (date === MERGED && mergedFrom >= 2)
+                    ? `<div class="cf-merge-note"><span>합배송</span>받는 날이 다른 상품을 한꺼번에 보내드려요</div>` : '';
                 let groupHtml = `
                     <div class="cf-group">
-                        <div class="cf-date">${date}</div>
+                        ${mergeNote}
+                        <div class="cf-date">${head}</div>
                         <div>
                 `;
 
@@ -12524,7 +12806,8 @@
                 }
             }
 
-            if (hasTodayOnlyItem && hasReserveOnlyItem) {
+            // [수정 2026-09-30] 당일·예약을 공동구매 하나로 합쳐 이 막기는 쓰지 않는다 (날짜가 다른 것은 아래 합배송 규칙이 맡는다)
+            if (false && hasTodayOnlyItem && hasReserveOnlyItem) {
                 showSystemModal("당일판매 상품과 예약판매 상품은 함께 주문할 수 없습니다.<br><br>구매 유형별(당일판매 및 예약판매)로 각각 나누어 따로 주문해 주세요.", 'alert');
                 return;
             }
@@ -12876,8 +13159,9 @@
                             //  기존에는 날짜 없는 상품을 무조건 다음날로 기록해서, 당일구매 과일만 주문하거나
                             //  상시판매만 주문하면 주문서에 내일 날짜로 올라가던 문제가 있었다.
                             //  (예약 상품과 함께 담긴 경우에는 아래 합배송 처리에서 배달일이 다시 맞춰진다)
-                            const _cartTab = cartDeliveryType[cartKey];
-                            if ((_cartTab === 'today' || _cartTab === 'onsite') && !isTodayOffOrAfterCutoff) {
+                            // [수정 2026-09-30] 공동구매로 합친 뒤에는 어느 탭에서 담았든 날짜 없는 상품(상시판매·예전 과일·특가)은
+                            //  당일 마감 전이고 휴무일이 아니면 오늘로 기록한다
+                            if (!isTodayOffOrAfterCutoff) {
                                 finalDate = todayStr;
                             }
                         } else {
@@ -12938,7 +13222,7 @@
                            지금까지 주문에는 상품 '이름'만 남아, 같은 물건이라도 이름을 조금 바꿔 올리면
                            딴 물건으로 세어졌다 (계란 한 가지가 아홉 이름으로 갈렸다).
                            번호가 함께 남으면 이름이 어떻든 하나로 묶인다. */
-                        allItems.push({ name: itemName, productCode: String((pData && pData.productCode) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
+                        allItems.push({ kind: gKindOf(pData), isGb: gIsGbProduct(pData), name: itemName, productCode: String((pData && pData.productCode) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
                     }
                 }
 
@@ -13135,7 +13419,7 @@
                 // 2. [배달전용] 날짜 검증 (USER 요청: 배달 날짜가 다른 상품 혼합 방지, 공휴일 스킵 적용)
                 if (shippingMethod === '배달주문') {
                     let targetDateObj = new Date(now);
-                    if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) {
+                    if (gTodayAfterClose(new Date())) {   // [수정 2026-09-30]
                         targetDateObj.setDate(targetDateObj.getDate() + 1);
                     }
 
@@ -13292,7 +13576,7 @@
 
             if (isFinal) {
                 // [4번 단계] 주문 완료 후 입금 안내 — [ver3] 계좌번호 창과 같은 모양. 주황은 금액에만
-                const payBy = (currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';
+                const payBy = (!gHasFutureReserveItem(allItems) && allItems.some(it => it.isGb && !gIsFeeRow(it.name) && String(it.date) === todayStr)) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';   // [수정 2026-09-30]
                 msg += `
                     <div class="pg">
                         <div class="pg-done">주문이 접수되었습니다</div>
@@ -13733,7 +14017,7 @@
 
                         // [신규] 그 사이 마감됐는지 먼저 본다 (무제한 상품도 마감은 막는다)
                         const [_cl, _ex] = await Promise.all([gFetchLiveClosed(fGetAdjKey(it.matchKey || it.date, it.name)), gFetchLiveExpired(pData)]);
-                        if (_cl || _ex) {
+                        if (_cl || _ex || gIsTodayGbClosed(pData)) {   // [수정 2026-09-30] 오늘 상품의 당일 마감도 막는다
                             failed.push({ name: it.name, need: parseInt(it.qty) || 0, remain: 0, closed: true });
                             continue;
                         }
