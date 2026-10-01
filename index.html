@@ -35,8 +35,14 @@
             errDiv.style = 'position:fixed; top:0; left:0; width:100%; background:#e53e3e; color:white; padding:15px; z-index:999999; font-family:monospace; font-size:12px; word-break:break-all; box-sizing:border-box; border-bottom:3px solid #c53030;';
             errDiv.innerHTML = '<strong>[JS ERROR]</strong> ' + message + '<br><small>Line: ' + lineno + ', Col: ' + colno + '<br>Source: ' + source + '</small>';
             document.body ? document.body.appendChild(errDiv) : document.documentElement.appendChild(errDiv);
+            // [신규 2026-10-01] 주문관리 '오류' 칸에도 남긴다 (기록 함수가 아직 안 읽혔으면 줄 세워 뒀다가 보낸다)
+            try { var _a = ['화면', error || { message: String(message) }, { line: '줄 ' + lineno + ':' + colno }]; window.gReportError ? window.gReportError.apply(null, _a) : (window.__gErrQ = window.__gErrQ || []).push(_a); } catch (e) { }
             return false;
         };
+        // [신규 2026-10-01] 놓친 비동기(Promise) 오류도 남긴다 — 손님 화면에는 띄우지 않는다
+        window.addEventListener('unhandledrejection', function (ev) {
+            try { var r = ev && ev.reason; var _a = ['화면(비동기)', (r && r.message) ? r : { message: String(r) }, {}]; window.gReportError ? window.gReportError.apply(null, _a) : (window.__gErrQ = window.__gErrQ || []).push(_a); } catch (e) { }
+        });
     </script>
 
     <!-- [추가] 자동 업데이트 체크: 새 버전 배포 시 모바일에서 즉시 반영되도록 강제 새로고침 -->
@@ -142,6 +148,13 @@
             return signing;
         };
         window.gFirebaseHasUser = async function () { await wait(firstState, 3000); return !!auth.currentUser; };
+        // [신규 2026-10-01] 로그인 증표 속 번호 — 오류 기록(error_logs)은 이 번호로만 쓸 수 있다. 로그인 전이면 ''
+        window.gFirebasePhone = async function () {
+            await wait(firstState, 3000);
+            const u = auth.currentUser;
+            if (!u) return '';
+            try { return String((await u.getIdTokenResult()).claims.phone || ''); } catch (e) { return ''; }
+        };
         window.gFirebaseSignOut = function () { return auth.signOut().catch(() => { }); };
     })();
     </script>
@@ -3518,7 +3531,7 @@
                 html = gTypeNoticeCard('', '과일', '#3d8f19', '#eef7e7', [
                     `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
                     `오늘 과일은 <b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 <b style="color:#3d8f19;">오후 6시</b> 전에 받을 수 있어요`,
-                    `${isSundayAsWeekday ? "휴무일은 쉬어요" : "일요일·휴무일은 쉬어요"}`
+                    `${isSundayAsWeekday ? "공휴일은 쉬어요" : "일요일·공휴일은 쉬어요"}`
                 ]);
             } else if (currentDeliveryType === 'reserve') {
                 kind = 'reserve';
@@ -5483,7 +5496,74 @@
         }
 
         // [시스템 모달]
+        /* [신규 2026-10-01] 손님 화면 오류를 error_logs/{날짜}/{번호} 에 남긴다 — 주문관리 가게 관리 > 오류 칸에서 본다.
+           (10/1 배달 주문이 저장된 뒤 오류가 났는데 손님이 캡처를 보내기 전엔 알 길이 없었다)
+             · 카카오 로그인한 손님만 — 규칙이 자기 번호로만 쓰게 한다. 로그인 전 오류는 남지 않는다
+             · 손님 화면은 절대 막지 않는다. 뒤에서 보내고, 실패해도 조용히 넘어간다
+             · 같은 오류가 1분 안에 다시 나면 새로 쓰지 않고 횟수만 올린다. 한 기기에서 하루 20건까지
+             · 인터넷이 끊겨 생긴 오류(Failed to fetch 등)와 내용 없는 'Script error.'는 남기지 않는다 */
+        const ERR_LOG_MAX_PER_DAY = 20;
+        const _gErrLast = {};   // '어디서|내용' → { path, count, at }
+        async function gReportError(where, err, extra) {
+            try {
+                if (isAdminMode) return;
+                const msg = String((err && err.message) || err || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+                if (!msg || /^Script error\.?$/i.test(msg) || /Failed to fetch|Load failed|NetworkError|network error|AbortError|ResizeObserver/i.test(msg)) return;
+                const phone = (typeof window.gFirebasePhone === 'function') ? await window.gFirebasePhone() : '';
+                if (!phone) return;
+                const now = new Date(), day = gYmdOf(now), sig = `${where}|${msg}`;
+                const last = _gErrLast[sig];
+                if (last && now.getTime() - last.at < 60000) {
+                    last.count++; last.at = now.getTime();
+                    fetch(`${FIREBASE_DB_URL}error_logs/${last.path}.json`, {
+                        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: last.count, lastAt: last.at })
+                    }).catch(() => { });
+                    return;
+                }
+                const capKey = 'moket_errlog_' + day;
+                const sent = parseInt(localStorage.getItem(capKey) || '0', 10) || 0;
+                if (sent >= ERR_LOG_MAX_PER_DAY) return;
+                localStorage.setItem(capKey, String(sent + 1));
+                const ua = navigator.userAgent || '';
+                const device = (/iPhone|iPad/.test(ua) ? '아이폰' : /Android/.test(ua) ? '안드로이드' : /Windows/.test(ua) ? '윈도우' : /Mac OS X/.test(ua) ? '맥' : '기타')
+                    + ' · ' + (/KAKAOTALK/i.test(ua) ? '카톡' : /SamsungBrowser/.test(ua) ? '삼성 인터넷' : /NAVER/.test(ua) ? '네이버' : /CriOS|Chrome\//.test(ua) ? '크롬' : /Safari\//.test(ua) ? '사파리' : '브라우저');
+                const x = extra || {};
+                const nameEl = document.getElementById('input-name');
+                const rec = {
+                    at: now.getTime(),
+                    phone,
+                    name: String((nameEl && nameEl.value) || '').slice(0, 40),
+                    where: String(where || '').slice(0, 40),
+                    msg,
+                    device,
+                    ver: String(document.lastModified || '').slice(0, 40),
+                    count: 1
+                };
+                if (x.line) rec.line = String(x.line).slice(0, 300);
+                if (err && err.stack) rec.stack = String(err.stack).split('\n').slice(0, 3).join(' / ').slice(0, 300);
+                if (x.saved !== undefined) rec.saved = !!x.saved;
+                if (x.ship) rec.ship = String(x.ship).slice(0, 20);
+                if (x.cart) rec.cart = String(x.cart).slice(0, 500);
+                const path = `${day}/${now.getTime()}_${Math.random().toString(36).slice(2, 7)}`;
+                _gErrLast[sig] = { path, count: 1, at: now.getTime() };
+                await fetch(`${FIREBASE_DB_URL}error_logs/${path}.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec)
+                });
+            } catch (e) { /* 기록 실패는 손님과 상관없다 */ }
+        }
+        // 장바구니를 한 줄로 (오류 기록용)
+        function gCartLineForLog() {
+            try { return Object.keys(cart).filter(k => cart[k] > 0).map(k => `${gCartName(k)}×${cart[k]}`).join(', '); } catch (e) { return ''; }
+        }
+        window.gReportError = gReportError;
+        (window.__gErrQ || []).splice(0).forEach(a => gReportError(a[0], a[1], a[2]));   // 이 함수가 읽히기 전에 난 오류
+
         function showSystemModal(msg, type, yesCallback, noCallback, isTight = false) {
+            // [신규 2026-10-01] 실패·오류 안내는 주문관리 오류 칸에도 남긴다 (주문 처리 오류는 catch 에서 장바구니까지 자세히 남기므로 뺀다)
+            try {
+                const _t = String(msg || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                if (/실패|오류/.test(_t) && !/^주문 처리 중 오류/.test(_t)) gReportError('안내창', _t);
+            } catch (e) { }
             const modal = document.getElementById('system-modal');
             const msgDiv = document.getElementById('sys-modal-msg');
             const btnDiv = document.getElementById('sys-modal-btns');
@@ -10265,6 +10345,10 @@
             // [정렬 적용] 재고 유무(품절 무조건 최하단) > 머릿말 > 일반 > 맺음말 > 날짜 > 이름 순
             filteredData.sort((a, b) => {
                 if (_isGbKey || (_searchQ && currentDeliveryType === 'reserve')) {
+                    // [수정 2026-10-01] 판매중 → 마감 → 품절이 먼저, 그 안에서 날짜순 (사장님 요청)
+                    const _st = p => (p.stock === undefined || p.stock === "" || isNaN(p.stock)) ? Infinity : parseInt(p.stock);
+                    const _rk = p => gIsClosedProduct(p) ? 1 : (_st(p) <= 0 ? 2 : 0);
+                    if (_rk(a) !== _rk(b)) return _rk(a) - _rk(b);
                     const _da = gGbDateOf(a), _db = gGbDateOf(b);
                     if (_da !== _db) return _da < _db ? -1 : 1;
                 }
@@ -10281,7 +10365,10 @@
                 const isSoldOutB = stockB <= 0 || gIsClosedProduct(b);
 
                 // [강력 조건] 품절된 상품은 머릿말 우선순위와 상관없이 무조건 뒤로 보냄
-                if (isSoldOutA !== isSoldOutB) return isSoldOutA ? 1 : -1;
+                // [수정 2026-10-01] 판매중 → 마감 → 품절 차례로 (카드에 '마감'으로 뜨는 상품이 품절보다 앞)
+                const _rank = (p, st) => gIsClosedProduct(p) ? 1 : (st <= 0 ? 2 : 0);
+                const _ra = _rank(a, stockA), _rb = _rank(b, stockB);
+                if (_ra !== _rb) return _ra - _rb;
 
                 // [신규] 오늘의추천·사다드림으로 표시해 둔 상품은 품절이 아닌 한 목록 맨 위로 올린다.
                 //  예전에는 이름 앞 [오늘의추천] 말머리 덕분에 아래 머릿말 규칙(getPriority)에 걸려 올라갔는데,
@@ -10696,7 +10783,9 @@
            고를 옵션이 있는 상품은 'N가지 중 선택'이 저절로 붙는다. 모양은 보관방법 딱지와 같다. */
         function gTagBadges(p) {
             const raw = Array.isArray(p && p.tags) ? p.tags : String((p && p.tags) || '').split(',');
-            const tags = raw.map(t => String(t || '').trim()).filter(Boolean).slice(0, 2);
+            // [수정 2026-10-01] '당일배송'은 손으로 붙이지 않고 저절로 붙인다 — 오늘 날짜 공동구매 상품에는 전부 (마감·품절이어도)
+            const tags = raw.map(t => String(t || '').trim()).filter(t => t && t !== '당일배송').slice(0, 2);
+            if (p && gIsGbProduct(p) && gGbDateOf(p) === gTodayYmd()) tags.unshift('당일배송');
             if (gHasChoiceOptions(p)) {
                 const g = (p.options || []).find(g => Array.isArray(g.items) && g.items.length > 1);
                 if (g) tags.push(`${g.items.length}가지 중 선택`);
@@ -13542,6 +13631,7 @@
                 if (gIsLoginErr(err)) {
                     gShowLoginExpired();
                 } else if (err.message !== "EMPTY_CART" && err.message !== "INVALID_DATE" && err.message !== "MISSING_ADDRESS" && err.message !== "MIXED_DELIVERY_DATES") {
+                    gReportError('주문 확인', err, { saved: false, ship: shippingMethod, cart: gCartLineForLog() });   // [신규 2026-10-01]
                     showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
                 }
             }
@@ -13699,6 +13789,7 @@
         // 실질적인 주문 전송 로직 분리 (배달비 확인 후 실행을 위함)
         async function executeOrder(allItems, name, phone, shippingMethod, cashReceipt = "미발행", receiptPhone = "", cashReceiptType = "개인") {
             const submitBtn = document.getElementById('btn-submit-order');
+            let _orderSaved = false;   // [신규 2026-10-01] 주문이 DB에 다 들어갔나 — 그 뒤에 난 오류인지 오류 기록에 남긴다
 
             // 전송 시작 시 배달 마감 플래그 초기화
             // window.deliveryCutoffConfirmed = false; // 파라미터 방식으로 변경되어 필요없음
@@ -14196,6 +14287,7 @@
                 });
                 try {
                     await Promise.all(fbPromises);
+                    _orderSaved = true;
                 } catch (e) {
                     // [신규] 주문을 못 남겼으면 잡아 둔 재고를 도로 놓아 준다 (재고만 줄어드는 일 방지)
                     for (const rv of reserved) { try { await gReleaseStockCAS(rv.adjKey, rv.qty); } catch (e2) {} }
@@ -14289,7 +14381,11 @@
                 window.isReserveDeliveryFeeAdded = false;
                 document.getElementById('system-modal').style.display = 'none';
                 if (gIsLoginErr(err)) gShowLoginExpired();
-                else showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
+                else {
+                    // [신규 2026-10-01] 저장된 뒤의 오류면 주문은 들어간 것이다 — 주문관리에서 바로 가려 볼 수 있게 남긴다
+                    gReportError(_orderSaved ? '주문 저장 뒤' : '주문 보내기', err, { saved: _orderSaved, ship: shippingMethod, cart: (allItems || []).filter(it => !it.isExtra).map(it => `${it.name}×${it.qty}`).join(', ') });
+                    showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
+                }
                 isHistoryProcessing = false;
                 if (submitBtn) {
                     submitBtn.disabled = false;
