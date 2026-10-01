@@ -12558,7 +12558,21 @@
                 // [수정] 당일구매 탭이 열려 있어도 장바구니에 예약(공동구매) 상품이 섞였으면 예약 기준 안내로 표시
                 // [ver3] 긴 문장 목록을 '말머리 + 짧은 한 줄'로. 가장 중요한 것(입금)을 맨 위에 둔다
                 // [수정 2026-09-30] 오늘 받는 공동구매 상품만 있으면 당일 마감시각까지, 뒷날 상품이 있으면 밤 12시까지
-                const payBy = (gHasFutureReserveInCart() || (currentDeliveryType !== 'onsite' && !gCartHasTodayGb())) ? '오늘 밤 12시' : gTodayCloseWords();
+                /* [수정 2026-10-01] 상시판매만 담은 주문도 오늘 나가면(마감 전·영업일) 마감시각까지 — 완료 안내와 같은 잣대 (사장님 요청).
+                   예전에는 보고 있는 탭(currentDeliveryType)으로 갈라서, 상시판매만 담고 공동구매 탭에서 주문하면 밤 12시로,
+                   상시판매 탭에서 마감 뒤 주문하면(실제로는 다음 영업일 배달) 이미 지난 마감시각으로 나왔다. */
+                const _cartOnlyOnsite = (() => {
+                    let n = 0;
+                    for (const k in cart) {
+                        if (!(cart[k] > 0)) continue;
+                        const p = gFindCartProduct(k);
+                        if (!p || gIsGbProduct(p) || gIsSadaProduct(p)) return false;
+                        n++;
+                    }
+                    return n > 0;
+                })();
+                const _goesToday = !gIsOffDay(gTodayYmd()) && !gTodayAfterClose(new Date());
+                const payBy = (!gHasFutureReserveInCart() && (gCartHasTodayGb() || (_cartOnlyOnsite && _goesToday))) ? gTodayCloseWords() : '오늘 밤 12시';
                 noticeArea.innerHTML = `
                     <div class="cf-notes">
                         <div><span>입금</span><span><b>${payBy}까지</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</span></div>
@@ -13582,7 +13596,13 @@
 
             if (isFinal) {
                 // [4번 단계] 주문 완료 후 입금 안내 — [ver3] 계좌번호 창과 같은 모양. 주황은 금액에만
-                const payBy = (!gHasFutureReserveItem(allItems) && allItems.some(it => it.isGb && !gIsFeeRow(it.name) && String(it.date) === todayStr)) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';   // [수정 2026-09-30]
+                // [버그수정 2026-10-01] todayStr 은 주문 보내는 함수 안에만 있어 여기서는 없는 이름이었다.
+                //  주문이 저장된 뒤 이 안내를 그리다 멈춰, 배달 주문이 들어갔는데도 손님에게 '주문 처리 중 오류'가 떴다.
+                // [수정 2026-10-01] 상시판매만 담은 주문도 마감시각까지 — 확인 창과 맞춘다 (사장님 요청).
+                //  마감 뒤·휴무일 주문은 상시판매도 다음 영업일 날짜가 붙어 gHasFutureReserveItem 에 걸리므로 밤 12시로 간다.
+                const _mine = allItems.filter(it => !it.isExtra && !gIsFeeRow(it.name));
+                const _onlyOnsite = _mine.length > 0 && _mine.every(it => !it.isGb && !gIsSadaOrder(it));
+                const payBy = (!gHasFutureReserveItem(allItems) && (_onlyOnsite || allItems.some(it => it.isGb && !gIsFeeRow(it.name) && String(it.date) === gTodayYmd()))) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';   // [수정 2026-09-30]
                 msg += `
                     <div class="pg">
                         <div class="pg-done">주문이 접수되었습니다</div>
