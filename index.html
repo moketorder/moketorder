@@ -2789,6 +2789,7 @@
                 <!-- [수정 2026-10-02] 후기 쓸 때 안내 — 포인트 받기·쓰기·사라짐, 지워질 수 있는 글 (사장님 요청) -->
                 <ul class="rv-guide">
                     <li>후기를 남기면 <b>50P</b>, 20자 이상(띄어쓰기 제외)이면 <b>100P</b>를 드려요</li>
+                    <li>후기는 상품을 받은 날부터 <b>2주</b> 안에 쓸 수 있어요</li>
                     <li><b>1,000P</b>부터 주문할 때나 매장 픽업 때 자유롭게 쓸 수 있어요</li>
                     <li>포인트는 받은 날부터 <b>1년</b>이 지나면 사라져요</li>
                     <li>욕설·비방이나 상품과 관계없는 글은 삭제될 수 있으며, 이때 받은 포인트도 회수돼요</li>
@@ -5994,15 +5995,25 @@
         // [신규 2026-10-02] 후기는 이번 주(9/28 월) 주문부터 — 그 전 주문엔 [후기 쓰기]를 안 붙인다 (사장님 요청)
         //  주문 시각 글자('2026년 9월 30일 (수) 10:12:30' 또는 '2026-09-30…')에서 날짜만 읽는다. 못 읽으면 안 붙인다
         const REVIEW_FROM_YMD = '2026-09-28';
-        function gReviewOrderYmd(o) {
-            const m = String((o && o.timestamp) || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+        function gReviewYmdOf(v) {
+            const m = String(v || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
             return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : '';
         }
+        function gReviewOrderYmd(o) { return gReviewYmdOf(o && o.timestamp); }
+        // [신규 2026-10-02] 받는 날(픽업일·배송일)부터 14일째 되는 날까지만 쓸 수 있다 (사장님 요청). 받는 날이 없으면 주문한 날로 센다
+        const REVIEW_DAYS = 14;
+        function gReviewLastYmd(o) {
+            const base = gReviewYmdOf(o && o.pickupDate) || gReviewOrderYmd(o);
+            if (!base) return '';
+            const d = new Date(base + 'T12:00:00'); d.setDate(d.getDate() + REVIEW_DAYS);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
         function gCanReview(o) {
-            const ymd = gReviewOrderYmd(o);
+            const ymd = gReviewOrderYmd(o), last = gReviewLastYmd(o);
             return !!(o && o.__fbKey && String(o.productCode || '').trim() && REVIEW_DONE_STATUS.includes(String(o.status || ''))
                 && !isOrderCancelled(o) && !gIsFeeRow(o.item) && o.item !== '포인트 사용'
-                && ymd && ymd >= REVIEW_FROM_YMD);
+                && ymd && ymd >= REVIEW_FROM_YMD
+                && last && gTodayYmd() <= last);
         }
         async function gLoadMyReviewKeys() {
             const ph = gReviewPhone();
