@@ -5991,9 +5991,18 @@
             return n >= 20 ? 100 : (n >= 1 ? 50 : 0);
         }
         function gReviewPhone() { return normP(localStorage.getItem('kakao_original_phone') || ''); }
+        // [신규 2026-10-02] 후기는 이번 주(9/28 월) 주문부터 — 그 전 주문엔 [후기 쓰기]를 안 붙인다 (사장님 요청)
+        //  주문 시각 글자('2026년 9월 30일 (수) 10:12:30' 또는 '2026-09-30…')에서 날짜만 읽는다. 못 읽으면 안 붙인다
+        const REVIEW_FROM_YMD = '2026-09-28';
+        function gReviewOrderYmd(o) {
+            const m = String((o && o.timestamp) || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+            return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : '';
+        }
         function gCanReview(o) {
+            const ymd = gReviewOrderYmd(o);
             return !!(o && o.__fbKey && String(o.productCode || '').trim() && REVIEW_DONE_STATUS.includes(String(o.status || ''))
-                && !isOrderCancelled(o) && !gIsFeeRow(o.item) && o.item !== '포인트 사용');
+                && !isOrderCancelled(o) && !gIsFeeRow(o.item) && o.item !== '포인트 사용'
+                && ymd && ymd >= REVIEW_FROM_YMD);
         }
         async function gLoadMyReviewKeys() {
             const ph = gReviewPhone();
