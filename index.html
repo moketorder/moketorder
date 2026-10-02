@@ -1470,6 +1470,21 @@
             letter-spacing: -0.02em;
         }
         .product-card.soldout .sale-pct { background: #8b9682; }
+        /* [수정 2026-10-02] 사장님이 보낸 그림처럼 — 숫자 높이를 넉넉히 감싸는 상자, 글씨는 굵게, 모서리는 살짝만 둥글게,
+           상자 가운데가 금액 가운데에 오게 (위 정의를 덮는다) */
+        .sale-pct, .item-price-row .item-price-val .sale-pct {
+            font-size: 0.66em !important;
+            font-weight: 800;
+            height: auto;
+            line-height: 1;
+            padding: 0.26em 0.62em 0.22em 0.34em !important;   /* 오른쪽은 사선으로 깎이는 만큼 더 띄운다 */
+            border-radius: 2px 0 0 2px !important;
+            /* 오른쪽 끝을 사선으로 깎는다 (위는 끝까지, 아래는 안쪽으로) — 사장님이 보낸 그림 모양 */
+            clip-path: polygon(0 0, 100% 0, calc(100% - 0.42em) 100%, 0 100%);
+            margin-right: 3px;
+            vertical-align: 0.24em;
+            letter-spacing: -0.01em;
+        }
 
         .item-orig-price .off {
             font-size: 1em;
