@@ -1438,12 +1438,35 @@
             font-size: calc(var(--price-size) * 0.78);
         }
 
+        /* [신규 2026-10-02] '정상가'가 붙어 길어지면 덩어리째 다음 줄로 (글씨 중간에서 끊지 않는다) */
+        .item-orig-price { flex-wrap: wrap; row-gap: 2px; }
+        .item-orig-price > span { white-space: nowrap; }
+
         .item-orig-price .orig {
             font-size: 1em;
             font-weight: 700;
             color: #8b9682;
             text-decoration: line-through;
         }
+
+        /* [신규 2026-10-02] 정상가 방식 — 최종 금액 앞 빨간 'n%' 딱지 (카드·상세보기 같이) */
+        /* 상자 높이 = 가격 글씨 높이(금액 글씨 크기의 약 0.84배), 아래 끝을 숫자 바닥에 맞춘다.
+           카드의 가격 줄에는 딱지용 '.item-price-row span { 12px !important }'가 있어 같은 힘(!important)으로 덮는다 */
+        .sale-pct, .item-price-row .item-price-val .sale-pct {
+            display: inline-block;
+            background: #e11d48;
+            color: #fff;
+            font-size: 0.68em !important;
+            font-weight: 900;
+            height: 1.24em;
+            line-height: 1.24em;
+            padding: 0 0.32em !important;
+            border-radius: 4px !important;
+            margin-right: 6px;
+            vertical-align: 0.2em;
+            letter-spacing: -0.02em;
+        }
+        .product-card.soldout .sale-pct { background: #8b9682; }
 
         .item-orig-price .off {
             font-size: 1em;
@@ -1486,6 +1509,9 @@
             pointer-events: none;
             backdrop-filter: blur(1px);
         }
+
+        /* [신규 2026-10-02] 사장님이 적은 문구 띠 — 사진이 좁아 길면 두 줄까지 접는다 */
+        .thumb-sale.txt { font-size: 13px; line-height: 1.3; padding: 4px 6px; word-break: keep-all; box-sizing: border-box; }
 
         .item-price-val {
             color: var(--nego-orange);
@@ -10602,7 +10628,10 @@
                     //  사진을 누르면 상세가 열리니, 누를 수 있다는 것을 여기서 알린다.
                     `<div class="thumb-notice">상세보기 <span>›</span></div>` +
                     // [신규] 할인 상품은 사진 위쪽에 '15% 할인!' 띠를 두른다 (아래 '예시이미지입니다.'와 짝)
-                    (gIsSale(p) ? `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>` : '') +
+                    // [수정 2026-10-02] 문구를 적어 두었으면 띠에 그 문구만, 없으면 '2,000원 할인!' (사장님 요청)
+                    (gIsSale(p) ? ((gSaleBadgeOn(p) && gSaleBadgeText(p))
+                        ? `<div class="thumb-sale txt">${gSaleBadgeText(p).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</div>`
+                        : `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>`) : '') +
                     `</div>` +
                     `<div class="item-info-top">` +
                     // [수정] [오늘의추천]은 이름이 아니라 isRecommend 값으로 그린다 (gRecommendMark).
@@ -10614,15 +10643,16 @@
                     //  색 글씨 말머리와 회색 수식어가 섞여 두 모양이었다. 땡처리 특가만 빨강을 남긴다(값 신호).
                     gCardNameHtml(p) +
                     `</div>` +
-                    gSaleNote(p) +
                     gDeadlineHtml(p, isClosed) +   // [신규] 마감 시각 · 마감 날 카운트다운
                     // [신규] 할인 상품은 판매가 바로 위에 할인 전 금액을 작게 적어 준다.
                     (gOrigPriceLabel(p)
-                        ? `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`
+                        ? (gOrigWord(p)
+                            ? `<div class="item-orig-price"><span class="orig">${gOrigWord(p)} ${gOrigPriceLabel(p)}</span></div>`   // [수정 2026-10-02] 정상가 방식 (사장님 요청)
+                            : `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`)
                         : '') +
                     `<div class="item-price-row">` +
-                    `<div class="item-badges">` + gStorageBadge(p) + gTagBadges(p) + `</div>` +   // [신규] 냉동·냉장 옆 딱지
-                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div>` +
+                    `<div class="item-badges">` + gFreshBadge(p) + gStorageBadge(p) + gTagBadges(p) + `</div>` +   // [신규] 냉동·냉장 옆 딱지 (신선은 맨 앞)
+                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div>` +
                     `</div>` +
                     `</div></div>` +
                     // [ver3] 수량(- 1 +)과 담기를 아래 한 줄로 모았다. 상세보기도 같은 줄 왼쪽에 둔다.
@@ -10711,6 +10741,8 @@
         function gIsSale(p) { return gDiscountRateOf(p) > 0 || gDiscAmountOf(p) > 0; }
         function gIsSaleToday(p) { return gIsSale(p) && !(p.saleToToday === false || p.saleToToday === 'false'); }
         function gSaleBadgeOn(p) { return gIsSale(p) && !(p.saleBadge === false || p.saleBadge === 'false'); }
+        // [신규 2026-10-02] 할인 섬네일 문구 — 주문관리 상세옵션에서 직접 쓴다. 비우면 문구 없음 (사장님 요청: 기본은 공란)
+        function gSaleBadgeText(p) { return String((p && p.saleBadgeText) || '').trim(); }
         function gDiscLabelOf(p) { return gDiscAmountOf(p) > 0 ? `${gDiscAmountOf(p).toLocaleString()}원 할인` : `${gDiscountRateOf(p)}% 할인`; }
 
         // 100원 단위로 버린다 (관리자 화면의 '예상 가격'과 똑같은 계산이라야 한다)
@@ -10727,6 +10759,18 @@
         }
 
         // 할인 전 금액. 할인이 없거나 값이 0이면 빈 문자열 → 카드에 줄 자체가 안 나온다.
+        // [신규 2026-10-02] 주문관리에서 '정상가'로 적은 할인이면 그어진 금액 앞에 '정상가'를 붙인다 (사장님 요청)
+        function gOrigWord(p) {
+            return (p && p.discountType === 'amount' && p.discountAmountMode === 'list') ? '정상가' : '';
+        }
+        // [신규 2026-10-02] 정상가 방식 — 최종 금액 앞에 빨간 'n%' 딱지. 반올림 (사장님 요청)
+        function gSalePctHtml(p) {
+            if (!gOrigWord(p)) return '';
+            const before = parseInt(p && p.price) || 0;
+            if (before <= 0) return '';
+            const pct = Math.round((before - gApplyDiscount(p, before)) / before * 100);
+            return pct > 0 ? `<span class="sale-pct">${pct}%</span>` : '';
+        }
         function gOrigPriceLabel(p) {
             if (!gIsSale(p)) return '';
             const base = parseInt(p && p.price) || 0;
@@ -10773,9 +10817,9 @@
             // [수정] 대괄호 말머리는 예전처럼 색을 입힌다 — 특가 빨강, 신선식품 초록, 오늘의추천·그 밖의 대괄호 주황
             const br = (t, cls) => `<span class="${cls}">[${E(t)}]</span>`;
             const tags = [
-                gSaleBadgeOn(p) ? br('땡처리 특가', 'lead-sale') : '',
+                // [수정 2026-10-02] 할인 문구는 말머리 줄에서 빼고 섬네일 띠에만 둔다 (사장님 요청)
                 gIsRecommendProduct(p) ? br('오늘의추천', 'lead-br') : '',
-                gIsFreshProduct(p) ? br('신선식품', 'lead-fresh') : '',
+                // [수정 2026-10-02] 신선식품은 말머리 줄 [신선식품] 대신 딱지 줄 맨 앞 초록 '신선' 딱지로 (gFreshBadge, 사장님 요청)
                 ...clean(Array.isArray(p.nameTags) ? p.nameTags : []).map(t => br(t, 'lead-br')),
                 ...ns.brs.map(t => br(t, 'lead-br'))
             ].filter(Boolean).join(' ');
@@ -10809,6 +10853,13 @@
             }
             const E = t => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
             return tags.map(t => `<span style="flex:0 0 auto; font-size:14px; font-weight:800; color:#4f5b46; background:#f1f4f7; padding:6px 11px; border-radius:8px; white-space:nowrap; line-height:1.2;">${E(t)}</span>`).join('');
+        }
+
+        // [신규 2026-10-02] 신선식품 딱지 — 다른 딱지와 같은 크기, 색만 초록. 딱지 줄 맨 앞에 둔다 (사장님 요청)
+        function gFreshBadge(p) {
+            if (!gIsFreshProduct(p)) return '';
+            return `<span style="flex:0 0 auto; font-size:14px; font-weight:800; color:#2e7d32; background:#e8f5e9;` +
+                ` padding:6px 11px; border-radius:8px; white-space:nowrap; line-height:1.2;">신선</span>`;
         }
 
         function gStorageBadge(p) {
@@ -11143,15 +11194,12 @@
            이름이 곧 상품의 열쇠(재고 조정키·주문 기록·중복 차단)라서 이름을 건드리면
            지난 주문과 재고가 통째로 어긋나기 때문이다. */
         function gSaleMark(p, size) {
-            if (!gSaleBadgeOn(p)) return '';   // [수정] '[땡처리 특가]' 문구는 고른 상품에만
-            return `<span style="color:#e11d48; font-size: ${size || '0.9em'};">[땡처리 특가]</span><br>`;
+            if (!gSaleBadgeOn(p) || !gSaleBadgeText(p)) return '';   // [수정] 문구는 고른 상품에만 (지금은 쓰는 곳 없음)
+            const t = gSaleBadgeText(p).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            return `<span style="color:#e11d48; font-size: ${size || '0.9em'};">[${t}]</span><br>`;
         }
 
-        // [신규] 특가 상품 안내 문구. 상품명 바로 아랫줄에 붙는다.
-        function gSaleNote(p) {
-            if (!gSaleBadgeOn(p)) return '';
-            return `<div class="item-sale-note">(수량이 많지 않습니다.)</div>`;
-        }
+        // [삭제 2026-10-02] 특가 상품 안내 문구 '(수량이 많지 않습니다.)'(gSaleNote) — 사장님 요청으로 뺐다
 
         /* ===== [신규] 재고 선점 (오버셀 방지) =====
            Firebase 실시간DB REST의 조건부 쓰기를 쓴다.
@@ -12499,21 +12547,17 @@
                 (_np.lead ? `<div class="item-lead detail-lead">${_np.lead}</div>` : '') + _np.main;
             // [수정] 할인 상품은 상세보기에서도 할인 전 금액을 위에 작게 적고, 판매가를 빨간색으로 바꾼다.
             //  글자 크기 22px의 0.6배로, 카드와 같은 비율을 쓴다.
-            // [신규] 특가 상품은 상품명 아랫줄에 안내 문구를 붙인다 (상품카드와 같은 문구)
-            if (gSaleBadgeOn(p)) {
-                document.getElementById('detail-title').insertAdjacentHTML('beforeend',
-                    `<div style="margin-top:6px; font-size:16px; font-weight:700; color:#e11d48;">(수량이 많지 않습니다.)</div>`);
-            }
+            // [삭제 2026-10-02] 특가 상품 이름 밑 '(수량이 많지 않습니다.)' — 카드와 함께 뺐다 (사장님 요청)
             const _dPriceEl = document.getElementById('detail-price');
             const _dRate = gIsSale(p);
             _dPriceEl.style.color = _dRate ? '#e11d48' : 'var(--nego-orange)';
             _dPriceEl.innerHTML =
                 (gOrigPriceLabel(p)
                     ? `<div style="display:flex; align-items:baseline; gap:6px; font-size:17px; font-weight:900; margin-bottom:3px;">`
-                      + `<span style="color:#e11d48;">${gDiscLabelOf(p)}</span>`
-                      + `<span style="color:#8b9682; font-weight:700; text-decoration:line-through;">${gOrigPriceLabel(p)}</span></div>`
+                      + (gOrigWord(p) ? '' : `<span style="color:#e11d48;">${gDiscLabelOf(p)}</span>`)   // [수정 2026-10-02] 정상가 방식은 'n원 할인' 대신 n% 딱지
+                      + `<span style="color:#8b9682; font-weight:700; text-decoration:line-through;">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</span></div>`
                     : '')
-                + gCardPriceLabel(p);
+                + gSalePctHtml(p) + gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
             // 설명은 따로 받아 온다. 나머지 화면은 기다리지 않고 먼저 그린다.
             document.getElementById('detail-desc').innerText = "";
