@@ -11398,9 +11398,10 @@
             const br = (t, cls) => `<span class="${cls}">[${E(t)}]</span>`;
             const tags = [
                 // [수정 2026-10-02] 할인 문구는 말머리 줄에서 빼고 섬네일 띠에만 둔다 (사장님 요청)
-                gIsRecommendProduct(p) ? br('오늘의추천', 'lead-br') : '',
                 // [수정 2026-10-02] 신선식품은 다시 말머리 줄의 초록 [신선식품]으로 (사장님 요청 — 사진 위 '신선' 딱지는 뺐다)
+                //  [신선식품]이 [오늘의추천]보다 앞 (사장님 요청)
                 gIsFreshProduct(p) ? br('신선식품', 'lead-fresh') : '',
+                gIsRecommendProduct(p) ? br('오늘의추천', 'lead-br') : '',
                 ...clean(Array.isArray(p.nameTags) ? p.nameTags : []).map(t => br(t, 'lead-br')),
                 ...ns.brs.map(t => br(t, 'lead-br'))
             ].filter(Boolean).join(' ');
