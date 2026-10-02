@@ -34,6 +34,8 @@
            로그인 기억 기능이 다시 붙으려다 같은 오류를 수십 번 낸다. 고칠 것이 없는 아이폰 사정이라
            오류 칸에는 남기지 않고, 손님에게 '새로고침' 안내를 한 번만 띄운다. */
         function __gIsIdbLost(m) { return /Indexed ?Database|IndexedDB|IDBDatabase/i.test(String(m || '')); }
+        // [신규 2026-10-02] 아이폰이 서랍 작업을 한 번 중간에 닫은 것 — 연결은 살아 있어 저절로 다시 된다. 기록도 안내도 없이 넘긴다
+        function __gIsIdbHiccup(m) { return /without an in-progress transaction|TransactionInactiveError|transaction (?:has finished|is not active|was aborted)|database connection is closing/i.test(String(m || '')); }
         function __gShowIdbRefresh() {
             if (window.__gIdbShown) return;
             window.__gIdbShown = true;
@@ -47,6 +49,7 @@
             document.body ? show() : window.addEventListener('DOMContentLoaded', show);
         }
         window.onerror = function(message, source, lineno, colno, error) {
+            if (__gIsIdbHiccup(message) || __gIsIdbHiccup(error && error.message)) return true;
             if (__gIsIdbLost(message) || __gIsIdbLost(error && error.message)) { __gShowIdbRefresh(); return true; }
             var errDiv = document.createElement('div');
             errDiv.style = 'position:fixed; top:0; left:0; width:100%; background:#e53e3e; color:white; padding:15px; z-index:999999; font-family:monospace; font-size:12px; word-break:break-all; box-sizing:border-box; border-bottom:3px solid #c53030;';
@@ -58,7 +61,7 @@
         };
         // [신규 2026-10-01] 놓친 비동기(Promise) 오류도 남긴다 — 손님 화면에는 띄우지 않는다
         window.addEventListener('unhandledrejection', function (ev) {
-            try { var r = ev && ev.reason; if (__gIsIdbLost(r && r.message) || __gIsIdbLost(r)) { __gShowIdbRefresh(); return; } var _a = ['화면(비동기)', (r && r.message) ? r : { message: String(r) }, {}]; window.gReportError ? window.gReportError.apply(null, _a) : (window.__gErrQ = window.__gErrQ || []).push(_a); } catch (e) { }
+            try { var r = ev && ev.reason; if (__gIsIdbHiccup(r && r.message) || __gIsIdbHiccup(r)) return; if (__gIsIdbLost(r && r.message) || __gIsIdbLost(r)) { __gShowIdbRefresh(); return; } var _a = ['화면(비동기)', (r && r.message) ? r : { message: String(r) }, {}]; window.gReportError ? window.gReportError.apply(null, _a) : (window.__gErrQ = window.__gErrQ || []).push(_a); } catch (e) { }
         });
     </script>
 
@@ -5166,7 +5169,7 @@
             if (!p) return false;
             if (gIsExpiredProduct(p)) return true;   // 노출일정의 마감 시각이 지났다
             if (gIsTodayGbClosed(p)) return true;    // [신규 2026-09-30] 오늘 상품인데 당일 마감시각이 지났거나 휴무일
-            const k = fGetAdjKey(p.matchKey || p.date, p.name);
+            const k = fGetAdjKey(p.matchKey || p.date, p.name, p.sid);
             return gClosedMap[k] === true || gClosedMap[encodeURIComponent(k)] === true;
         }
 
@@ -5249,7 +5252,34 @@
             } catch (e) { return false; }
         }
 
-        function fGetAdjKey(mKey, name) {
+        /* [수정 2026-10-02] 재고 열쇠 = 상품 노출번호(sid). 주문관리에서 픽업일을 바꿔도 재고·마감이 그대로 따라간다.
+           부르는 쪽은 예전처럼 (날짜·분류, 이름)을 넘기고, 받아 둔 상품 목록(gSidIndex)에서 그 상품의 노출번호를 찾는다.
+           번호가 없는 상품(주문관리가 아직 안 옮긴 것)은 예전 열쇠 '날짜_이름'을 그대로 쓴다. sid 를 직접 넘기면 그것을 쓴다.
+           ※ 주문관리가 이 글자(gSidIndex)가 올라간 것을 보고서야 재고를 옮긴다 — 이름을 바꾸지 말 것 */
+        let gSidIndex = new Map();   // '이름|날짜' → 노출번호
+        function gSidNormMk(mKey) {
+            const s = String(mKey || '').trim();
+            const m = s.match(/^(\d{2,4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
+            if (!m) return s;
+            const y = m[1].length === 2 ? '20' + m[1] : m[1];
+            return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        }
+        function gBuildSidIndex(list) {
+            const map = new Map();
+            (Array.isArray(list) ? list : []).forEach(p => {
+                if (!p || !p.sid || !p.name) return;
+                const k = String(p.name).trim() + '|' + gSidNormMk(p.matchKey || p.date);
+                if (!map.has(k)) map.set(k, String(p.sid));
+                const k2 = String(p.name).trim() + '|' + gSidNormMk(p.date || p.matchKey);   // 날짜로 불러도 찾게
+                if (!map.has(k2)) map.set(k2, String(p.sid));
+            });
+            gSidIndex = map;
+        }
+        function fGetAdjKey(mKey, name, sid) {
+            const direct = String(sid || '').trim();
+            if (direct) return direct;
+            const found = gSidIndex.get(String(name || '').trim() + '|' + gSidNormMk(mKey));
+            if (found) return found;
             const s = String(mKey || "").trim();
             return fSafeKey(s) + "_" + fSafeKey(name);
         }
@@ -5551,7 +5581,7 @@
             try {
                 if (isAdminMode) return;
                 const msg = String((err && err.message) || err || '').replace(/\s+/g, ' ').trim().slice(0, 300);
-                if (!msg || /^Script error\.?$/i.test(msg) || /Failed to fetch|Load failed|NetworkError|network error|AbortError|ResizeObserver|Indexed ?Database|IndexedDB/i.test(msg)) return;   // [수정 2026-10-01] 아이폰 저장 공간 끊김은 남기지 않는다
+                if (!msg || /^Script error\.?$/i.test(msg) || /Failed to fetch|Load failed|NetworkError|network error|AbortError|ResizeObserver|Indexed ?Database|IndexedDB|in-progress transaction|TransactionInactiveError/i.test(msg)) return;   // [수정 2026-10-01] 아이폰 저장 공간 끊김은 남기지 않는다
                 const phone = (typeof window.gFirebasePhone === 'function') ? await window.gFirebasePhone() : '';
                 if (!phone) return;
                 const now = new Date(), day = gYmdOf(now), sig = `${where}|${msg}`;
@@ -8590,7 +8620,7 @@
                         const _pForKey = (typeof productsData !== 'undefined' ? productsData : []).find(pd => pd && (pd.name === rawItemName || String(pd.name).replace(/['"]/g, '') === rawItemName));
                         const keyMatchKey = order.matchKey || (_pForKey && _pForKey.matchKey) || order.date || order.pickupDate || "";
                         const keyName = (_pForKey && _pForKey.name) ? _pForKey.name : rawItemName;
-                        const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey, keyName) : (fSafeKey(keyMatchKey) + "_" + fSafeKey(keyName));
+                        const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey, keyName, order && order.sid) : (fSafeKey(keyMatchKey) + "_" + fSafeKey(keyName));
                         const diff = parseInt(order.qty) || 1;
 
                         // [개선] 취소 시 재고 복구도 최대 5회 재시도(쓰기 성공 확인). 취소 자체(PATCH)는 이미
@@ -8740,7 +8770,7 @@
                 const _pForKey2 = (typeof productsData !== 'undefined' ? productsData : []).find(pd => pd && (pd.name === rawItemName || String(pd.name).replace(/['"]/g, '') === rawItemName));
                 const keyMatchKey2 = matchKey || (_pForKey2 && _pForKey2.matchKey) || pickupDate || "";
                 const keyName2 = (_pForKey2 && _pForKey2.name) ? _pForKey2.name : rawItemName;
-                const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey2, keyName2) : (fSafeKey(keyMatchKey2) + "_" + fSafeKey(keyName2));
+                const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey2, keyName2, fullHistoryData[targetIdx] && fullHistoryData[targetIdx].sid) : (fSafeKey(keyMatchKey2) + "_" + fSafeKey(keyName2));
                 const diff = parseInt(fullHistoryData[targetIdx].qty) || 1;
 
                 const stockPromise = fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`)
@@ -9062,6 +9092,7 @@
                 //  (rawData는 publishedProducts를 그대로 복사한 것이라 번호가 서로 같다)
                 if (Array.isArray(publishedProducts)) publishedProducts.forEach((p, i) => { if (p) p.__pubIdx = i; });
                 if (Array.isArray(rawData)) rawData.forEach((p, i) => { if (p) p.__pubIdx = i; });
+                gBuildSidIndex(publishedProducts);   // [신규 2026-10-02] 재고 열쇠(노출번호) 찾기표
 
                 // 실시간 전역 재고 변동분 처리
                 let globalAdjustments = {};
@@ -9175,7 +9206,7 @@
 
                         // 다중 키 지원으로 global_stock 연동 완벽 보장
                         const adjKey1 = fGetAdjKey(mKey, pName);
-                        const adjKey2 = pubMatch ? fGetAdjKey(pubMatch.matchKey || pubMatch.date, pubMatch.name) : adjKey1;
+                        const adjKey2 = pubMatch ? fGetAdjKey(pubMatch.matchKey || pubMatch.date, pubMatch.name, pubMatch.sid) : adjKey1;
                         const adjKey3 = fGetAdjKey(normKey(mKey), pName);
 
                         const adj = pickAdj(adjKey1, adjKey2, adjKey3);
@@ -9216,8 +9247,8 @@
 
                     // [버그수정] 캐시 항목이면 stock에 adj가 반영돼 있으므로 참 기본재고 originalStock 우선.
                     const baseStock = (pub.originalStock !== undefined && pub.originalStock !== null && pub.originalStock !== "") ? pub.originalStock : pub.stock;
-                    const adjKey1 = fGetAdjKey(pubKey, pubName);
-                    const adjKey2 = fGetAdjKey(normKey(pubKey), pubName);
+                    const adjKey1 = fGetAdjKey(pubKey, pubName, pub.sid);
+                    const adjKey2 = fGetAdjKey(normKey(pubKey), pubName, pub.sid);
 
                     const adj = pickAdj(adjKey1, adjKey2);
 
@@ -11219,7 +11250,7 @@
 
         // 옵션 항목 하나를 가리키는 키. 상품키 + 옵션그룹 + 항목이름.
         function gOptStockKey(p, groupName, itemName) {
-            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '');
+            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '', p && p.sid);
             return base + '__' + fSafeKey(groupName) + '__' + fSafeKey(itemName);
         }
 
@@ -13392,7 +13423,7 @@
                            지금까지 주문에는 상품 '이름'만 남아, 같은 물건이라도 이름을 조금 바꿔 올리면
                            딴 물건으로 세어졌다 (계란 한 가지가 아홉 이름으로 갈렸다).
                            번호가 함께 남으면 이름이 어떻든 하나로 묶인다. */
-                        allItems.push({ kind: gKindOf(pData), isGb: gIsGbProduct(pData), name: itemName, productCode: String((pData && pData.productCode) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
+                        allItems.push({ kind: gKindOf(pData), isGb: gIsGbProduct(pData), name: itemName, productCode: String((pData && pData.productCode) || '').trim(), sid: String((pData && pData.sid) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
                     }
                 }
 
@@ -14062,7 +14093,7 @@
                 const newHistoryItems = saveItems.map(it => ({
                     timestamp: jsFormatDate(new Date(tempTimestamp)),
                     item: it.name,
-                    productCode: it.productCode || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
+                    productCode: it.productCode || "", sid: it.sid || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
                     qty: it.qty,
                     price: it.price,
                     total: it.subtotal,
@@ -14194,7 +14225,7 @@
                         }
 
                         // [신규] 그 사이 마감됐는지 먼저 본다 (무제한 상품도 마감은 막는다)
-                        const [_cl, _ex] = await Promise.all([gFetchLiveClosed(fGetAdjKey(it.matchKey || it.date, it.name)), gFetchLiveExpired(pData)]);
+                        const [_cl, _ex] = await Promise.all([gFetchLiveClosed(fGetAdjKey(it.matchKey || it.date, it.name, it.sid || (pData && pData.sid))), gFetchLiveExpired(pData)]);
                         /* [신규 2026-09-30] 확정 직전에 숨김도 한 번 더 본다 (공동구매 상품만 — 상시판매는 따로 논다).
                            주문서를 켜 둔 채 자정을 넘기면 어제 상품이 목록에선 사라져도 장바구니엔 남는데,
                            당일 마감 검사는 '받는 날이 오늘'인 것만 보므로 날이 바뀐 상품이 그대로 주문됐다. */
@@ -14207,7 +14238,7 @@
                         if (gIsUnlimitedStock(pData)) continue;
 
                         let base = parseInt((pData && pData.originalStock) || 0) || 0;
-                        const adjKey = fGetAdjKey(it.matchKey || it.date, it.name);
+                        const adjKey = fGetAdjKey(it.matchKey || it.date, it.name, it.sid || (pData && pData.sid));
                         const need = parseInt(it.qty) || 0;
                         if (need <= 0) continue;
 
@@ -14290,7 +14321,7 @@
                         ...payload,
                         timestamp: formattedTimestamp,
                         item: it.name,
-                        productCode: it.productCode || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
+                        productCode: it.productCode || "", sid: it.sid || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
                         qty: it.qty,
                         price: it.price,
                         // [버그수정] price × qty로 다시 계산하면 줄당 한 번 붙는 사다드림 대행료가 빠진다.
