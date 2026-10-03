@@ -2906,7 +2906,8 @@
                 <!-- [수정 2026-10-02] 후기 쓸 때 안내 — 포인트 받기·쓰기·사라짐, 지워질 수 있는 글 (사장님 요청) -->
                 <ul class="rv-guide">
                     <li>후기를 남기면 <b>50P</b>, 20자 이상(띄어쓰기 제외)이면 <b>100P</b>를 드려요</li>
-                    <li>후기는 상품을 받은 날부터 <b>2주</b> 안에 쓸 수 있어요</li>
+                    <li>후기는 픽업·배달일로부터 <b>2주</b> 안에 쓸 수 있어요</li><!-- [수정 2026-10-03] 받은 날 → 픽업·배달일 (사장님 요청) -->
+                    <li>후기는 같은 상품당 <b>1번</b>만 쓸 수 있어요</li><!-- [신규 2026-10-03] 사장님 요청 -->
                     <li><b>1,000P</b>부터 주문할 때나 매장 픽업 때 자유롭게 쓸 수 있어요</li>
                     <li>포인트는 받은 날부터 <b>1년</b>이 지나면 사라져요</li>
                     <li>욕설·비방이나 상품과 관계없는 글은 삭제될 수 있으며, 이때 받은 포인트도 회수돼요</li>
@@ -3924,6 +3925,8 @@
 
                     const modal = document.getElementById('profile-modal');
                     if (modal) modal.classList.remove('login-forced');
+                    // [신규 2026-10-03] 로그인·가입 화면이 떠 있으면 닫는다 — 사장님 모드에서는 로그인 없이 둘러본다
+                    try { gSetProfileClosable(true); closeModal('profile-modal'); checkScrollLock(); gSyncMenuFoot(); } catch (e2) { }
                 } else {
                     showSystemModal("관리자 모드가 해제되었습니다.<br>(일반 사용자 화면으로 전환됩니다)", 'alert');
                     setTimeout(() => location.reload(), 1000);
@@ -4100,10 +4103,11 @@
                    → 카카오 토큰이 살아 있으면 조용히 받아 두고, 만료됐으면 카카오 로그인을 한 번 다시 하게 한다 */
                 if (localStorage.getItem('kakao_original_name') && typeof gFirebaseKakaoSignIn === 'function' && !(await gFirebaseHasUser())) {
                     const _fb = await gFirebaseKakaoSignIn(localStorage.getItem('kakao_original_phone') || '');
-                    if (_fb === 'no-kakao' && isLoginEntryEnabled && !gIsGuestView()) localStorage.removeItem('kakao_original_name');
+                    if (_fb === 'no-kakao' && isLoginEntryEnabled && !gIsGuestView() && !isAdminMode) localStorage.removeItem('kakao_original_name');
                 }
                 const kakaoInfo = localStorage.getItem('kakao_original_name');
-                if (!kakaoInfo && isLoginEntryEnabled && !gIsGuestView()) {
+                // [수정 2026-10-03] 사장님 모드면 로그인 화면을 띄우지 않는다 (사장님 요청 — 로그인해야 보이는 화면을 빈 채로 둘러본다)
+                if (!kakaoInfo && isLoginEntryEnabled && !gIsGuestView() && !isAdminMode) {
                     const modal = document.getElementById('profile-modal');
                     if (modal) {
                         modal.classList.add('login-forced');
@@ -4112,7 +4116,7 @@
                     }
                 }
                 /* [신규] 로그인은 했는데 가입을 안 마친 손님 — 못 닫는 가입 화면으로 붙잡는다 */
-                else if (kakaoInfo && isLoginEntryEnabled && !gIsGuestView() && !gJoinDone()) {
+                else if (kakaoInfo && isLoginEntryEnabled && !gIsGuestView() && !isAdminMode && !gJoinDone()) {
                     gForceJoin();
                 }
             } catch (e) { console.error("로그인 설정 로드 실패:", e); }
@@ -5859,7 +5863,7 @@
            · 포인트(1P=1원) : 글 1~19자 50P · 20자 이상 100P — 띄어쓰기( )만 빼고 센다. 규칙관리와 똑같이 세야 저장된다
            · 한 번에 같이 쓰는 것 : 후기 · 내 후기 표시(review_keys) · 상품 별점 합계 · (포인트가 있으면) 포인트 기록과 잔액 */
         const REVIEW_DONE_STATUS = ['픽업', '배달완료', '픽업완료'];
-        window.gMyReviewKeys = null;   // { 주문키: true }
+        window.gMyReviewKeys = null;   // { 주문키: { code(상품번호), rid, at } }
         function gReviewPts(text) {
             const n = String(text || '').replace(/ /g, '').length;
             return n >= 20 ? 100 : (n >= 1 ? 50 : 0);
@@ -5893,16 +5897,23 @@
             if (!gIsValidPhone(ph) || gIsGuestView()) return;
             window.__gReviewKeysLoading = true;
             try {
-                const r = await fetch(`${FIREBASE_DB_URL}review_keys/${ph}.json?shallow=true&t=${Date.now()}`);
+                // [수정 2026-10-03] 상품번호(code)까지 받는다 — 같은 상품은 후기 1번만 (사장님 요청)
+                const r = await fetch(`${FIREBASE_DB_URL}review_keys/${ph}.json?t=${Date.now()}`);
                 window.gMyReviewKeys = (r.ok ? await r.json() : null) || {};
             } catch (e) { window.gMyReviewKeys = window.gMyReviewKeys || null; }
             window.__gReviewKeysLoading = false;
             const hm = document.getElementById('history-modal');
             if (window.gMyReviewKeys && hm && getComputedStyle(hm).display !== 'none') renderHistory();
         }
+        // [신규 2026-10-03] 이 상품(번호)에 이미 후기를 썼나 — 다른 날 주문한 같은 상품도 1번만 (사장님 요청)
+        function gReviewedCode(o) {
+            const code = String((o && o.productCode) || '').trim();
+            return !!code && Object.values(window.gMyReviewKeys || {}).some(v => v && String(v.code || '').trim() === code);
+        }
         function gReviewBtnHtml(o) {
             if (!gCanReview(o) || !window.gMyReviewKeys) return '';
             if (window.gMyReviewKeys[o.__fbKey]) return `<div class="rv-done">후기 완료</div>`;
+            if (gReviewedCode(o)) return `<div class="rv-done">후기 쓴 상품</div>`;   // [신규 2026-10-03] 다른 주문에서 이미 후기를 쓴 같은 상품 (사장님 요청)
             return `<button type="button" class="rv-write-btn" onclick="gOpenReview('${encodeURIComponent(o.__fbKey)}')">후기 쓰기</button>`;
         }
         let _gRv = null;   // 지금 쓰는 후기 { order, stars }
@@ -5910,6 +5921,7 @@
             const key = decodeURIComponent(encKey);
             const o = (fullHistoryData || []).find(x => x.__fbKey === key);
             if (!o || !gCanReview(o)) { showToast('후기를 쓸 수 없는 상품이에요'); return; }
+            if (gReviewedCode(o)) { showToast('이 상품은 이미 후기를 썼어요'); return; }   // [신규 2026-10-03] 같은 상품 1번만
             _gRv = { order: o, stars: 0 };
             document.getElementById('rv-item').innerText = String(o.item || '');
             document.getElementById('rv-text').value = '';
@@ -5949,6 +5961,7 @@
             const o = _gRv.order, ph = gReviewPhone();
             if (!gIsValidPhone(ph)) { showToast('로그인한 뒤에 쓸 수 있어요'); return; }
             const code = String(o.productCode).trim(), ref = o.__fbKey;
+            if (gReviewedCode(o)) { showToast('이 상품은 이미 후기를 썼어요'); return; }   // [신규 2026-10-03] 같은 상품 1번만
             const text = String(document.getElementById('rv-text').value || '').trim().slice(0, 500);
             const pts = gReviewPts(text);
             const btn = document.getElementById('rv-send');
@@ -5974,7 +5987,7 @@
                     const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
                     if (res.ok) {
                         window.gMyReviewKeys = window.gMyReviewKeys || {};
-                        window.gMyReviewKeys[ref] = true;
+                        window.gMyReviewKeys[ref] = { code, rid, at: now };   // [수정 2026-10-03] 상품번호도 적어 둔다 (같은 상품 1번만)
                         closeModal('review-modal');
                         showToast(pts ? `후기를 남겼어요 · ${pts}P 적립` : '후기를 남겼어요');
                         try { renderHistory(); } catch (e) { }
@@ -6108,6 +6121,10 @@
             const sumEl = document.getElementById('cf-sum-val');
             if (!box) return;
             const ph = gKeyPhone(document.getElementById('input-phone').value);
+            if ((!gIsValidPhone(ph) || gIsGuestView()) && isAdminMode && goods > 0) {   // [신규 2026-10-03] 사장님 모드 — 빈 화면(0P)
+                box.innerHTML = `<div class="cf-pt-note">포인트 0P · ${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있어요 (사장님 모드)</div>`;
+                return;
+            }
             if (!gIsValidPhone(ph) || gIsGuestView() || !(goods > 0)) return;
             let bal = 0;
             try {
@@ -6228,8 +6245,17 @@
         }
         async function gOpenMyPoints() {
             const ph = gReviewPhone();
-            if (!gIsValidPhone(ph) || gIsGuestView()) { showToast('카카오로 로그인하면 포인트를 볼 수 있어요'); return; }
+            const _owner = (!gIsValidPhone(ph) || gIsGuestView()) && isAdminMode;   // [신규 2026-10-03] 사장님 모드 — 손님 없이 빈 화면으로 연다
+            if ((!gIsValidPhone(ph) || gIsGuestView()) && !_owner) { showToast('카카오로 로그인하면 포인트를 볼 수 있어요'); return; }
             const side = document.getElementById('side-menu');
+            if (_owner) {
+                if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
+                document.getElementById('pt-bal').innerHTML = `0<small>P</small>`;
+                document.getElementById('pt-list').innerHTML = `<div class="dr-empty">아직 쌓인 포인트가 없어요<br><small>(사장님 모드 — 손님 로그인 없이 빈 화면)</small></div>`;
+                document.getElementById('points-modal').style.display = 'flex';
+                checkScrollLock();
+                return;
+            }
             if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
             document.getElementById('pt-bal').innerHTML = '…';
             document.getElementById('pt-list').innerHTML = '';
@@ -7753,6 +7779,14 @@
             const phone = String(document.getElementById('input-phone').value || '').trim()
                 || _ls('moket_user_phone') || _ls('kakao_original_phone');
 
+            // [신규 2026-10-03] 사장님 모드 — 손님 로그인이 없으면 주문내역 화면을 빈 채로 연다
+            if (isAdminMode && (!phone || !/^010\d{8}$/.test(gKeyPhone(phone)) || gIsGuestView())) {
+                if (isSilent) return;
+                fullHistoryData = [];
+                setupHistoryUI('사장님 모드');
+                renderHistory();
+                return;
+            }
             if (!phone) {
                 if (!isSilent) {
                     showSystemModal("주문자명과 연락처를 입력해주세요.", 'alert', () => {
@@ -11876,7 +11910,7 @@
         function gHomeMineHtml() {
             const name = String(localStorage.getItem('moket_user_name') || '').trim();
             const phone = String(localStorage.getItem('moket_user_phone') || '').trim();
-            if (!name || !phone || gIsGuestView()) return '';
+            if ((!name || !phone || gIsGuestView()) && !isAdminMode) return '';   // [수정 2026-10-03] 사장님 모드면 빈 칸으로라도 보인다
             let rows = (Array.isArray(fullHistoryData) && fullHistoryData.length) ? fullHistoryData : null;
             if (!rows) { try { rows = JSON.parse(localStorage.getItem(`history_cache_${name}_${gKeyPhone(phone)}`) || '[]'); } catch (e) { rows = []; } }
             if (!Array.isArray(rows)) rows = [];
