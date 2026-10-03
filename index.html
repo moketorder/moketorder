@@ -11186,6 +11186,8 @@
                         : '') +
                     `<div class="item-price-row">` +
                     `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div>` +
+                    // [수정 2026-10-03] 사장님 모드 잔여 수량은 가격 줄 오른쪽에 — 담기 위에 두면 담기가 수량보다 아래로 내려갔다 (사장님 요청)
+                    (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800; margin-left:auto; padding-left:6px; font-size:12px; white-space:nowrap; align-self:center;">${stockText.replace(': ', ' ')}</div>` : '') +
                     `</div>` +
                     `</div></div>` +
                     // [ver3] 수량(- 1 +)과 담기를 아래 한 줄로 모았다. 상세보기도 같은 줄 왼쪽에 둔다.
@@ -11197,7 +11199,6 @@
                     `<button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>` +
                     `</div>` +
                     `<div class="qty-group">` +
-                    (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800;">${stockText}</div>` : '') +
                     // [수정] 수량 조절(- 0 +) 대신 '담기' 버튼. 누를 때마다 1개씩 늘어난다.
                     `<div class="add-cart-wrap ${currentQty > 0 ? 'selected' : ''}" style="${isSoldOut ? 'pointer-events:none;' : ''}">` +
                     `<input type="hidden" class="qty-num" value="${currentQty}" data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
