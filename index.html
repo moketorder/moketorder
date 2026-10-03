@@ -11789,7 +11789,9 @@
         }
         function gHomeStockOf(p) { return (p && p.stock !== undefined && p.stock !== '') ? parseInt(p.stock) : Infinity; }
         // 홈에는 지금 담을 수 있는 상품만 (마감·품절은 뺀다)
-        function gHomeBuyable(p) { return !!gHomeTypeOf(p) && !gIsClosedProduct(p) && !(gHomeStockOf(p) <= 0); }
+        // [수정 2026-10-03] 숨긴 상품(hide)은 사장님 모드여도 홈에 안 넣는다 — 홈은 손님이 보는 모습 그대로 (사장님 요청: '주문이 많아요'에 숨긴 과일이 나왔다)
+        function gHomeHiddenProd(p) { return p.hidden === true || p.hidden === "true" || p.hide === true || p.hide === "true"; }
+        function gHomeBuyable(p) { return !!gHomeTypeOf(p) && !gHomeHiddenProd(p) && !gIsClosedProduct(p) && !(gHomeStockOf(p) <= 0); }
         function gHomeEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
         // 홈 상품 카드 — 목록 카드와 같은 담기 단추(.qty-num + .btn-add-cart)를 써서 담는 처리를 그대로 탄다
