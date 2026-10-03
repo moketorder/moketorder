@@ -11972,6 +11972,55 @@
                     `<small>${HM_WEEK[new Date(d + 'T12:00:00').getDay()]} · ${cnt[d]}개</small></button>`).join('') + `</div></section>`;
         }
 
+        /* [신규 2026-10-03] 홈 사진 깜빡임 막기 (사장님 요청).
+           앱을 켜면 설정·상품·소식이 차례로 와서 홈을 0.5초 사이 5번쯤 다시 그린다. 예전엔 그때마다 통째로 지워
+           사진 35장을 새로 만들어 깜빡였다. 이제 줄(칸)마다 글이 같으면 그대로 두고, 상품 줄은 카드마다 같으면 그대로 둔다.
+           · 줄 이름표(_k) = 상품 줄은 data-rail, 나머지는 class + 제목 글자 */
+        function gHomeKeyOf(el) {
+            const r = el.querySelector && el.querySelector('[data-rail]');
+            if (r) return 'rail:' + r.dataset.rail;
+            const t = el.querySelector && el.querySelector('b, .t1');
+            return (el.className || el.nodeName) + ':' + (t ? t.textContent : '');
+        }
+        function gHomePatch(box, out) {
+            const tpl = document.createElement('template');
+            tpl.innerHTML = out.join('');
+            const fresh = [...tpl.content.children];
+            const olds = new Map();
+            [...box.children].forEach(el => { if (el._k !== undefined) olds.set(el._k, el); });
+            const next = fresh.map(nw => {
+                const k = gHomeKeyOf(nw), html = nw.outerHTML;
+                const old = olds.get(k);
+                if (old) olds.delete(k);
+                if (old && old._h === html) return old;   // 글이 같으면 그대로
+                const or = old && old.querySelector('[data-rail]'), nr = nw.querySelector('[data-rail]');
+                if (or && nr) {
+                    // 상품 줄 — 위 제목칸은 새것으로, 카드는 같은 것끼리 그대로 둔다
+                    const oh = old.firstElementChild, nh = nw.firstElementChild;
+                    if (oh && nh && oh !== or && nh !== nr && oh.outerHTML !== nh.outerHTML) oh.replaceWith(nh);
+                    const oc = new Map();
+                    [...or.children].forEach(c => { const a = oc.get(c._h) || []; a.push(c); oc.set(c._h, a); });
+                    const cards = [...nr.children].map(c => {
+                        const h = c.outerHTML, a = oc.get(h);
+                        if (a && a.length) return a.shift();
+                        c._h = h; return c;
+                    });
+                    gHomePlace(or, cards);
+                    old._h = html;
+                    return old;
+                }
+                nw._k = k; nw._h = html;
+                [...(nw.querySelectorAll('[data-rail] > *'))].forEach(c => { c._h = c.outerHTML; });
+                return nw;
+            });
+            gHomePlace(box, next);
+        }
+        // 차례대로 놓되, 이미 제자리인 것은 건드리지 않는다 (떼었다 붙이면 사진이 다시 그려질 수 있다)
+        function gHomePlace(parent, list) {
+            const keep = new Set(list);
+            [...parent.children].forEach(el => { if (!keep.has(el)) el.remove(); });
+            list.forEach((el, i) => { if (parent.children[i] !== el) parent.insertBefore(el, parent.children[i] || null); });
+        }
         function gRenderHome() {
             const box = document.getElementById('home-view');
             if (!box) return;
@@ -11980,7 +12029,7 @@
             const out = [gHomeTodayHtml(), gHomeNoticeHtml()];
             if (!isAdminMode && !isProductListEnabled) {
                 out.push(`<div class="hm-closed">현재는 주문이 불가능 합니다.<br>(주문 가능 시간 - 오전 10시 ~ 다음날 오전 6시)</div>`);
-                box.innerHTML = out.join('');
+                gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
                 return;
             }
             const buy = (productsData || []).filter(p => p && gHomeBuyable(p));
@@ -12016,7 +12065,7 @@
                 // [신규 2026-10-03] 문의는 1:1 카톡으로 (사장님 요청) — 메뉴 '카카오톡 문의하기'와 같은 주소
                 `<div class="hm-ask"><p>배달·상품 문의와 AS 신청은<br><b>1:1 카톡</b>으로 문의해 주세요.</p>` +
                 `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
-            box.innerHTML = out.join('');
+            gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
             box.querySelectorAll('[data-rail]').forEach(r => { if (keep[r.dataset.rail]) r.scrollLeft = keep[r.dataset.rail]; });
         }
 
