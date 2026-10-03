@@ -280,6 +280,7 @@
         .hm-mine-row .n { flex: 1 1 auto; min-width: 0; font-size: 13.5px; font-weight: 600; color: #4f5b46; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .hm-mine-row .s { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: #8b9682; }
         .hm-mine-row .s.go { color: #FF6D00; }
+        .hm-mine-row .s.done { color: #3d8f19; }   /* [신규 2026-10-03] 오늘 받은 것 — 초록 */
         .hm-link { display: block; width: 100%; padding: 11px 14px; border: 0; border-top: 1px solid #f1f3ee; background: #f8faf4; font: inherit; font-size: 13.5px; font-weight: 700; color: #3d8f19; text-align: center; cursor: pointer; }
         .hm-empty { font-size: 13.5px; font-weight: 600; color: #8b9682; line-height: 1.6; }
         /* 받는 날로 보기 */
@@ -11926,26 +11927,30 @@
             const t = gTodayYmd();
             const groups = {};
             rows.forEach(o => {
-                if (!o || isOrderCancelled(o) || isOrderReceived(o) || isOrderDelivered(o)) return;
+                if (!o || isOrderCancelled(o)) return;
                 if (gIsFeeRow(o.item) || gIsPointRow(o.item)) return;
                 const d = parseKRDate(o.pickupDate);
                 if (!d) return;
                 const ymd = gYmdOf(d), stocked = isOrderStocked(o);
-                if (ymd < t && !stocked) return;   // 지난 날짜는 들어와서 찾아가야 하는 것만
-                const g = groups[ymd] || (groups[ymd] = { ymd, n: 0, first: '', stocked: false, del: false });
+                // [수정 2026-10-03] 받은 것(픽업완료·배달완료)은 받는 날이 오늘이면 남겨 둔다 (사장님 요청). 완료 시각은 따로 없어 받는 날로 본다
+                const done = isOrderReceived(o) || isOrderDelivered(o);
+                if (done && ymd !== t) return;
+                if (!done && ymd < t && !stocked) return;   // 지난 날짜는 들어와서 찾아가야 하는 것만
+                const g = groups[ymd] || (groups[ymd] = { ymd, n: 0, first: '', stocked: false, del: false, left: 0 });
                 g.n += 1;   // '외 N개'는 상품 가짓수로 센다
                 if (!g.first) g.first = String(o.item || '');
-                if (stocked) g.stocked = true;
+                if (!done) { g.left += 1; if (stocked) g.stocked = true; }   // 상태는 아직 안 받은 것으로 정한다
                 if (String(o.shippingMethod || '').includes('배달')) g.del = true;
             });
             const list = Object.values(groups).sort((a, b) => a.ymd < b.ymd ? -1 : 1).slice(0, 3);
             const body = list.length
                 ? list.map(g => {
                     const d = new Date(g.ymd + 'T12:00:00');
-                    const st = g.stocked ? (g.del ? '배달 준비' : '찾아가세요') : (g.del ? '배달 예정' : '픽업 예정');
+                    const st = !g.left ? (g.del ? '배달 완료' : '픽업 완료')   // [신규 2026-10-03] 그 날 것을 다 받았으면
+                        : g.stocked ? (g.del ? '배달 준비' : '픽업 가능') : (g.del ? '배달 예정' : '픽업 예정');   // [수정 2026-10-03] '찾아가세요' → '픽업 가능' (사장님 요청)
                     return `<div class="hm-mine-row"><span class="d">${gHomeDayLabel(g.ymd)} ${HM_WEEK[d.getDay()]}</span>` +
                         `<span class="n">${gHomeEsc(g.first)}${g.n > 1 ? ` 외 ${g.n - 1}개` : ''}</span>` +
-                        `<span class="s${g.stocked && !g.del ? ' go' : ''}">${st}</span></div>`;
+                        `<span class="s${!g.left ? ' done' : (g.stocked ? ' go' : '')}">${st}</span></div>`;   // [수정 2026-10-03] 배달 준비도 픽업 가능처럼 주황 (사장님 요청)
                 }).join('')
                 : `<div class="hm-mine-row"><span class="hm-empty">다가오는 픽업·배달이 없어요.</span></div>`;
             // [수정 2026-10-03] '마지막으로 본 주문내역 기준' 설명은 뺐다 — 홈에서 새로 받아 오므로 (사장님 요청)
