@@ -11346,17 +11346,26 @@
         }
 
         // [신규] '신선식품'으로 표시해 둔 상품인지. 상품등록 공동구매 칸에서 고른 값(isFresh)을 본다.
+        //  [수정 2026-10-03] isFresh 는 이제 '신선배송'(자기 날짜에만 배달) 표시이고 사다드림도 켜져 있다.
+        //   이 함수는 [신선식품] 딱지용이라 사다드림은 뺀다 — 사다드림은 [사다드림]만 보인다 (사장님 결정: 딱지는 지금처럼).
         function gIsFreshProduct(p) {
             if (!p) return false;
-            return (p.isFresh === true || p.isFresh === 'true');
+            return (p.isFresh === true || p.isFresh === 'true') && !gIsSadaProduct(p);
+        }
+        // [신규 2026-10-03] 신선배송 — 자기 날짜에만 배달, 뒷날 상품과 한 배달로 못 묶는다 (사장님이 정한 이름).
+        //  주문관리가 종류(일반(신선)·과일·채소·사다드림)를 보고 isFresh 하나로 저장한다.
+        //  isFresh 없이 저장된 예전 사다드림도 신선배송으로 본다.
+        function gIsFreshShip(p) {
+            if (!p) return false;
+            return p.isFresh === true || p.isFresh === 'true' || gIsSadaProduct(p);
         }
 
         // [신규] 합배송에서 '자기 날짜를 지켜야 하는' 상품인지.
         //  사다드림과 신선식품이 여기에 든다. 둘 다 그날 드셔야 하는 물건이라
         //  더 늦은 날짜 상품과 한 차에 실어 보낼 수 없다.
         function gIsDateBoundProduct(p) {
-            // 과일도 제날 배달해야 하면 주문관리에서 '신선'을 켜 둔다 (2026-09-30 사장님 결정)
-            return gIsSadaProduct(p) || gIsFreshProduct(p);
+            // [수정 2026-10-03] 신선배송 하나로 본다 (사다드림을 따로 보지 않는다)
+            return gIsFreshShip(p);
         }
 
         /* ===== [신규 2026-09-30] 공동구매(당일판매 + 예약판매 합침) =====
