@@ -7874,6 +7874,9 @@
                         fullHistoryData = [];
                         if (document.getElementById('history-modal').style.display === 'flex') renderHistory();
                     }
+                    window.__hmMineAt = Date.now();
+                    // [신규 2026-10-03] 새로 받은 주문내역으로 홈 '내 주문'도 다시 그린다 (사장님 요청 — 예전엔 주문내역을 열어야 바뀌었다)
+                    if (window.gHomeOn && typeof gScheduleHome === 'function') gScheduleHome();
                 }
             } catch (e) {
                 console.warn("Firebase History Load Error", e);
@@ -11749,6 +11752,11 @@
             gApplyHomeView(true);
             gRenderHome();
             gHomeLoadExtras();
+            // [신규 2026-10-03] 홈을 열 때 주문내역을 뒤에서 새로 받는다 (1분 안에 받았으면 건너뜀) — 받으면 '내 주문'이 다시 그려진다
+            if (!window.__hmMineAt || Date.now() - window.__hmMineAt > 60000) {
+                window.__hmMineAt = Date.now();
+                try { openHistoryModal(false, true).catch(() => { }); } catch (e) { }
+            }
             if (!silent) window.scrollTo(0, 0);
         }
         function gCloseHome() { gApplyHomeView(false); }
@@ -11940,7 +11948,8 @@
                         `<span class="s${g.stocked && !g.del ? ' go' : ''}">${st}</span></div>`;
                 }).join('')
                 : `<div class="hm-mine-row"><span class="hm-empty">다가오는 픽업·배달이 없어요.</span></div>`;
-            return `<section class="hm-sec"><div class="hm-sec-h"><b>내 주문</b><small>마지막으로 본 주문내역 기준</small></div>` +
+            // [수정 2026-10-03] '마지막으로 본 주문내역 기준' 설명은 뺐다 — 홈에서 새로 받아 오므로 (사장님 요청)
+            return `<section class="hm-sec"><div class="hm-sec-h"><b>내 주문</b></div>` +
                 `<div class="hm-mine">${body}<button type="button" class="hm-link" onclick="openHistoryModal()">주문내역 전체 보기</button></div></section>`;
         }
         // 받는 날로 보기 — 공동구매 받는 날마다 상품 수, 누르면 그 날짜 목록으로
