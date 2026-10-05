@@ -11438,7 +11438,8 @@
         }
         function gCardNameHtml(p) {
             const { lead, main } = gNameParts(p);
-            return (lead ? `<div class="item-lead">${lead}</div>` : '') + `<div class="item-name">${main}</div>`;
+            // [수정 2026-10-05] 말머리가 없어도 빈 칸을 둔다 — 옆 카드와 이름 줄을 맞추려고 (gAlignLeads, 사장님 요청)
+            return `<div class="item-lead">${lead}</div>` + `<div class="item-name">${main}</div>`;
         }
 
         function gSplitLead(name) {
@@ -11534,7 +11535,26 @@
         /* [ver3] 하는 일이 없어졌다.
            수량 박스가 담기 단추 위에 있던 시절, 두 칸의 오른쪽 선을 맞추려고 너비를 재서 붙여 주던 함수다.
            이제 둘이 한 줄에 나란히 서서 자리를 반반 나누므로 손댈 것이 없다. (부르는 곳이 여럿이라 껍데기는 남긴다) */
-        function gSyncQtyStepperWidths(root) { /* 아무것도 하지 않는다 */ }
+        // [수정 2026-10-05] 이 자리를 빌려 나란히 선 카드끼리 말머리 줄 높이를 맞춘다 (gAlignLeads)
+        function gSyncQtyStepperWidths(root) { gAlignLeads(root); }
+
+        /* [신규 2026-10-05] 대괄호·수식어가 있는 카드와 없는 카드가 나란히 서면 이름 줄이 어긋났다 (사장님 요청).
+           같은 줄(목록은 두 칸 한 줄, 홈은 가로 한 줄)에서 가장 높은 말머리 높이에 모두 맞춘다. */
+        function gAlignLeads(root) {
+            (root || document).querySelectorAll('.card-grid, .hm-rail').forEach(grid => {
+                const cards = [...grid.children].filter(c => c.classList.contains('product-card'));
+                cards.forEach(c => { const l = c.querySelector('.item-lead'); if (l) l.style.minHeight = ''; });
+                const rows = new Map();
+                cards.forEach(c => { const t = c.offsetTop; if (!rows.has(t)) rows.set(t, []); rows.get(t).push(c); });
+                rows.forEach(row => {
+                    const leads = row.map(c => c.querySelector('.item-lead')).filter(Boolean);
+                    const h = Math.max(0, ...leads.map(l => l.offsetHeight));
+                    if (h > 0) leads.forEach(l => { l.style.minHeight = h + 'px'; });
+                });
+            });
+        }
+        // 글꼴이 늦게 들어오면 높이가 바뀌므로 한 번 더
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => gAlignLeads());
 
         let _qtyWidthTimer = null;
         window.addEventListener('resize', () => {
@@ -11809,6 +11829,7 @@
                 if (el) el.classList.toggle('hm-hide', !!on);
             });
             document.querySelectorAll('.delivery-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === (on ? 'home' : currentDeliveryType)));
+            gAlignLeads();   // [신규 2026-10-05] 가려져 있던 목록은 높이를 못 쟀으므로 보일 때 다시 맞춘다
         }
         function gOpenHome(silent) {
             gApplyHomeView(true);
@@ -12131,6 +12152,7 @@
                 `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
             gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
             box.querySelectorAll('[data-rail]').forEach(r => { if (keep[r.dataset.rail]) r.scrollLeft = keep[r.dataset.rail]; });
+            gAlignLeads(box);   // [신규 2026-10-05] 홈 줄도 말머리 높이를 맞춘다
         }
 
         /* [신규 2026-10-03] 컴퓨터에서도 상품 줄을 좌우로 넘겨 볼 수 있게 (사장님 요청)
