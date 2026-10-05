@@ -2702,6 +2702,15 @@
            세로로 긴 사진(.tall)은 위아래를 잘라 칸을 꽉 채우고, 넓거나 정사각인 사진은 잘리지 않게 둔다. */
         .product-card .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
         .product-card .thumb img.tall { object-fit: cover; object-position: center; }
+        /* [신규 2026-10-05] PC — 창이 넓으면 목록 판을 넓혀 한 줄에 칸 수를 늘린다 (한 칸 240px 이상, 최대 4개) (사장님 요청)
+           칸 수가 바뀌므로 세로줄은 모든 칸 오른쪽에 긋고, 판 맨 오른쪽 1px(마지막 칸의 줄)은 잘라 낸다.
+           앞쪽 #product-list.container 600px 를 덮어야 해서 맨 끝에 둔다 */
+        @media (min-width: 700px) {
+            #product-list.container { max-width: 1130px; }
+            .card-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); clip-path: inset(0 1px 0 0); }
+            .card-grid > .product-card { border-right: 1px solid #eef1e9 !important; }
+            .card-grid > .product-card .thumb { width: calc(100% + 1px) !important; margin-right: -1px !important; z-index: 1; }
+        }
     </style>
 </head>
 
