@@ -330,7 +330,7 @@
             font-size: 11px !important; font-weight: 800 !important; padding: 3px 6px !important; border-radius: 6px !important;
             background: rgba(255, 255, 255, 0.93) !important; line-height: 1.2 !important;
         }
-        .hm-card .thumb-sale.txt { font-size: 12px; }
+        /* [삭제 2026-10-05] 홈 카드 문구 띠 12px — '할인!' 띠(15px)와 크기를 맞추려고 뺐다 (사장님 요청) */
         .hm-card .hm-thumb { position: relative; aspect-ratio: 1 / 1; max-width: 100%; background: #f6f7f3; cursor: pointer; overflow: hidden; }
         .hm-card .hm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .hm-card .hm-noimg { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 12px; color: #b6bcac; }
@@ -1775,7 +1775,8 @@
         }
 
         /* [신규 2026-10-02] 사장님이 적은 문구 띠 — 사진이 좁아 길면 두 줄까지 접는다 */
-        .thumb-sale.txt { font-size: 13px; line-height: 1.3; padding: 4px 6px; word-break: keep-all; box-sizing: border-box; }
+        /* [수정 2026-10-05] 13px → 15px. '할인!' 띠와 글씨 크기를 맞춘다 (사장님 요청) */
+        .thumb-sale.txt { font-size: 15px; line-height: 1.3; padding: 4px 6px; word-break: keep-all; box-sizing: border-box; }
 
         .item-price-val {
             color: var(--nego-orange);
@@ -11878,8 +11879,9 @@
                     return `<div class="hm-day">${lab === '오늘' || lab === '내일' ? `${lab}(${w})` : `${lab}(${w})`} 픽업·배달</div>`;
                 })()}<div class="item-head" ${open}>${gCardNameHtml(p)}</div>` +
                 gRatingHtml(p) + gDeadlineHtml(p, closed) +
-                (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigPriceLabel(p)}</div>` : '') +
-                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div></div>` +
+                // [수정 2026-10-05] 홈 카드도 목록 카드처럼 원 할인은 '정상가'와 빨간 n% 딱지 (사장님 요청)
+                (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</div>` : '') +
+                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div></div>` +
                 `<div class="add-cart-wrap${q > 0 ? ' selected' : ''}"${sold ? ' style="pointer-events:none;"' : ''}>` +
                 `<input type="hidden" class="qty-num" value="${q}" data-name="${gHomeEsc(p.name)}" data-price="${gHomeEsc(p.price)}" data-stock="${stock}">` +
                 `<button type="button" class="btn-add-cart${sold ? ' soldout' : ''}" onclick="gHomeAdd(this)">${label}</button></div></div>`;
