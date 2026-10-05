@@ -11363,8 +11363,9 @@
 
         // 할인 전 금액. 할인이 없거나 값이 0이면 빈 문자열 → 카드에 줄 자체가 안 나온다.
         // [신규 2026-10-02] 주문관리에서 '정상가'로 적은 할인이면 그어진 금액 앞에 '정상가'를 붙인다 (사장님 요청)
+        // [수정 2026-10-05] 깎을 금액·팔 금액으로 적은 원 할인도 정상가 방식과 똑같이 보여 준다 (사장님 요청)
         function gOrigWord(p) {
-            return (p && p.discountType === 'amount' && p.discountAmountMode === 'list') ? '정상가' : '';
+            return gDiscAmountOf(p) > 0 ? '정상가' : '';
         }
         // [신규 2026-10-02] 정상가 방식 — 최종 금액 앞에 빨간 'n%' 딱지. 반올림 (사장님 요청)
         function gSalePctHtml(p) {
@@ -11430,7 +11431,8 @@
             ].filter(Boolean).join(' ');
             // 수식어는 지금처럼 회색
             const words = [p.nameLead ? E(String(p.nameLead).trim()) : '', ...ns.leads].filter(Boolean).join(' · ');
-            const lead = [tags, words].filter(Boolean).join(' ');
+            // [수정 2026-10-05] 대괄호는 수식어 윗줄에 따로 (사장님 요청) — 둘 다 있으면 줄을 나눈다
+            const lead = [tags, words].filter(Boolean).join('<br>');
             return { lead, main: ns.main };
         }
         function gCardNameHtml(p) {
@@ -13201,8 +13203,8 @@
                 const r = gAgencyRule(p);
                 if (r && r.stepFee > 0 && r.threshold > 0) {
                     return gAgencyFeeTableBox(
-                        row(`${r.threshold.toLocaleString()}원 미만`, `${r.baseFee.toLocaleString()}원`) +
-                        row(`${r.threshold.toLocaleString()}원 이상`, `${r.step.toLocaleString()}원당 +${r.stepFee.toLocaleString()}원`)
+                        row(`${r.threshold.toLocaleString()}원 이하`, `${r.baseFee.toLocaleString()}원`) +
+                        row(`${r.threshold.toLocaleString()}원 초과`, `${r.step.toLocaleString()}원당 +${r.stepFee.toLocaleString()}원`)
                     );
                 }
             }
@@ -13275,8 +13277,9 @@
             const rule = gAgencyRule(p);
             if (rule) {
                 const amt = parseInt(amount) || 0;
-                if (amt < rule.threshold) return rule.baseFee;
-                return rule.baseFee + rule.stepFee * (Math.floor((amt - rule.threshold) / rule.step) + 1);
+                // [수정 2026-10-05] 기준금액 '이하'까지 기본료 (사장님 요청 — 예전 '미만'). 주문관리 gAgencyFeeByRule 와 같게
+                if (amt <= rule.threshold) return rule.baseFee;
+                return rule.baseFee + rule.stepFee * Math.ceil((amt - rule.threshold) / rule.step);
             }
 
             const tiers = Array.isArray(p.agencyFeeTiers) ? p.agencyFeeTiers : [];
