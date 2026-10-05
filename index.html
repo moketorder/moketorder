@@ -13144,9 +13144,10 @@
                     /* [수정 2026-10-05] 옵션 이름이 길면(띄어쓰기 없는 괄호 설명) 수량 단추·금액 위로 겹쳤다 (사장님 요청, 안 2).
                        · 끝의 (괄호 설명)은 떼어 이름 아래 회색 작은 글씨로
                        · 수량 단추는 이름 줄이 아니라 아랫줄 오른쪽에 — 이름은 금액만 빼고 칸을 넓게 쓴다 */
-                    const _nm = String(it.name || '').match(/^(.+?)\s*\(([^()]+)\)\s*$/);
-                    const nmMain = _nm ? _nm[1] : (it.name || '');
-                    const nmSub = _nm ? _nm[2] : '';
+                    /* [수정 2026-10-05] 괄호로 가르지 않는다 — 주문관리 옵션 설정의 '둘째 줄' 칸(it.sub)을 그대로 쓴다 (사장님 요청).
+                       둘째 줄을 안 적은 항목은 이름 한 줄만 (괄호가 있어도 그대로) */
+                    const nmMain = it.name || '';
+                    const nmSub = String(it.sub || '').trim().replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
                     html += `<div onclick="pickOption(${gi}, ${ii})" style="display:flex; align-items:flex-start; gap:8px; padding:11px 12px; margin-bottom:6px; border:1.5px solid ${on ? 'var(--moket-green)' : '#e8ebee'}; background:${soldOut ? '#f6f7f8' : (on ? '#f1fbf5' : '#fff')}; border-radius:10px; cursor:${soldOut ? 'default' : 'pointer'}; opacity:${soldOut ? '0.55' : '1'};">` +
                         // [수정 2026-10-05] 고르면 칸을 칠하기만 하던 것을 — 중복 선택은 초록 칸에 흰 체크, 단일 선택은 초록 테두리에 가운데 점 (사장님 요청)
                         `<span style="flex:0 0 auto; margin-top:1px; width:18px; height:18px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border-radius:${isMulti ? '5px' : '50%'}; border:2px solid ${on ? 'var(--moket-green)' : '#d1d8c8'}; background:${(on && isMulti) ? 'var(--moket-green)' : '#fff'};">` +
