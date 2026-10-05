@@ -2554,6 +2554,9 @@
             background: #f4f6f0 !important; border-color: #e2e8da !important;
         }
         #sys-modal-msg [style*="#c2610a"] { color: #4f5b46 !important; }
+        /* [수정 2026-10-05] '함께 배달할 수 없어요' 창의 사다드림은 주황을 남긴다 — 초록 신선식품 옆에서 회색이라 눈에 안 띄었다 (사장님 요청) */
+        #sys-modal-msg .sm-sada { color: #c2610a !important; }
+        #sys-modal-msg span.sm-sada { background: #fff4e9 !important; }
 
         /* 받는 방법 — 두 줄 같은 크기, 누르면 다음으로 */
         .ship-opts { display: flex; flex-direction: column; gap: 10px; }
@@ -12641,7 +12644,7 @@
             const kindTag = (item) => item.isFresh
                 ? `<span style="display:inline-block; background:#eafaf2; color:#3d8f19; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">신선식품</span>`
                 : (item.isSada
-                    ? `<span style="display:inline-block; background:#fff4e9; color:#c2610a; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">사다드림</span>`
+                    ? `<span class="sm-sada" style="display:inline-block; background:#fff4e9; color:#c2610a; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">사다드림</span>`
                     : ``);
 
             const row = (item) => {
@@ -12680,7 +12683,7 @@
                 `<div style="line-height:1.7; word-break:keep-all;">` +
                 `<div style="font-weight:900; color:var(--nego-orange); font-size:1.05em; margin-bottom:10px;">🛵 함께 배달할 수 없어요</div>` +
                 `배달은 가장 늦은 입고일에<br>한 번에 나갑니다.<br><br>` +
-                `<b style="color:#c2610a;">사다드림</b>·<b style="color:#3d8f19;">신선식품</b>은<br>당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
+                `<b class="sm-sada" style="color:#c2610a;">사다드림</b>·<b style="color:#3d8f19;">신선식품</b>은<br>당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
                 `<div style="background:#f8f9fa; border-radius:10px; padding:12px 14px; text-align:left;">` +
                 listHtml +
                 `</div><br>` +
