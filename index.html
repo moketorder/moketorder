@@ -13141,18 +13141,29 @@
                     const soldOut = (remain !== null && remain <= 0 && !on);
                     const stockText = soldOut ? '품절' : '';
 
-                    html += `<div onclick="pickOption(${gi}, ${ii})" style="display:flex; align-items:center; gap:8px; padding:11px 12px; margin-bottom:6px; border:1.5px solid ${on ? 'var(--moket-green)' : '#e8ebee'}; background:${soldOut ? '#f6f7f8' : (on ? '#f1fbf5' : '#fff')}; border-radius:10px; cursor:${soldOut ? 'default' : 'pointer'}; opacity:${soldOut ? '0.55' : '1'};">` +
+                    /* [수정 2026-10-05] 옵션 이름이 길면(띄어쓰기 없는 괄호 설명) 수량 단추·금액 위로 겹쳤다 (사장님 요청, 안 2).
+                       · 끝의 (괄호 설명)은 떼어 이름 아래 회색 작은 글씨로
+                       · 수량 단추는 이름 줄이 아니라 아랫줄 오른쪽에 — 이름은 금액만 빼고 칸을 넓게 쓴다 */
+                    const _nm = String(it.name || '').match(/^(.+?)\s*\(([^()]+)\)\s*$/);
+                    const nmMain = _nm ? _nm[1] : (it.name || '');
+                    const nmSub = _nm ? _nm[2] : '';
+                    html += `<div onclick="pickOption(${gi}, ${ii})" style="display:flex; align-items:flex-start; gap:8px; padding:11px 12px; margin-bottom:6px; border:1.5px solid ${on ? 'var(--moket-green)' : '#e8ebee'}; background:${soldOut ? '#f6f7f8' : (on ? '#f1fbf5' : '#fff')}; border-radius:10px; cursor:${soldOut ? 'default' : 'pointer'}; opacity:${soldOut ? '0.55' : '1'};">` +
                         // [수정 2026-10-05] 고르면 칸을 칠하기만 하던 것을 — 중복 선택은 초록 칸에 흰 체크, 단일 선택은 초록 테두리에 가운데 점 (사장님 요청)
-                        `<span style="flex:0 0 auto; width:18px; height:18px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border-radius:${isMulti ? '5px' : '50%'}; border:2px solid ${on ? 'var(--moket-green)' : '#d1d8c8'}; background:${(on && isMulti) ? 'var(--moket-green)' : '#fff'};">` +
+                        `<span style="flex:0 0 auto; margin-top:1px; width:18px; height:18px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border-radius:${isMulti ? '5px' : '50%'}; border:2px solid ${on ? 'var(--moket-green)' : '#d1d8c8'}; background:${(on && isMulti) ? 'var(--moket-green)' : '#fff'};">` +
                         (on ? (isMulti
                             ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6.5"></polyline></svg>`
                             : `<span style="width:8px; height:8px; border-radius:50%; background:var(--moket-green);"></span>`) : '') +
                         `</span>` +
-                        `<span style="flex:1; min-width:0; font-size:14px; font-weight:${on ? '800' : '700'}; color:var(--item-black); word-break:keep-all;">${it.name}` +
+                        `<div style="flex:1; min-width:0;">` +
+                        `<div style="display:flex; align-items:flex-start; gap:8px;">` +
+                        `<span style="flex:1; min-width:0; font-size:14px; line-height:1.35; font-weight:${on ? '800' : '700'}; color:var(--item-black); word-break:keep-all; overflow-wrap:anywhere;">${nmMain}` +
                         (stockText ? `<span style="margin-left:6px; font-size:11px; font-weight:800; color:${soldOut ? '#d32f2f' : '#7f93a3'};">${stockText}</span>` : '') +
                         `</span>` +
-                        stepper +
-                        `<span style="flex:0 0 auto; min-width:62px; text-align:right; font-size:13px; font-weight:800; color:${price ? 'var(--nego-orange)' : '#a5ab9b'};">${priceText}</span>` +
+                        `<span style="flex:0 0 auto; text-align:right; font-size:13px; line-height:1.45; font-weight:800; color:${price ? 'var(--nego-orange)' : '#a5ab9b'};">${priceText}</span>` +
+                        `</div>` +
+                        (nmSub ? `<div style="margin-top:2px; font-size:12px; line-height:1.4; font-weight:600; color:#8b9682; word-break:keep-all; overflow-wrap:anywhere;">${nmSub}</div>` : '') +
+                        (stepper ? `<div style="display:flex; justify-content:flex-end; margin-top:8px;">${stepper}</div>` : '') +
+                        `</div>` +
                         `</div>`;
                 });
                 html += `</div>`;
