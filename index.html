@@ -6012,6 +6012,7 @@
                     const up = {};
                     up[`product_reviews/${code}/${rid}`] = { stars: _gRv.stars, text, name: gMaskName(localStorage.getItem('moket_user_name') || localStorage.getItem('kakao_original_name') || ''), item: String(o.item || '').slice(0, 100), at: now, ref, pts };
                     up[`review_keys/${ph}/${ref}`] = { code, rid, at: now };
+                    up[`review_codes/${ph}/${code}`] = { rid, ref, at: now };   // [신규 2026-10-06] 상품번호당 한 번 — 규칙이 이 표시로 두 번째 후기를 막는다
                     up[`review_stats/${code}`] = { n: (st ? Number(st.n) || 0 : 0) + 1, sum: (st ? Number(st.sum) || 0 : 0) + _gRv.stars, last: rid };
                     if (pts) {
                         up[`point_logs/${ph}/r_${rid}`] = { amt: pts, why: 'review', at: now, code, rid, ref };
