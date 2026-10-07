@@ -2644,18 +2644,30 @@
         .cb-tot { margin-top: 8px; padding: 10px 4px 0; border-top: 1px solid #eef1e9; display: flex; justify-content: space-between; align-items: baseline; font-size: 14.5px; font-weight: 800; }
         .cb-tot b { font-size: 18px; font-weight: 900; color: var(--nego-orange); }
         .cb-tot > span:last-child { text-align: right; }   /* [수정 2026-10-07] 밑 글이 길어도 금액은 맨 오른쪽 */
-        .cb-tot small { display: block; text-align: right; font-size: 12px; font-weight: 800; color: #3d8f19; margin-top: 2px; max-width: 200px; margin-left: auto; word-break: keep-all; line-height: 1.45; }
-        .cb-tot small.fee { color: #c62828; }
+        .cb-tot small { display: block; text-align: right; font-size: 12px; font-weight: 800; color: #15803d; margin-top: 2px; max-width: 200px; margin-left: auto; word-break: keep-all; line-height: 1.45; }
+        .cb-tot small.fee { color: #c2410c; }
+        .cb-tot small.inc { color: #6f7a66; }
         .cb-nudge { margin-top: 10px; background: #f1fbf5; border: 1px solid #cfe6d8; border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 700; color: #2e7d32; line-height: 1.6; text-align: center; word-break: keep-all; text-wrap: balance; }
         .cb-note { margin-top: 8px; font-size: 12.5px; font-weight: 600; color: #6f7a66; text-align: center; word-break: keep-all; }
-        .cb-agree { margin-top: 14px; display: flex; align-items: center; gap: 8px; padding: 11px 12px; border: 1.5px solid #d9ecc9; background: #f5faf0; border-radius: 10px; font-size: 14.5px; font-weight: 800; color: #16200f; cursor: pointer; text-align: left; }
+        .cb-agree { margin-top: 14px; display: flex; align-items: center; gap: 8px; padding: 11px 12px; border: 1.5px solid #cfd8c5; background: #fff; border-radius: 10px; font-size: 14.5px; font-weight: 800; color: #16200f; cursor: pointer; text-align: left; }
         .cb-agree input { width: 20px; height: 20px; accent-color: #3d8f19; margin: 0; flex: 0 0 auto; }
+        /* [신규 2026-10-07] 안내 칸 색은 성격으로 네 가지 — 회색 알려 드림 · 초록 좋은 소식 · 주황 돈이 바뀜 · 빨강 못 하는 것.
+           글은 늘 진한 색, 색은 앞 이름표와 금액에만. 한 창에 색 칸은 두 개까지 (gNote 로 만든다) */
+        .nt { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 9px 11px; border-radius: 10px; border: 1px solid; font-size: 13.5px; font-weight: 500; line-height: 1.6; word-break: keep-all; color: #16200f; text-align: left; white-space: normal; }
+        .nt b { font-weight: 800; }
+        .nt-c { flex: 0 0 auto; font-size: 11.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px; line-height: 1.6; margin-top: 1px; white-space: nowrap; }
+        .nt-info { background: #f4f6f0; border-color: #e2e8da; } .nt-info .nt-c { background: #e2e8da; color: #3b4634; }
+        .nt-good { background: #eefaf1; border-color: #bfe3c8; } .nt-good .nt-c { background: #15803d; color: #fff; } .nt-good b { color: #15803d; }
+        .nt-money { background: #fff7ed; border-color: #fdc99a; } .nt-money .nt-c { background: #c2410c; color: #fff; } .nt-money b { color: #c2410c; }
+        .nt-stop { background: #fef2f2; border-color: #fecaca; } .nt-stop .nt-c { background: #b91c1c; color: #fff; } .nt-stop b { color: #b91c1c; }
+        .nt + .nt { margin-top: 8px; }
         #confirm-notice-area { border-top: 1px solid #e2e8da !important; margin: 0 -16px 12px !important; padding: 12px 16px 0 !important; }
         .cf-notes { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; font-weight: 500; color: #4f5b46; line-height: 1.5; word-break: keep-all; }
         .cf-notes > div { display: flex; gap: 10px; }
         .cf-notes > div > span:first-child { flex: 0 0 64px; font-weight: 700; color: #8b9682; font-size: 13px; }
         .cf-notes > div > span:last-child { flex: 1; min-width: 0; }
         .cf-notes b { color: #16200f; font-weight: 700; }
+        .cf-notes > div.pay > span:first-child { color: #c2410c; }
         #order-note { border: 1px solid #e2e8da !important; border-radius: 8px !important; font-weight: 500 !important; }
         #order-note:focus { border-color: #4CAF20 !important; }
         #confirm-overlay label[for], #confirm-overlay label { font-weight: 600 !important; color: #16200f !important; }
@@ -4481,7 +4493,7 @@
 
             if (missDeliv.length && fromPickup) { opts.onPickup(); return; }   // [신규 2026-10-07] 주소가 없으면 배달로 묻지 않는다
             if (missDeliv.length) {
-                showSystemModal(`배달 주문시 <b style="color:#e11d48;">${missDeliv.join(' · ')}</b>를 입력해주세요.`, "alert", () => {
+                showSystemModal(`<div class="sm-title">주소가 빠졌어요</div>${gNote('stop', '주소', `배달하려면 <b>${missDeliv.join(' · ')}</b>를 적어 주세요.`)}`, "alert", () => {
                     /* [신규] 수령방법 선택 창은 닫아 준다.
                        저장하고 나면 장바구니로 돌아가, 금액을 보고 구매하기를 다시 누르게 된다.
                        고른 것을 그대로 둔 채 뒤에서 기다리게 하면 어디까지 했는지 헷갈린다. */
@@ -4735,16 +4747,17 @@
                 `<span style="color:var(--item-black); font-weight:700; white-space:nowrap;">${value.toLocaleString()}원</span>` +
                 `</div>`;
 
+            // [수정 2026-10-07] 사다드림 안내는 칸 없이 회색 글 (색 칸은 배달비·무료배달 두 개까지)
             const feeNote = (text) =>
-                `<div style="font-size:0.9em; font-weight:600; color:#4f5b46; background:#f4f6f0; border-radius:8px; padding:9px 12px; margin-bottom:12px; line-height:1.6;">${text}</div>`;
+                `<div style="margin-top:8px; font-size:12.5px; font-weight:600; color:#6f7a66; text-align:center; line-height:1.55;">${text}</div>`;
 
             const feeModal = (title, rowsHtml, noteHtml, resultHtml) =>
                 `<div style="text-align:left; line-height:1.7; word-break:keep-all;">` +
                 `<div class="sm-title">${title}</div>` +
-                (rowsHtml ? `<div style="border-top:1px solid #eef1e9; border-bottom:1px solid #eef1e9; padding:4px 0; margin-bottom:12px;">${rowsHtml}</div>` : ``) +
+                (rowsHtml ? `<div style="border-top:1px solid #eef1e9; border-bottom:1px solid #eef1e9; padding:4px 0;">${rowsHtml}</div>` : ``) +
+                resultHtml +
                 (noteHtml || ``) +
-                `<div style="margin-bottom:14px;">${resultHtml}</div>` +
-                `<div style="text-align:center; font-weight:700;">배달비를 더해 주문할까요?</div>` +
+                `<div style="margin-top:14px; text-align:center; font-weight:700;">배달비를 더해 주문할까요?</div>` +
                 `</div>`;
 
             const feeAmount = (v) => `<b style="color:var(--nego-orange);">${v.toLocaleString()}원</b>`;
@@ -4752,7 +4765,7 @@
             // [신규] 무료배달까지 얼마나 남았는지 알려준다. 배달비를 내는 바로 그 순간이라
             //  '조금만 더 담으면 무료'라는 정보가 가장 쓸모 있는 자리.
             const feeNudge = (shortfall) => shortfall > 0
-                ? `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:9px 12px; margin-top:10px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all; text-wrap:balance; text-align:center;">같은 날짜 상품을 ${`<b>${shortfall.toLocaleString()}원</b>`}만 더 담으면 배달비가 무료예요.</div>`
+                ? gNote('good', '무료배달', `같은 날짜 상품을 <b>${shortfall.toLocaleString()}원</b>만 더 담으면 배달비가 무료예요.`)
                 : ``;
 
             /* [수정] 배달비 안내를 여기서 바로 띄우지 않고 함수로만 만들어 둔다.
@@ -4763,11 +4776,10 @@
                 if (needSadaFeePrompt && needReserveFeePrompt) {
                     showSystemModal(
                         feeModal(
-                            `배달 최소주문금액 미달`,
+                            `배달비 안내`,
                             feeRow('사다드림 주문금액', sadaTotal) + feeRow('공동구매 주문금액', reserveTotal),
-                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.'),
-                            `사다드림과 공동구매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
-                            `<span style="display:block; text-align:center; margin-top:8px;">배달비 ${feeAmount(deliveryFee)} × 2 = ${feeAmount(deliveryFee * 2)}</span>`
+                            feeNote('사다드림 상품 금액은 무료배달 기준(15,000원)에 포함되지 않아요.'),
+                            gNote('money', '배달비', `사다드림과 공동구매는 배달일이 달라 배달비가 따로 붙어요. <b>${deliveryFee.toLocaleString()}원 × 2 = ${(deliveryFee * 2).toLocaleString()}원</b>`)
                         ),
                         'confirm',
                         () => {
@@ -4788,8 +4800,8 @@
                         feeModal(
                             `배달비 안내`,
                             feeRow('사다드림 주문금액', sadaTotal),
-                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.'),
-                            `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>`
+                            feeNote('사다드림 상품 금액은 무료배달 기준(15,000원)에 포함되지 않아요.'),
+                            gNote('money', '배달비', `사다드림 주문에는 배달비 <b>${deliveryFee.toLocaleString()}원</b>이 붙어요.`)
                         ),
                         'confirm',
                         () => {
@@ -4806,10 +4818,10 @@
                 if (needReserveFeePrompt) {
                     showSystemModal(
                         feeModal(
-                            `배달 최소주문금액 미달`,
-                            feeRow('주문금액', reserveTotal) + feeRow('최소주문금액', 15000),
-                            cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.') : ``,
-                            `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>` +
+                            `배달비 안내`,
+                            feeRow('주문금액', reserveTotal) + feeRow('무료배달 기준', 15000),
+                            cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준(15,000원)에 포함되지 않아요.') : ``,
+                            gNote('money', '배달비', `15,000원이 안 돼서 배달비 <b>${deliveryFee.toLocaleString()}원</b>이 붙어요.`) +
                             feeNudge(15000 - reserveTotal) +
                             gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?')
                         ),
@@ -4916,7 +4928,7 @@
 
             // [추가] 공동구매 상품과 일반(상시/과일) 상품 혼합 주문 시 안내 (최우선순위)
             if (hasReserve && hasAnyRegular) {
-                const msg = `<div class="sm-title">합배송 안내</div>담으신 상품 중 가장 늦은 입고일에 한 번에 배달됩니다.${maxDateStr ? `<br>배달 예정일 <b>${maxDateStr}</b>` : ''}`;
+                const msg = `<div class="sm-title">합배송 안내</div>${gNote('info', '배달일', `담으신 상품은 가장 늦은 입고일${maxDateStr ? `인 <b>${maxDateStr}</b>` : ''}에 한 번에 배달돼요.`)}`;
                 // [수정] 안내창을 따로 띄우지 않고 합배송 목록과 한 창에 묶어서 보여준다.
                 holidayConfirmedStatus = true;
                 cutoffConfirmedStatus = true;
@@ -4934,7 +4946,7 @@
                 } else {
                     holidayTerm = "주말";
                 }
-                const holidayMsg = `<div class="sm-title">배달 안내</div>${holidayTerm}에 주문하신 상품은 <b>다음 평일</b>에 배달됩니다.`;
+                const holidayMsg = `<div class="sm-title">배달 안내</div>${gNote('info', '배달일', `${holidayTerm}에 주문하신 상품은 <b>다음 평일</b>에 배달돼요.`)}`;
 
                 holidayConfirmedStatus = true;
                 cutoffConfirmedStatus = true;
@@ -4948,20 +4960,20 @@
             // [신규] 예약배송 모드일 때는 마감 시각 조건 없이 예약배송용 배달안내 팝업을 우선 활성화
             if (gHasFutureReserveInCart()) {   // [수정 2026-09-30] 뒷날 상품이 있을 때만
                 showModal = true;
-                msg = `<div class="sm-title">합배송 안내</div>담으신 상품 중 가장 늦은 입고일에 한 번에 배달됩니다.${maxDateStr ? `<br>배달 예정일 <b>${maxDateStr}</b>` : ''}`;
+                msg = `<div class="sm-title">합배송 안내</div>${gNote('info', '배달일', `담으신 상품은 가장 늦은 입고일${maxDateStr ? `인 <b>${maxDateStr}</b>` : ''}에 한 번에 배달돼요.`)}`;
             } else if (gTodayAfterClose(new Date())) {
                 if (hasAnyRegular) {
                     showModal = true;
-                    msg = `<div class="sm-title">배달 안내</div>${gTodayCloseWords()} 이후 주문은 <b>내일</b> 배달됩니다.`;
+                    msg = `<div class="sm-title">배달 안내</div>${gNote('info', '배달일', `${gTodayCloseWords()} 이후 주문은 <b>내일</b> 배달돼요.`)}`;
                 } else if (hasReserve) {
                     showModal = true;
-                    msg = `<div class="sm-title">배달 안내</div>공동구매 상품은 상품마다 <b>입고일</b>에 맞춰 배달됩니다.`;
+                    msg = `<div class="sm-title">배달 안내</div>${gNote('info', '배달일', '공동구매 상품은 상품마다 <b>입고일</b>에 맞춰 배달돼요.')}`;
                 }
             } else {
                 // 15시 이전
                 if (hasReserve) {
                     showModal = true;
-                    msg = `<div class="sm-title">배달 안내</div>공동구매 상품은 상품마다 <b>입고일</b>에 맞춰 배달됩니다.`;
+                    msg = `<div class="sm-title">배달 안내</div>${gNote('info', '배달일', '공동구매 상품은 상품마다 <b>입고일</b>에 맞춰 배달돼요.')}`;
                 } else {
                     // 일반상품만 3시 이전인 경우: 별도 안내 없이 바로 진행
                     showModal = false;
@@ -5040,7 +5052,7 @@
                 if (fromPickup && !pendingGoods.length) { opts.onPickup(); return; }
                 if (!pendingGoods.length && !pickupGoods.length) {
                     if (!noticeHtml) { proceed(); return; }
-                    showSystemModal(noticeHtml + "<br><br>주문할까요?", 'confirm', proceed);
+                    showSystemModal(noticeHtml + '<div style="margin-top:14px; text-align:center; font-weight:700;">주문할까요?</div>', 'confirm', proceed);
                     return;
                 }
 
@@ -5069,13 +5081,13 @@
                     const n = (needSada ? 1 : 0) + (needReserve ? 1 : 0);
                     let tag, extra = '';
                     if (n) {
-                        tag = `<small class="fee">배달비 ${won(deliveryFee * n)}</small>`;
-                        if (needReserve && base < 15000) extra += `<div class="cb-nudge">같은 날짜 상품을 <b>${won(15000 - base)}</b>만 더 담으면 배달비가 무료예요.</div>`;
+                        tag = `<small class="fee">+ 배달비 ${won(deliveryFee * n)}</small>`;
+                        if (needReserve && base < 15000) extra += gNote('good', '무료배달', `같은 날짜 상품을 <b>${won(15000 - base)}</b>만 더 담으면 배달비가 무료예요.`);
                         if (needSada) extra += `<div class="cb-note">사다드림 상품 금액은 무료배달 기준(15,000원)에 포함되지 않아요.</div>`;
                         extra += gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?');
-                    } else if (refund > 0) tag = `<small>무료배달<br>앞서 붙은 배달비 ${won(refund)}은 취소돼요<br>이미 입금하셨다면 돌려드려요</small>`;
+                    } else if (refund > 0) { tag = `<small>무료배달</small>`; extra = gNote('money', '배달비', `합배송으로 앞 주문 배달비 <b>${won(refund)}</b>은 취소해 드려요. 이미 입금하셨다면 돌려드려요.`); }
                     else if (base >= 15000) tag = `<small>무료배달</small>`;
-                    else tag = `<small>배달비는 이전 주문에 포함</small>`;   // 그날 배달비를 이미 냈다
+                    else tag = `<small class="inc">배달비는 앞 주문에 포함</small>`;   // 그날 배달비를 이미 냈다
                     return { tag, extra };
                 };
                 const groups = [];
@@ -5084,6 +5096,7 @@
                 const totalAll = groups.reduce((a, g) => a + g.items.reduce((x, it) => x + lineAmt(it), 0), 0) + cartAmt;
                 // 앞 단계 배달 안내(가장 늦은 입고일 · 주말 · 마감 뒤)는 제목을 떼고 한 줄로 붙인다
                 let noteLine = noticeHtml ? String(noticeHtml).replace(/<div class="sm-title">[\s\S]*?<\/div>/, '').trim() : '';
+                noteLine = noteLine.replace(/^<div class="nt[^"]*"><span class="nt-c">[^<]*<\/span><span>([\s\S]*)<\/span><\/div>$/, '$1');   // [수정 2026-10-07] 색 칸은 두 개까지
                 // '가장 늦은 입고일' 안내는 날짜가 다른 상품이 섞였을 때만 (한 날짜면 위 첫 줄과 같은 말)
                 const _cartDays = new Set();
                 for (const k in cart) { if (cart[k] > 0) { const pc = gFindCartProduct(k); const mk = String((pc && pc.matchKey) || '').trim(); if (/^\d{2,4}[.-]\d{1,2}[.-]\d{1,2}$/.test(mk)) _cartDays.add(mk); } }
@@ -5176,8 +5189,8 @@
                 } else {
                     holidayTerm = "주말";
                 }
-                const pickupHolidayMsg = `<span style="display:block;">[픽업 안내]</span>${holidayTerm}에 주문하신 상품은 <b>다음 영업일</b>부터 찾아가실 수 있습니다.`;
-                showSystemModal(pickupHolidayMsg + "<br><br>주문할까요?", 'confirm', () => {
+                const pickupHolidayMsg = `<div class="sm-title">픽업 안내</div>${gNote('info', '픽업일', `${holidayTerm}에 주문하신 상품은 <b>다음 영업일</b>부터 찾아가실 수 있어요.`)}`;
+                showSystemModal(pickupHolidayMsg + '<div style="margin-top:14px; text-align:center; font-weight:700;">주문할까요?</div>', 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
                     proceedToConfirm();
@@ -5188,7 +5201,7 @@
             // [수정] 13시 마감 보정 팝업(과일, 야채, 기타 한정 경고) 전면 제거로 즉시 주문 확인으로 직진
             // 단, 예약배송 모드일 때는 픽업 서비스 안내 팝업을 우선 활성화
             if (gHasFutureReserveInCart()) {   // [수정 2026-09-30] 뒷날 상품이 있을 때만
-                const msg = `<span style="display:block;">[픽업 안내]</span>상품마다 입고일에 맞춰 찾아가실 수 있습니다.<br><br>주문할까요?`;
+                const msg = `<div class="sm-title">픽업 안내</div>${gNote('info', '픽업일', '상품마다 <b>입고일</b>에 맞춰 찾아가실 수 있어요.')}<div style="margin-top:14px; text-align:center; font-weight:700;">주문할까요?</div>`;
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
                     proceedToConfirm();
@@ -5955,6 +5968,11 @@
         }
         window.gReportError = gReportError;
         (window.__gErrQ || []).splice(0).forEach(a => gReportError(a[0], a[1], a[2]));   // 이 함수가 읽히기 전에 난 오류
+
+        // [신규 2026-10-07] 안내 칸 — tone: info(회색) · good(초록) · money(주황) · stop(빨강). 한 줄로 만든다 (안내창이 줄바꿈을 그대로 찍는다)
+        function gNote(tone, label, html) {
+            return `<div class="nt nt-${tone}"><span class="nt-c">${label}</span><span>${html}</span></div>`;
+        }
 
         function showSystemModal(msg, type, yesCallback, noCallback, isTight = false) {
             // [신규 2026-10-01] 실패·오류 안내는 주문관리 오류 칸에도 남긴다 (주문 처리 오류는 catch 에서 장바구니까지 자세히 남기므로 뺀다)
@@ -9261,49 +9279,25 @@
             // [수정] 이 안내는 주문 카드를 통째로 취소할 때만 뜬다. 어차피 전액 취소라
             //  '남은 결제 금액'은 늘 0이거나 이번에 새로 붙은 배달비뿐이라 따로 보여주지 않는다.
 
-            const row = (label, value, opt = {}) => `
-                <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; ${opt.mt ? 'margin-top:7px;' : ''}">
-                    <span style="font-size:13px; font-weight:700; color:${opt.strong ? '#8a7461' : '#9a8b7a'};">${label}</span>
-                    <span style="font-size:${opt.strong ? '20px' : '15px'}; font-weight:${opt.strong ? '900' : '800'}; color:${opt.color || '#8a7461'}; font-variant-numeric:tabular-nums; white-space:nowrap;">${value}</span>
-                </div>`;
+            const row = (label, value, opt = {}) =>
+                `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:5px 0; font-size:14px; font-weight:700;"><span style="color:#5f6b56;">${label}</span><span style="color:${opt.color || '#16200f'}; font-variant-numeric:tabular-nums; white-space:nowrap;">${value}</span></div>`;
 
             // [주의] showSystemModal이 white-space:pre-wrap을 걸어두기 때문에, HTML 구조로 쓴 이
             // 안내문은 normal로 되돌리지 않으면 들여쓰기·줄바꿈이 그대로 여백으로 찍힌다.
-            let msg = `<div style="text-align:left; display:flex; flex-direction:column; gap:14px; white-space:normal;">
-                <div style="text-align:center; font-size:18px; font-weight:800; color:var(--item-black);">
-                    주문이 모두 취소되었습니다
-                </div>
+            // [수정 2026-10-07] 숫자는 줄로, 배달비가 바뀐 것은 주황 칸 하나로 (안내 색 규칙)
+            let msg = `<div style="text-align:left; display:flex; flex-direction:column; white-space:normal;">`
+                + `<div style="text-align:center; font-size:18px; font-weight:800; color:var(--item-black); margin-bottom:12px;">주문을 취소했어요</div>`
+                + `<div style="border-top:1px solid #eef1e9; border-bottom:1px solid #eef1e9; padding:4px 0;">`
+                + row('취소한 금액', won(canceledTotal))
+                + ((feeResult && feeResult.pointBack > 0) ? row('돌려드린 포인트', feeResult.pointBack.toLocaleString() + 'P', { color: '#15803d' }) : '')
+                + `</div>`;
 
-                <div style="background:#fff9f2; padding:14px; border-radius:12px; border:1px solid #ffe8cc;">
-                    ${row('취소한 금액', '-' + won(canceledTotal))}
-                    ${addedFee > 0 ? row('추가된 배달비', '+' + won(addedFee), { mt: true, color: '#d32f2f' }) : ''}
-                    ${refundedFee > 0 ? row('취소된 배달비', '-' + won(refundedFee), { mt: true, color: '#2e7d32' }) : ''}
-                    ${(feeResult && feeResult.pointBack > 0) ? row('돌려드린 포인트', '+' + feeResult.pointBack.toLocaleString() + 'P', { mt: true, color: '#2e7d32' }) : ''}
-                </div>`;
-
-            if (refundedFee > 0) {
-                // 취소하고 남은 금액이 무료배달 기준을 넘어 배달비를 도로 빼드린 경우
-                msg += `
-                <div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:11px 12px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all;">
-                    남은 주문 금액이 무료배송 기준(15,000원)을 넘어 배달비 ${won(refundedFee)}을 빼드렸습니다.
-                </div>
-                <div style="font-size:13px; font-weight:600; color:#9a8b7a; line-height:1.6; text-align:center;">
-                    이미 입금하셨다면 환불해 드립니다.
-                </div>`;
-            } else if (addedFee > 0) {
-                msg += `
-                <div style="background:#fff5f5; border:1px solid #ffd8d8; border-radius:10px; padding:11px 12px; font-size:13px; font-weight:700; color:#d32f2f; line-height:1.6; word-break:keep-all;">
-                    ⚠️ 남은 주문 금액이 무료배송 기준(15,000원) 미만이 되어 배달비 ${won(addedFee)}이 추가되었습니다.
-                </div>
-                <div style="font-size:14px; font-weight:700; color:var(--item-black); line-height:1.6; text-align:center; word-break:keep-all;">
-                    배달비 <span class="sm-amt" style="color:var(--nego-orange); font-weight:900;">${won(addedFee)}</span>을 입금해 주세요.
-                    <div style="font-size:12px; font-weight:600; color:#9a8b7a; margin-top:6px;">이미 입금하셨다면 차액은 환불해 드립니다.</div>
-                </div>`;
+            if (addedFee > 0) {
+                msg += gNote('money', '배달비', `남은 주문이 15,000원보다 적어져 그날 마지막 주문에 배달비 <b>${won(addedFee)}</b>이 붙었어요.`);
+            } else if (refundedFee > 0) {
+                msg += gNote('money', '배달비', `붙어 있던 배달비 <b>${won(refundedFee)}</b>도 함께 취소했어요. 이미 입금하셨다면 돌려드려요.`);
             } else {
-                msg += `
-                <div style="font-size:13px; font-weight:600; color:#9a8b7a; line-height:1.6; text-align:center;">
-                    이미 입금하셨다면 환불해 드립니다.
-                </div>`;
+                msg += `<div style="margin-top:10px; font-size:13px; font-weight:600; color:#6f7a66; text-align:center;">이미 입금하셨다면 돌려드려요.</div>`;
             }
 
             return msg + `</div>`;
@@ -14109,7 +14103,7 @@
                 const payBy = (!gHasFutureReserveInCart() && (gCartHasTodayGb() || (_cartOnlyOnsite && _goesToday))) ? gTodayCloseWords() : '오늘 밤 12시';
                 noticeArea.innerHTML = `
                     <div class="cf-notes">
-                        <div><span>입금</span><span><b>${payBy}까지</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</span></div>
+                        <div class="pay"><span>입금</span><span><b>${payBy}까지</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</span></div>
                         <div><span>배달</span><span><b>오후 3시~6시</b> 사이에 순차적으로 배달돼요. 배달이 완료되면 <b>개별 문자로 알려드려요.</b></span></div>
                         <div><span>취소</span><span>주문서에서 상품이 내려간 뒤에는 취소가 어려워요.</span></div>
                         <div><span>일정</span><span>업체·물류 사정으로 날짜가 바뀌거나 취소될 수 있어요.</span></div>
@@ -14190,7 +14184,7 @@
                 //  주문하기 전에 얼마가 빠지는지 손님이 알 수 있어야 한다.
                 // [수정 2026-10-07] 차감 줄을 넣지 않고, 앞 주문 배달비가 취소된다는 안내만 보여 준다 (이번 합계는 그대로)
                 if (window.pendingFeeRefund > 0) {
-                    var feeCancelNote = `<div style="margin:4px 0 8px; padding:8px 10px; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; font-size:12.5px; font-weight:700; color:#2e7d32; line-height:1.55; word-break:keep-all; text-align:left;">이전 주문과 <b>합배송</b>되어 무료배달 기준(15,000원)을 넘었어요. 앞서 붙은 배달비 <b>${window.pendingFeeRefund.toLocaleString()}원</b>은 <b>취소</b>돼요. 이미 입금하셨다면 돌려드려요.</div>`;
+                    var feeCancelNote = gNote('money', '배달비', `합배송으로 앞 주문 배달비 <b>${window.pendingFeeRefund.toLocaleString()}원</b>은 취소해 드려요. 이미 입금하셨다면 돌려드려요.`);
                 }
             }
 
@@ -14309,9 +14303,9 @@
 
             const summary = document.getElementById('confirm-summary-area');
             summary.innerHTML = `
-                ${typeof feeCancelNote === 'string' ? feeCancelNote : ''}
                 <div id="cf-points"></div>
-                <div class="cf-sum"><span>합계 <small>총 ${totalQty}개</small></span><b id="cf-sum-val">${totalSum.toLocaleString()}원</b></div>
+                <div class="cf-sum"><span>합계 <small>총 ${totalQty}개</small>${typeof feeCancelNote === 'string' ? '<small style="color:#15803d; font-weight:800; margin-left:4px;">무료배달</small>' : ''}</span><b id="cf-sum-val">${totalSum.toLocaleString()}원</b></div>
+                ${typeof feeCancelNote === 'string' ? feeCancelNote : ''}
             `;
             // [신규 2026-10-02] 포인트 쓰기 — 창을 열 때마다 '안 쓰기'로 시작한다
             window.gPointUse = 0;
@@ -15021,7 +15015,7 @@
                     if (!ent.trim()) missDel.push('공동현관 비밀번호');
 
                     if (missDel.length) {
-                        showSystemModal(`배달 주문시 <b style="color:#e11d48;">${missDel.join(' · ')}</b>를 입력해주세요.`, 'alert', () => {
+                        showSystemModal(`<div class="sm-title">주소가 빠졌어요</div>${gNote('stop', '주소', `배달하려면 <b>${missDel.join(' · ')}</b>를 적어 주세요.`)}`, 'alert', () => {
                             const pm = document.getElementById('profile-modal');
                             document.getElementById('profile-modal-title').innerText = "배달 상세 주소 입력";
                             const sbt = document.getElementById('profile-submit-btn'); if (sbt) sbt.innerText = "저장하기";
@@ -15136,13 +15130,13 @@
                 const payBy = (!gHasFutureReserveItem(allItems) && (_onlyOnsite || allItems.some(it => it.isGb && !gIsFeeRow(it.name) && String(it.date) === gTodayYmd()))) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';   // [수정 2026-09-30]
                 msg += `
                     <div class="pg">
-                        <div class="pg-done">주문이 접수되었습니다</div>
+                        <div class="pg-done">주문이 접수되었어요</div>
                         <div class="pg-amt-l">입금하실 금액</div>
                         <div class="pg-amt">${displayTotal.toLocaleString()}원</div>
-                        <div class="pg-due"><b>${payBy}</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소됩니다.</div>
-                        ${feeCanceledAmt > 0 ? `<div class="pg-refund">이전 주문과 합배송되어 앞 주문 배달비 <b>${feeCanceledAmt.toLocaleString()}원</b>은 취소됐어요. 이미 입금하셨다면 돌려드려요.</div>` : ''}
-                        ${overRefund > 0 ? `<div class="pg-refund">빼 드릴 배달비가 이번 주문 금액보다 <b>${overRefund.toLocaleString()}원</b> 많아요. 앞 주문을 아직 입금하지 않으셨다면 그 금액에서 <b>${overRefund.toLocaleString()}원</b>을 빼고 보내 주시고, 이미 입금하셨다면 <b>${overRefund.toLocaleString()}원</b>을 돌려드려요.</div>` : ''}
-                        ${extraItems.length > 0 ? `<div class="pg-extra">이전 주문 ${extraItems.filter(it => it.name !== '배달비').length}건도 같은 날 함께 배달됩니다. 위 금액은 이번 주문 금액입니다.</div>` : ''}
+                        ${gNote('money', '입금', `<b>${payBy}</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.`)}
+                        ${feeCanceledAmt > 0 ? gNote('money', '배달비', `합배송으로 앞 주문 배달비 <b>${feeCanceledAmt.toLocaleString()}원</b>은 취소했어요. 이미 입금하셨다면 돌려드려요.`) : ''}
+                        ${overRefund > 0 ? `<div class="nt nt-money"><span class="nt-c">배달비</span><span>빼 드릴 배달비가 이번 주문 금액보다 <b>${overRefund.toLocaleString()}원</b> 많아요. 앞 주문을 아직 입금하지 않으셨다면 그 금액에서 <b>${overRefund.toLocaleString()}원</b>을 빼고 보내 주시고, 이미 입금하셨다면 <b>${overRefund.toLocaleString()}원</b>을 돌려드려요.</span></div>` : ''}
+                        ${extraItems.length > 0 ? `<div class="pg-extra">이전 주문 ${extraItems.filter(it => it.name !== '배달비').length}건도 같은 날 함께 배달돼요. 위 금액은 이번 주문만이에요.</div>` : ''}
 
                         <div class="pg-bank">
                             <div class="v3-bank">카카오뱅크</div>
@@ -15659,17 +15653,17 @@
                            손님 입장에서는 남 탓처럼 들리고, 사장님이 수량을 줄인 경우에도
                            그렇게 떠서 사실과 달랐다. 무슨 일이 있었는지 말하지 않고 상태만 적는다. */
                         const allClosed = failed.every(f => f.closed);
-                        const head = allClosed ? '방금 주문이 마감된 상품이 있습니다.' : allOut
-                            ? (allOpt ? '방금 품절된 옵션이 있습니다.' : '방금 품절된 상품이 있습니다.')
-                            : '주문하신 수량만큼 남아 있지 않습니다.';
+                        const head = allClosed ? '방금 주문이 마감된 상품이 있어요.' : allOut
+                            ? (allOpt ? '방금 품절된 옵션이 있어요.' : '방금 품절된 상품이 있어요.')
+                            : '주문하신 수량만큼 남아 있지 않아요.';
                         const tail = allOpt
                             ? '다른 옵션을 고르시면 주문하실 수 있어요.'
                             : '수량을 줄이거나 장바구니에서 빼고 다시 주문해 주세요.';
 
                         showSystemModal(
-                            `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${allClosed ? '마감' : (allOut ? '품절' : '재고 부족')}]</span>` +
-                            `${head}<br><br>${lines}<br><br>` +
-                            `${tail}`,
+                            `<div class="sm-title">${allClosed ? '마감' : (allOut ? '품절' : '수량 부족')}</div>` +
+                            gNote('stop', allClosed ? '마감' : (allOut ? '품절' : '수량'), `${head} ${tail}`) +
+                            `<div style="margin-top:12px; text-align:left; font-size:14px; line-height:1.55;">${lines}</div>`,
                             'alert',
                             () => { try { loadData(true); } catch (e) { location.reload(); } }
                         );
