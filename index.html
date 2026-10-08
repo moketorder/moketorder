@@ -8548,6 +8548,8 @@
                                         <span>${order.item}</span>
                                         ${gOptionLinesHtml(order.optionText)}
                                     </div>
+                                    ${/* [신규 2026-10-08] 가게가 적은 취소·날짜 변경 이유 (가게가 '손님에게 보이기'를 켠 것만) — 줄 긋기에 안 걸리게 inline-block */ ''}
+                                    ${(order.shopNote && order.shopNote.show && order.shopNote.text) ? `<div style="display:inline-block; margin:2px 0 4px; font-size:12.5px; font-weight:700; color:#9a3412; background:#fff7ed; border-radius:6px; padding:3px 8px; line-height:1.4;">가게 안내 · ${String(order.shopNote.kind || '').replace(/[<>&]/g, '')}: ${String(order.shopNote.text).replace(/[<>&]/g, '')}</div>` : ''}
                                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                         <div style="font-size:13px; font-weight:700; color:#4f5b46;">${order.qty}개</div>
                                         <div style="font-size:13px; font-weight:700; color:var(--item-black);">${parseInt(order.total || 0).toLocaleString()}원</div>
@@ -9003,6 +9005,7 @@
                                             <span>${order.item}</span>
                                             ${gOptionLinesHtml(order.optionText)}
                                         </div>
+                                        ${(order.shopNote && order.shopNote.show && order.shopNote.text) ? `<div style="display:inline-block; margin:2px 0 4px; font-size:12.5px; font-weight:700; color:#9a3412; background:#fff7ed; border-radius:6px; padding:3px 8px; line-height:1.4;">가게 안내 · ${String(order.shopNote.kind || '').replace(/[<>&]/g, '')}: ${String(order.shopNote.text).replace(/[<>&]/g, '')}</div>` : ''}   ${/* [신규 2026-10-08] 가게 안내 (주문순 탭) */ ''}
                                         <div style="display:flex; align-items:center; gap:8px;">
                                             <div style="font-size:13px; font-weight:700; color:#4f5b46;">${order.qty}개</div>
                                             <div style="font-size:13px; font-weight:700; color:var(--item-black);">${parseInt(order.total || 0).toLocaleString()}원</div>
