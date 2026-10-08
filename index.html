@@ -12387,7 +12387,9 @@
             const box = document.getElementById('home-view');
             if (!box) return;
             const keep = {};
-            box.querySelectorAll('[data-rail]').forEach(r => { keep[r.dataset.rail] = r.scrollLeft; });   // 다시 그려도 밀어 둔 자리는 그대로
+            // 다시 그려도 밀어 둔 자리는 그대로 — [수정 2026-10-08] 단, 맨 앞 상품이 바뀌면(새 상품이 올라오면) 처음으로 (사장님 요청)
+            const firstOf = r => { const n = r.querySelector('.item-name'); return n ? n.textContent : ''; };
+            box.querySelectorAll('[data-rail]').forEach(r => { keep[r.dataset.rail] = { left: r.scrollLeft, first: firstOf(r) }; });
             const out = [gHomeTodayHtml(), gHomeNoticeHtml()];
             if (!isAdminMode && !isProductListEnabled) {
                 out.push(`<div class="hm-closed">현재는 주문이 불가능 합니다.<br>(주문 가능 시간 - 오전 10시 ~ 다음날 오전 6시)</div>`);
@@ -12428,7 +12430,10 @@
                 `<div class="hm-ask"><p>배달·상품 문의와 AS 신청은<br><b>1:1 카톡</b>으로 문의해 주세요.</p>` +
                 `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
             gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
-            box.querySelectorAll('[data-rail]').forEach(r => { if (keep[r.dataset.rail]) r.scrollLeft = keep[r.dataset.rail]; });
+            box.querySelectorAll('[data-rail]').forEach(r => {
+                const k = keep[r.dataset.rail];
+                r.scrollLeft = (k && k.left && k.first === firstOf(r)) ? k.left : 0;
+            });
             gAlignLeads(box);   // [신규 2026-10-05] 홈 줄도 말머리 높이를 맞춘다
         }
 
