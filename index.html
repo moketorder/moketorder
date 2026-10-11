@@ -11622,7 +11622,15 @@
              · saleToToday / saleBadge : 적혀 있지 않으면 예전처럼 켜진 것으로 본다 */
         function gDiscAmountOf(p) {
             if (!p || !gBool(p.useOptions, true) || !gBool(p.useDiscount) || p.discountType !== 'amount') return 0;
+            if (gListPrice(p)) return gListPrice(p) - (parseInt(p.price) || 0);   // [신규 2026-10-11] 정상가 − 가격
             return Math.max(0, parseInt(p.discountAmount) || 0);
+        }
+        /* [신규 2026-10-11] 주문관리에서 정상가를 따로 저장한 상품(listPrice) — 그어 보이는 값 = 정상가, 받는 값 = 가격 그대로 (사장님 요청).
+           예전 방식(가격 = 정상가, discountAmount 만큼 깎기)으로 저장된 상품은 listPrice 가 없어 0 → 예전대로 */
+        function gListPrice(p) {
+            if (!p || !gBool(p.useOptions, true) || !gBool(p.useDiscount) || p.discountType !== 'amount' || p.discountAmountMode !== 'list') return 0;
+            const lp = parseInt(p.listPrice) || 0, pr = parseInt(p.price) || 0;
+            return lp > pr ? lp : 0;
         }
         function gIsSale(p) { return gDiscountRateOf(p) > 0 || gDiscAmountOf(p) > 0; }
         function gIsSaleToday(p) { return gIsSale(p) && !(p.saleToToday === false || p.saleToToday === 'false'); }
@@ -11640,6 +11648,7 @@
         }
 
         function gApplyDiscount(p, amount) {
+            if (gListPrice(p)) return Math.max(0, parseInt(amount) || 0);   // [신규 2026-10-11] 정상가 따로 — 가격이 곧 받는 값 (깎지 않는다)
             if (gDiscAmountOf(p) > 0) return Math.max(0, (parseInt(amount) || 0) - gDiscAmountOf(p));   // [신규] 금액 할인
             return gDiscountedPrice(amount, gDiscountRateOf(p));
         }
@@ -11653,13 +11662,15 @@
         // [신규 2026-10-02] 정상가 방식 — 최종 금액 앞에 빨간 'n%' 딱지. 반올림 (사장님 요청)
         function gSalePctHtml(p) {
             if (!gOrigWord(p)) return '';
-            const before = parseInt(p && p.price) || 0;
+            const lp = gListPrice(p);   // [신규 2026-10-11] 정상가 따로 — (정상가 − 가격) / 정상가
+            const before = lp || parseInt(p && p.price) || 0;
             if (before <= 0) return '';
-            const pct = Math.round((before - gApplyDiscount(p, before)) / before * 100);
+            const pct = Math.round((before - (lp ? (parseInt(p.price) || 0) : gApplyDiscount(p, before))) / before * 100);
             return pct > 0 ? `<span class="sale-pct">${pct}%</span>` : '';
         }
         function gOrigPriceLabel(p) {
             if (!gIsSale(p)) return '';
+            if (gListPrice(p)) return gListPrice(p).toLocaleString() + '원';   // [신규 2026-10-11] 정상가를 따로 적었으면 그 값을 긋는다
             const base = parseInt(p && p.price) || 0;
             const before = !gHasChoiceOptions(p) ? base : (base > 0 ? base : gMinOptionAdd(p));
             if (before <= 0) return '';
