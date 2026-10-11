@@ -2728,7 +2728,7 @@
         .pg-pay-v b { font-size: 15.5px; font-weight: 800; color: #16200f; letter-spacing: -.2px; font-variant-numeric: tabular-nums; }
         .pg-pay-acct small { display: block; font-size: 11.5px; font-weight: 700; color: #8b9682; line-height: 1.2; }
         .pg-pay-acct b { display: block; font-size: 16px; line-height: 1.3; }
-        .pg-pay-top .pg-amt { flex: 1 1 auto; text-align: right; font-size: 22px; line-height: 1.2; }
+        .pg-pay-top .pg-amt { flex: 1 1 auto; text-align: left;   /* [수정 2026-10-11] 왼쪽 정렬 (사장님 요청) */ font-size: 22px; line-height: 1.2; }
         .pg-pay-due { margin-top: 8px; font-size: 12.5px; font-weight: 600; color: #9a3412; line-height: 1.45; }
         .pg-pay-due b { color: #c2410c; font-weight: 800; }
         .pg-pay-hint { margin-top: 2px; font-size: 12px; font-weight: 600; color: #3d8f19; line-height: 1.45; }
@@ -6279,7 +6279,7 @@
                     <div class="pg-rv-tx"><div class="pg-rv-n">${E(o.item)}</div>
                     <div class="pg-rv-d">${md(pk(o))} ${how(o)} · <em>${md(gReviewLastYmd(o))}까지</em> 쓸 수 있어요</div></div>
                     <button type="button" class="pg-rv-btn" onclick="gReviewNudgeOpen('${encodeURIComponent(o.__fbKey)}')">후기 쓰기</button></div>`).join('')}
-                <div class="pg-rv-f">20자 이상 쓰면 100P, 짧게 쓰면 50P · 1,000P부터 주문할 때 써요</div>
+                <div class="pg-rv-f">20자 이상 쓰면 100P, 짧게 쓰면 50P · 1,000P부터 사용가능</div>
             </div>`).replace(/\n\s*/g, '');
         }
         // 주문 완료 창(맨 위) 위로 후기 창을 띄운다
@@ -14205,7 +14205,7 @@
                 const payBy = (!gHasFutureReserveInCart() && (gCartHasTodayGb() || (_cartOnlyOnsite && _goesToday))) ? gTodayCloseWords() : '오늘 밤 12시';
                 noticeArea.innerHTML = `
                     <div class="cf-notes">
-                        <div class="pay"><span>입금 안내</span><span><b>${payBy}까지</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</span></div>
+                        <div class="pay"><span>입금 안내</span><span><b>${payBy}까지</b> 입금해 주세요. 미입금시 주문이 취소돼요.</span></div>
                         <div><span>배달 안내</span><span><b>오후 3시~6시</b> 사이에 순차적으로 배달돼요. 배달이 완료되면 <b>개별 문자로 알려드려요.</b></span></div>
                         <div><span>노쇼 안내</span><span>다음 주문이 어려울 수 있어요.</span></div>
                         <div><span>취소 안내</span><span>주문 마감된 후에는 취소가 어려워요.</span></div>
@@ -15240,7 +15240,7 @@
                             <div class="pg-pay-r"><span class="pg-pay-l">입금 계좌</span><span class="pg-pay-v pg-pay-acct"><small>카카오뱅크</small><b id="bank-acc-num">3333-37-3410268</b></span><button type="button" class="pg-copy-s" onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')">복사</button></div>
                             <div class="pg-pay-r"><span class="pg-pay-l">예금주</span><span class="pg-pay-v">강*민 (모켓)</span></div>
                         </div>
-                        <div class="pg-pay-due"><b>${payBy}</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</div>
+                        <div class="pg-pay-due"><b>${payBy}</b> 입금해 주세요. 미입금시 주문이 취소돼요.</div>
                         <div class="pg-pay-hint">입금자명을 <b>오픈채팅방 닉네임</b>과 같게 보내 주세요.</div>
                         ${feeCanceledAmt > 0 ? gNote('money', '배달비', `합배송으로 앞 주문 배달비 <b>${feeCanceledAmt.toLocaleString()}원</b>은 취소했어요. 이미 입금하셨다면 돌려드려요.`) : ''}
                         ${overRefund > 0 ? `<div class="nt nt-money"><span class="nt-c">배달비</span><span>빼 드릴 배달비가 이번 주문 금액보다 <b>${overRefund.toLocaleString()}원</b> 많아요. 앞 주문을 아직 입금하지 않으셨다면 그 금액에서 <b>${overRefund.toLocaleString()}원</b>을 빼고 보내 주시고, 이미 입금하셨다면 <b>${overRefund.toLocaleString()}원</b>을 돌려드려요.</span></div>` : ''}
