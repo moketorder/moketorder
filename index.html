@@ -351,6 +351,8 @@
         .hm-card .hm-price { margin-top: auto; padding-top: 2px; font-size: 15.5px; font-weight: 800; color: #16200f; font-variant-numeric: tabular-nums; }
         .hm-card .hm-price.sale { color: #e11d48; }
         .hm-card .hm-orig { font-size: 11.5px; font-weight: 600; color: #a3ab9a; text-decoration: line-through; }
+        /* [신규 2026-10-11] 홈 카드도 공구가 가격·정상가는 오른쪽 정렬 (사장님 요청) */
+        .hm-card .hm-price, .hm-card .hm-orig { text-align: right; }
         .hm-card .add-cart-wrap { padding: 8px 9px 9px; }
         .hm-card .btn-add-cart { width: 100%; height: 34px; border-radius: 8px; border: 1.5px solid #4CAF20; background: #fff; color: #3d8f19; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
         .hm-card .add-cart-wrap.selected .btn-add-cart { background: #4CAF20; color: #fff; }
@@ -1647,6 +1649,11 @@
         .card-grid .item-info-top > .item-price-row { margin-top: auto; padding-top: 6px; }
         .card-grid .item-info-top > .item-orig-price + .item-price-row { margin-top: 0 !important; padding-top: 0; }
         .card-grid .item-price-val { font-size: 19px !important; }
+        /* [신규 2026-10-11] 상품목록(두 칸 카드) — 공구가 글씨 15% 크게, 공구가·정상가 줄 오른쪽 정렬 (사장님 요청) */
+        /* [수정 2026-10-11] 공구가 12px, 가격과 사이 5px (사장님 요청) — 가격 줄의 .item-price-row span(12px·안쪽 여백 9px, !important)을 이겨야 해서 !important */
+        .card-grid .item-price-row .gb-pw { font-size: 12px !important; margin-right: 5px !important; padding: 0 !important; border-radius: 0 !important; }
+        .card-grid .item-orig-price { justify-content: flex-end; text-align: right; }
+        .card-grid .item-price-row { justify-content: flex-end; }
         /* [수정 2026-10-02] 수량 칸과 담기 단추가 칸 너비를 빈틈없이 나눠 채운다 (수량 : 담기 = 1 : 1.15) — 사장님 요청 */
         .card-grid .item-controls-bottom-v { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; align-self: stretch; width: auto !important; box-sizing: border-box; padding: 8px 10px 0; gap: 6px !important; grid-column: auto !important; grid-row: auto !important; }
         .card-grid .item-controls-bottom-v > :only-child { grid-column: 1 / -1; }   /* 품절 등 단추 하나뿐이면 한 줄 다 */
@@ -2699,6 +2706,8 @@
         .pg-copy { width: 100%; margin-top: 12px; }
         .pg-items { margin-top: 16px; padding-top: 12px; border-top: 1px solid #eef1e9; }
         .pg-items-t { font-size: 13.5px; font-weight: 700; color: #16200f; margin-bottom: 4px; }
+        /* [신규 2026-10-11] 가격 앞 '공구가' — 가격과 같은 색(물려받음), 작게 */
+        .gb-pw { font-size: 0.6em; font-weight: 800; color: inherit; margin-right: 4px; vertical-align: 0.12em; letter-spacing: -0.02em; }
         /* [신규 2026-10-11] 주문 완료 창 — 후기 안 쓴 지난 상품 권하기 (한 화면에 다 들어오게 작게) */
         .pg-rv { margin-top: 12px; border: 1.5px solid #b9de9f; background: #f1f9eb; border-radius: 12px; padding: 10px 11px; text-align: left; }
         .pg-rv-h { font-size: 14px; font-weight: 900; color: #2f6e12; }
@@ -11613,7 +11622,7 @@
                             : `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`)
                         : '') +
                     `<div class="item-price-row">` +
-                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div>` +
+                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gGbPriceWord(p)}${gSalePctHtml(p)}${gCardPriceLabel(p)}</div>` +
                     // [수정 2026-10-03] 사장님 모드 잔여 수량은 가격 줄 오른쪽에 — 담기 위에 두면 담기가 수량보다 아래로 내려갔다 (사장님 요청)
                     (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800; margin-left:auto; padding-left:6px; font-size:12px; white-space:nowrap; align-self:center;">${stockText.replace(': ', ' ')}</div>` : '') +
                     `</div>` +
@@ -12066,6 +12075,8 @@
             if (/과일/.test(mk) || /\[과일\]/.test(nm) || dt === 'today-fruit') return 'fruit';
             return 'group';
         }
+        // [신규 2026-10-11] 공동구매 상품 가격 앞 '공구가' — 박스 없이 가격과 같은 색 작은 글씨 (사장님 요청). 상시판매·사다드림에는 안 붙인다
+        function gGbPriceWord(p) { return (gIsGbProduct(p) && !gIsSadaProduct(p)) ? '<span class="gb-pw">공구가</span>' : ''; }
         function gIsGbProduct(p) {
             if (!p || p.name === '배달비') return false;
             if (gIsSaleToday(p)) return true;
@@ -12273,7 +12284,7 @@
                 gRatingHtml(p) + gDeadlineHtml(p, closed) +
                 // [수정 2026-10-05] 홈 카드도 목록 카드처럼 원 할인은 '정상가'와 빨간 n% 딱지 (사장님 요청)
                 (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</div>` : '') +
-                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div></div>` +
+                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gGbPriceWord(p)}${gSalePctHtml(p)}${gCardPriceLabel(p)}</div></div>` +
                 `<div class="add-cart-wrap${q > 0 ? ' selected' : ''}"${sold ? ' style="pointer-events:none;"' : ''}>` +
                 `<input type="hidden" class="qty-num" value="${q}" data-name="${gHomeEsc(p.name)}" data-price="${gHomeEsc(p.price)}" data-stock="${stock}">` +
                 `<button type="button" class="btn-add-cart${sold ? ' soldout' : ''}" onclick="gHomeAdd(this)">${label}</button></div></div>`;
@@ -14037,7 +14048,7 @@
                       + (gOrigWord(p) ? '' : `<span style="color:#e11d48;">${gDiscLabelOf(p)}</span>`)   // [수정 2026-10-02] 정상가 방식은 'n원 할인' 대신 n% 딱지
                       + `<span style="color:#8b9682; font-weight:700; text-decoration:line-through;">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</span></div>`
                     : '')
-                + gSalePctHtml(p) + gCardPriceLabel(p);
+                + gGbPriceWord(p) + gSalePctHtml(p) + gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
             // 설명은 따로 받아 온다. 나머지 화면은 기다리지 않고 먼저 그린다.
             document.getElementById('detail-desc').innerText = "";
