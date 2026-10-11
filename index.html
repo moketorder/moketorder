@@ -6141,7 +6141,7 @@
                 // [수정 2026-10-03] '매장 픽업' → '영업 시간(픽업)' (사장님 요청). 메뉴 줄 이름·창 제목도 '영업 시간'
                 `<p class="kv"><span class="k">${pickupLabel || '영업 시간(픽업)'}</span><span>${E(H.pickup)}</span></p>` +
                 `<p class="kv"><span class="k">배달 시간</span><span>월~토 · ${E(H.delivery)}</span></p>` +   // [수정 2026-10-03] '배달 운영'으로 바꿨다가 다시 '배달 시간'으로 (사장님 요청)
-                `<p class="kv"><span class="k">배달 쉬는 날</span><span>일요일 · 공휴일</span></p></div>` +
+                `<p class="kv"><span class="k">배달 쉬는 날</span><span>일요일 · 임시휴무일</span></p></div>` +
                 // [수정 2026-10-03] 배달 풀이 한 줄도 표 아래에 같이 둔다 — 홈 '매장 안내'와 메뉴 '운영시간' 창이 똑같이 보이게 (사장님 요청)
                 `<p class="hm-note">배달은 <b>${E(H.delivery)}</b> 사이에 순서대로 갖다 드려요. 배달이 끝나면 개별 문자로 알려 드려요.</p>`;
         }
