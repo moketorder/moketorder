@@ -2699,6 +2699,18 @@
         .pg-copy { width: 100%; margin-top: 12px; }
         .pg-items { margin-top: 16px; padding-top: 12px; border-top: 1px solid #eef1e9; }
         .pg-items-t { font-size: 13.5px; font-weight: 700; color: #16200f; margin-bottom: 4px; }
+        /* [신규 2026-10-11] 주문 완료 창 — 후기 안 쓴 지난 상품 권하기 */
+        .pg-rv { margin-top: 16px; border: 1.5px solid #b9de9f; background: #f1f9eb; border-radius: 14px; padding: 14px; text-align: left; }
+        .pg-rv-h { font-size: 15.5px; font-weight: 900; color: #2f6e12; }
+        .pg-rv-s { font-size: 13px; color: #3d8f19; margin-top: 5px; line-height: 1.5; font-weight: 600; }
+        .pg-rv-s b { color: #e8650a; font-weight: 900; }
+        .pg-rv-it { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 10px; padding: 10px 11px; margin-top: 7px; }
+        .pg-rv-tx { flex: 1; min-width: 0; }
+        .pg-rv-n { font-size: 13.5px; font-weight: 800; color: #16200f; line-height: 1.35; word-break: keep-all; }
+        .pg-rv-d { font-size: 11.5px; color: #8b9682; margin-top: 2px; font-weight: 600; }
+        .pg-rv-d em { font-style: normal; color: #e8650a; font-weight: 800; }
+        .pg-rv-btn { flex: 0 0 auto; border: none; background: #4caf20; color: #fff; border-radius: 8px; padding: 7px 11px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+        .pg-rv-f { font-size: 11.5px; color: #6a8f55; margin-top: 9px; font-weight: 600; }
         .pg-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; font-size: 14px; }
         .pg-row + .pg-row { border-top: 1px solid #f1f4ec; }
         .pg-name { flex: 1; min-width: 0; font-weight: 500; color: #16200f; line-height: 1.45; word-break: keep-all; }
@@ -6206,6 +6218,45 @@
             if (gReviewedCode(o)) return `<div class="rv-done">후기 쓴 상품</div>`;   // [신규 2026-10-03] 다른 주문에서 이미 후기를 쓴 같은 상품 (사장님 요청)
             return `<button type="button" class="rv-write-btn" onclick="gOpenReview('${encodeURIComponent(o.__fbKey)}')">후기 쓰기</button>`;
         }
+        /* [신규 2026-10-11] 주문 완료 창 맨 아래 — 후기를 안 쓴 지난 상품을 보여 주고 포인트로 후기를 권한다 (사장님 요청).
+           주문내역의 [후기 쓰기]와 같은 조건(gCanReview · 같은 상품 1번)으로 고르고, 마감(쓸 수 있는 마지막 날)이 가까운 순으로 3개까지.
+           주문내역을 조용히 새로 받아(상태가 '픽업완료'로 바뀐 것까지) 고른다. 쓸 상품이 없으면 칸을 안 그린다 */
+        async function gReviewNudgeFill(noRefresh) {
+            const slot = document.getElementById('pg-review-slot');
+            if (!slot || gIsGuestView() || !gIsValidPhone(gReviewPhone())) return;
+            try {
+                if (!noRefresh) await openHistoryModal(false, true);
+                if (!window.gMyReviewKeys) await gLoadMyReviewKeys();
+            } catch (e) { }
+            if (!window.gMyReviewKeys) return;
+            const seen = new Set();
+            const list = (fullHistoryData || [])
+                .filter(o => gCanReview(o) && !window.gMyReviewKeys[o.__fbKey] && !gReviewedCode(o))
+                .sort((a, b) => gReviewLastYmd(a).localeCompare(gReviewLastYmd(b)))
+                .filter(o => { const c = String(o.productCode || '').trim(); if (seen.has(c)) return false; seen.add(c); return true; })
+                .slice(0, 3);
+            if (!document.getElementById('pg-review-slot')) return;   // 받는 사이 창을 닫았으면
+            if (!list.length) { slot.innerHTML = ''; return; }
+            const md = ymd => `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}`;
+            const E = s => String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const pk = o => gReviewYmdOf(o.pickupDate) || gReviewOrderYmd(o);
+            const how = o => String(o.shippingMethod || '').includes('배달') ? '배달' : '픽업';
+            slot.innerHTML = `<div class="pg-rv">
+                <div class="pg-rv-h">⭐ 지난번 상품은 어떠셨어요?</div>
+                <div class="pg-rv-s">후기를 남기면 상품마다 <b>최대 100P</b>를 드려요${list.length > 1 ? `<br>아래 ${list.length}개 다 쓰면 <b>최대 ${list.length * 100}P</b>!` : ''}</div>
+                ${list.map(o => `<div class="pg-rv-it">
+                    <div class="pg-rv-tx"><div class="pg-rv-n">${E(o.item)}</div>
+                    <div class="pg-rv-d">${md(pk(o))} ${how(o)} · <em>${md(gReviewLastYmd(o))}까지</em> 쓸 수 있어요</div></div>
+                    <button type="button" class="pg-rv-btn" onclick="gReviewNudgeOpen('${encodeURIComponent(o.__fbKey)}')">후기 쓰기</button></div>`).join('')}
+                <div class="pg-rv-f">20자 이상 쓰면 100P, 짧게 쓰면 50P · 1,000P부터 주문할 때 써요</div>
+            </div>`;
+        }
+        // 주문 완료 창(맨 위) 위로 후기 창을 띄운다
+        function gReviewNudgeOpen(encKey) {
+            const m = document.getElementById('review-modal');
+            if (m) m.style.zIndex = '10050';
+            gOpenReview(encKey);
+        }
         let _gRv = null;   // 지금 쓰는 후기 { order, stars }
         function gOpenReview(encKey) {
             const key = decodeURIComponent(encKey);
@@ -6282,6 +6333,7 @@
                         closeModal('review-modal');
                         showToast(pts ? `후기를 남겼어요 · ${pts}P 적립` : '후기를 남겼어요');
                         try { renderHistory(); } catch (e) { }
+                        try { gReviewNudgeFill(true); } catch (e) { }   // [신규 2026-10-11] 주문 완료 창의 후기 권하기 칸도 다시 (쓴 상품은 빠진다)
                         try { gLoadReviewStats(true); } catch (e) { }
                         return;
                     }
@@ -15182,6 +15234,7 @@
                                     </div>`;
                             }).join('')}
                         </div>
+                        <div id="pg-review-slot"></div><!-- [신규 2026-10-11] 후기 안 쓴 지난 상품 (gReviewNudgeFill 가 채운다) -->
                     </div>
                 `;
             } else {
@@ -15228,6 +15281,7 @@
             // [수정] 취소 버튼을 없애고 확인만 남긴다.
             //  바로 앞 주문확인창에서 이미 주문 여부를 확인했으므로, 이 창은 입금 계좌와 금액을
             //  확인하고 넘어가는 자리다. 여기서 또 취소를 묻던 것이 흐름을 끊었다.
+            if (isFinal) setTimeout(() => { try { gReviewNudgeFill(); } catch (e) { } }, 0);   // [신규 2026-10-11] 창이 뜬 뒤 후기 안 쓴 지난 상품을 채운다
             showSystemModal(msg, 'alert', async () => {
                 if (isFinal) {
                     gReloadKeepingView();
