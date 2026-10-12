@@ -2737,9 +2737,11 @@
         /* [수정 2026-10-12] '공구가' 글자가 상품명·금액 글자와 같은 세로줄에 서게, 딱지를 안쪽 여백(0.42em)만큼 왼쪽으로 (사장님: 안쪽으로 들어간 느낌) */
         /* [수정 2026-10-12] 왼쪽으로 내밀었더니 상자가 튀어나와 보여(사장님) — 상자는 상품명과 같은 줄에서 시작하고, 왼쪽 안쪽 여백만 줄인다 */
         /* [수정 2026-10-12] 할인 없는 상품의 '공구가'는 연한 주황 바탕 + 주황 글씨 — 주황 금액과 짝 (B안, 사장님 결정). 할인 상품은 빨강 한 표시 그대로 */
-        .pw-mark:not(.joined) .gb-pw, .card-grid .item-price-row .pw-mark:not(.joined) .gb-pw { color: var(--nego-orange) !important; background: #fff1e6 !important; }
+        .pw-mark:not(.joined) .gb-pw, .card-grid .item-price-row .pw-mark:not(.joined) .gb-pw { color: var(--nego-orange) !important; background: #ffe2cc !important; }   /* [수정 2026-10-12] 연한 주황 + 주황 글씨 — 할인 표시의 연한 빨강 '공구가'와 같은 진하기. 진하게 칠하는 건 할인 %만 (사장님 결정) */
+        /* [수정 2026-10-12] 사선은 뺐다 — 혼자 있으면 잘린 것처럼 보여서. 모서리 3px 네모 (사장님 결정: 4번) */
+        .pw-mark:not(.joined) .gb-pw, .card-grid .item-price-row .pw-mark:not(.joined) .gb-pw { padding: 0.28em 0.45em 0.24em !important; border-radius: 3px !important; clip-path: none; }
         .pw-mark, .item-price-row .pw-mark { display: inline-flex; align-items: stretch; font-size: inherit !important; padding: 0 !important; border-radius: 0 !important; background: none; }   /* 가격 줄의 'span 12px' 딱지 규칙이 묶음에 걸리지 않게 */
-        .pw-mark.joined .gb-pw, .card-grid .item-price-row .pw-mark.joined .gb-pw { margin-right: 0 !important; border-radius: 2px 0 0 2px !important; }
+        .pw-mark.joined .gb-pw, .card-grid .item-price-row .pw-mark.joined .gb-pw { margin-right: 0 !important; border-radius: 3px 0 0 3px !important; padding-left: 0.45em !important; }
         .pw-mark.joined .sale-pct, .item-price-row .item-price-val .pw-mark.joined .sale-pct { margin-left: 0 !important; border-radius: 0 !important; vertical-align: 0 !important; }   /* 위 줄이 가격보다 넓으면 가격이 오른쪽으로 밀리던 것 */
         /* [신규 2026-10-12] '공구가'를 할인 % 딱지와 짝 맞춘 딱지로 (사장님 요청 — 빨간 % 옆에서 조화롭게).
            크기·높이는 % 딱지와 같게, 색은 가격색(보통 주황, 할인 빨강)을 연하게 깐 바탕 + 가격색 글씨 */
