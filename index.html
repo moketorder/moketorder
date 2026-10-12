@@ -331,9 +331,9 @@
             background: rgba(255, 255, 255, 0.93) !important; line-height: 1.2 !important;
         }
         /* [삭제 2026-10-05] 홈 카드 문구 띠 12px — '할인!' 띠(15px)와 크기를 맞추려고 뺐다 (사장님 요청) */
-        .hm-card .hm-thumb { position: relative; aspect-ratio: 1 / 1; max-width: 100%; background: #f6f7f3; cursor: pointer; overflow: hidden; }
+        .hm-card .hm-thumb { position: relative; aspect-ratio: 1 / 1; width: 100%; max-width: 100%; flex-shrink: 0;   /* [수정 2026-10-12] width 100% — 사진 없는 카드에서 칸이 글자 크기로 줄던 것 (사장님 요청) */ background: #f6f7f3; cursor: pointer; overflow: hidden; }
         .hm-card .hm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .hm-card .hm-noimg { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 12px; color: #b6bcac; }
+        .hm-card .hm-noimg { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #b6bcac; }
         .hm-card .thumb-sale { top: auto !important; bottom: 0 !important; }
         .hm-card .thumb-badges { display: flex; position: absolute; left: 6px; right: 6px; top: 6px; flex-wrap: wrap; gap: 4px; z-index: 2; pointer-events: none; }
         /* [신규 2026-10-04] '주문이 많아요' 순위 — 사진 오른쪽 위. 1~3위는 주황, 나머지는 짙은 회색 */
@@ -12272,7 +12272,7 @@
             return `<div class="product-card hm-card${sold ? ' soldout' : ''}${rank ? ' ranked' : ''}">` +
                 `<div class="hm-thumb" ${open}>` +
                 (rank ? `<span class="hm-rank${rank <= 3 ? ' top' : ''}">${rank}위</span>` : '') +   // [신규 2026-10-04] 주문 많은 순위
-                (img ? `<img src="${getImgUrl(img, 300)}" loading="lazy" referrerpolicy="no-referrer" alt="" onerror="this.onerror=null; this.src=getImgUrl('${img}', 300, true);">` : `<span class="hm-noimg">사진 없음</span>`) +
+                (img ? `<img src="${getImgUrl(img, 300)}" loading="lazy" referrerpolicy="no-referrer" alt="" onerror="this.onerror=null; this.src=getImgUrl('${img}', 300, true);">` : `<span class="hm-noimg">이미지 없음</span>`) +
                 sale + `<div class="thumb-badges">${gStorageBadge(p)}${gTagBadges(p)}</div></div>` +
                 // [신규 2026-10-03] 받는 날 — 공동구매는 '10/6(화) 픽업·배달', 오늘·내일은 말로. 상시판매는 '상시판매' (사장님 요청 — 홈 카드에 날짜가 없었다)
                 `<div class="hm-info">${(() => {
