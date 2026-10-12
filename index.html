@@ -349,7 +349,7 @@
         .hm-card .item-name { font-size: 14px !important; line-height: 1.3; word-break: keep-all; }
         .hm-card .item-deadline { font-size: 11.5px; }
         /* [수정 2026-10-12] 가격을 카드 아래로 밀어 옆 카드와 줄 맞추던 것(margin-top:auto)을 뺐다 — 마감 시각 바로 밑에 붙는다 (사장님 요청). 담기 단추는 그대로 맨 아래 */
-        .hm-card .hm-price { padding-top: 2px; font-size: 15.5px; font-weight: 800; color: #16200f; font-variant-numeric: tabular-nums; }
+        .hm-card .hm-price { padding-top: 2px; font-size: 15.5px; font-weight: 800; color: var(--nego-orange); font-variant-numeric: tabular-nums; }
         .hm-card .hm-price.sale { color: #e11d48; }
         .hm-card .hm-orig { font-size: 11.5px; font-weight: 600; color: #a3ab9a; text-decoration: line-through; }
         /* [신규 2026-10-11] 홈 카드도 공구가 가격·정상가는 오른쪽 정렬 (사장님 요청) */
@@ -2732,13 +2732,12 @@
         .hm-card .hm-info > .hm-orig + .hm-price, .card-grid .item-info-top > .hm-orig + .hm-price, .hm-card .hm-info > .item-orig-price + .item-price-row, .card-grid .item-info-top > .item-orig-price + .item-price-row { margin-top: 3px !important; }
         .pw-top { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 3px; }
         .card-grid .item-price-val, .hm-card .hm-price { text-align: left !important; }
-        /* [수정 2026-10-12] 금액은 검정, 할인만 빨강 (사장님 요청 — 주황은 '곧 마감'·사다드림 표시에만 남긴다). 품절 회색은 그대로 */
-        .card-grid .product-card:not(.soldout) .item-price-val:not(.sale) { color: #16200f; }
+        /* [수정 2026-10-12] 금액은 다시 주황 (B안, 사장님 결정 — 장바구니·결제 금액과 같은 색). 할인은 빨강, 품절은 회색 그대로 */
         /* [신규 2026-10-12] '공구가'+'16%' 한 표시 — 사이 틈을 없애고 맞닿는 모서리는 각지게 */
         /* [수정 2026-10-12] '공구가' 글자가 상품명·금액 글자와 같은 세로줄에 서게, 딱지를 안쪽 여백(0.42em)만큼 왼쪽으로 (사장님: 안쪽으로 들어간 느낌) */
         /* [수정 2026-10-12] 왼쪽으로 내밀었더니 상자가 튀어나와 보여(사장님) — 상자는 상품명과 같은 줄에서 시작하고, 왼쪽 안쪽 여백만 줄인다 */
-        /* [수정 2026-10-12] 할인 없는 상품의 '공구가'는 연한 초록 바탕 + 초록 글씨 (사장님 요청 — 회색은 칙칙). 할인 상품은 빨강 한 표시 그대로 */
-        .pw-mark:not(.joined) .gb-pw, .card-grid .item-price-row .pw-mark:not(.joined) .gb-pw { color: #2f7d14 !important; background: #eaf5e2 !important; }
+        /* [수정 2026-10-12] 할인 없는 상품의 '공구가'는 연한 주황 바탕 + 주황 글씨 — 주황 금액과 짝 (B안, 사장님 결정). 할인 상품은 빨강 한 표시 그대로 */
+        .pw-mark:not(.joined) .gb-pw, .card-grid .item-price-row .pw-mark:not(.joined) .gb-pw { color: var(--nego-orange) !important; background: #fff1e6 !important; }
         .pw-mark, .item-price-row .pw-mark { display: inline-flex; align-items: stretch; font-size: inherit !important; padding: 0 !important; border-radius: 0 !important; background: none; }   /* 가격 줄의 'span 12px' 딱지 규칙이 묶음에 걸리지 않게 */
         .pw-mark.joined .gb-pw, .card-grid .item-price-row .pw-mark.joined .gb-pw { margin-right: 0 !important; border-radius: 2px 0 0 2px !important; }
         .pw-mark.joined .sale-pct, .item-price-row .item-price-val .pw-mark.joined .sale-pct { margin-left: 0 !important; border-radius: 0 !important; vertical-align: 0 !important; }   /* 위 줄이 가격보다 넓으면 가격이 오른쪽으로 밀리던 것 */
@@ -2825,7 +2824,7 @@
         .item-deadline.is-today { color: #3d8f19; }
         .item-deadline.is-today b { font-weight: 700; letter-spacing: 0.02em; }
         /* [수정 2026-10-12] 남은 시간에 따라 초록 → 주황(12시간 안) → 빨강(3시간 안) (사장님 요청 — 예전엔 1시간 안만 빨강) */
-        .item-deadline.is-soon { color: #ea6a00; }
+        .item-deadline.is-soon { color: #3d8f19; }   /* [수정 2026-10-12] 주황 단계는 뺐다 — 금액 주황과 겹쳐서 (B안). 3시간 안만 빨강 */
         .item-deadline.is-urgent { color: #dc2626; }
         .item-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 auto; }
         .item-price-row .item-price-val { white-space: nowrap; flex: 0 0 auto; }   /* '13,800원~'의 ~가 떨어지지 않게 */
@@ -14093,7 +14092,7 @@
             // [삭제 2026-10-02] 특가 상품 이름 밑 '(수량이 많지 않습니다.)' — 카드와 함께 뺐다 (사장님 요청)
             const _dPriceEl = document.getElementById('detail-price');
             const _dRate = gIsSale(p);
-            _dPriceEl.style.color = _dRate ? '#e11d48' : '#16200f';   // [수정 2026-10-12] 상세 금액도 검정, 할인만 빨강 (사장님 요청)
+            _dPriceEl.style.color = _dRate ? '#e11d48' : 'var(--nego-orange)';   // [수정 2026-10-12] 금액 주황, 할인만 빨강 (B안)
             _dPriceEl.innerHTML =
                 (gOrigPriceLabel(p)
                     ? `<div style="display:flex; align-items:baseline; gap:6px; font-size:17px; font-weight:900; margin-bottom:3px;">`
