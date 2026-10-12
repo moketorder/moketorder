@@ -11658,7 +11658,7 @@
                     //  색 글씨 말머리와 회색 수식어가 섞여 두 모양이었다. 땡처리 특가만 빨강을 남긴다(값 신호).
                     gCardNameHtml(p) +
                     `</div>` +
-                    gRatingHtml(p) +   // [수정 2026-10-02] 별 5개(반 개씩) + (후기 수) — 제목 바로 아래
+                    /* [이동 2026-10-12] 별점은 가격 줄 아래로 옮겼다 (사장님 요청) */
                     gDeadlineHtml(p, isClosed) +   // [신규] 마감 시각 · 마감 날 카운트다운
                     // [신규] 할인 상품은 판매가 바로 위에 할인 전 금액을 작게 적어 준다.
                     (gOrigPriceLabel(p)
@@ -11671,6 +11671,7 @@
                     // [수정 2026-10-03] 사장님 모드 잔여 수량은 가격 줄 오른쪽에 — 담기 위에 두면 담기가 수량보다 아래로 내려갔다 (사장님 요청)
                     (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800; margin-left:auto; padding-left:6px; font-size:12px; white-space:nowrap; align-self:center;">${stockText.replace(': ', ' ')}</div>` : '') +
                     `</div>` +
+                    gRatingHtml(p) +   // [이동 2026-10-12] 별 5개 + (후기 수) — 가격 바로 아래 (사장님 요청)
                     `</div></div>` +
                     // [ver3] 수량(- 1 +)과 담기를 아래 한 줄로 모았다. 상세보기도 같은 줄 왼쪽에 둔다.
                     //  (예전에는 수량이 사진 옆 정보칸, 담기가 아래 줄로 떨어져 있었다)
@@ -12332,10 +12333,10 @@
                     const lab = gHomeDayLabel(d), w = HM_WEEK[new Date(d + 'T12:00:00').getDay()];
                     return `<div class="hm-day">${lab === '오늘' || lab === '내일' ? `${lab}(${w})` : `${lab}(${w})`} 픽업·배달</div>`;
                 })()}<div class="item-head" ${open}>${gCardNameHtml(p)}</div>` +
-                gRatingHtml(p) + gDeadlineHtml(p, closed) +
+                gDeadlineHtml(p, closed) +   // [이동 2026-10-12] 별점은 가격 밑으로 (사장님 요청)
                 // [수정 2026-10-05] 홈 카드도 목록 카드처럼 원 할인은 '정상가'와 빨간 n% 딱지 (사장님 요청)
                 (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</div>` : '') +
-                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gPriceTopHtml(p)}${gCardPriceLabel(p)}</div></div>` +
+                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gPriceTopHtml(p)}${gCardPriceLabel(p)}</div>` + gRatingHtml(p) + `</div>` +
                 `<div class="add-cart-wrap${q > 0 ? ' selected' : ''}"${sold ? ' style="pointer-events:none;"' : ''}>` +
                 `<input type="hidden" class="qty-num" value="${q}" data-name="${gHomeEsc(p.name)}" data-price="${gHomeEsc(p.price)}" data-stock="${stock}">` +
                 `<button type="button" class="btn-add-cart${sold ? ' soldout' : ''}" onclick="gHomeAdd(this)">${label}</button></div></div>`;
