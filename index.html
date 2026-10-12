@@ -2782,6 +2782,8 @@
         .item-deadline { margin-top: 4px; font-size: 13px; font-weight: 600; color: #8b9682; font-variant-numeric: tabular-nums; }
         .item-deadline.is-today { color: #3d8f19; }
         .item-deadline.is-today b { font-weight: 700; letter-spacing: 0.02em; }
+        /* [수정 2026-10-12] 남은 시간에 따라 초록 → 주황(12시간 안) → 빨강(3시간 안) (사장님 요청 — 예전엔 1시간 안만 빨강) */
+        .item-deadline.is-soon { color: #ea6a00; }
         .item-deadline.is-urgent { color: #dc2626; }
         .item-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 auto; }
         .item-price-row .item-price-val { white-space: nowrap; flex: 0 0 auto; }   /* '13,800원~'의 ~가 떨어지지 않게 */
@@ -5581,7 +5583,7 @@
                 const hh = String(Math.floor(left / 3600)).padStart(2, '0');
                 const mm = String(Math.floor(left % 3600 / 60)).padStart(2, '0');
                 const ss = String(left % 60).padStart(2, '0');
-                return { today: true, urgent: left < 3600, html: `마감까지 <b>${hh}:${mm}:${ss}</b>` };
+                return { today: true, urgent: left < 3 * 3600, soon: left < 12 * 3600, html: `마감까지 <b>${hh}:${mm}:${ss}</b>` };
             }
             // 0시 정각 마감도 그대로 '오전 12시'로 적는다 (사장님: 오전·오후가 낫다 — '밤 12시'로 바꿨다가 되돌림)
             const d = new Date(t);
@@ -5590,13 +5592,13 @@
             const clock = `${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}시${mi ? ` ${mi}분` : ''}`;
             // [수정 2026-10-07] 며칠 남았는지는 달력 날짜가 아니라 남은 시간으로 센다 (24~48시간 = 1일, 48~72시간 = 2일)
             const dayDiff = Math.floor((t - now.getTime()) / 86400000);
-            return { today: false, urgent: false, html: `${d.getMonth() + 1}/${d.getDate()}(${W}) ${clock} 마감 · <b>${dayDiff}일 남음</b>` };
+            return { today: false, urgent: false, soon: false, html: `${d.getMonth() + 1}/${d.getDate()}(${W}) ${clock} 마감 · <b>${dayDiff}일 남음</b>` };
         }
         function gDeadlineHtml(p, closed) {
             const t = gExpireAt(p) || gTodayGbCloseAt(p);   // [신규 2026-09-30] 오늘 상품은 당일 마감시각까지 카운트다운
             if (!t || closed) return '';
             const x = gDeadlineText(t);
-            return `<div class="item-deadline${x.today ? ' is-today' : ''}${x.urgent ? ' is-urgent' : ''}" data-exp="${t}">${x.html}</div>`;
+            return `<div class="item-deadline${x.today ? ' is-today' : ''}${x.soon && !x.urgent ? ' is-soon' : ''}${x.urgent ? ' is-urgent' : ''}" data-exp="${t}">${x.html}</div>`;
         }
         // 1초마다 카운트다운을 고친다. 마감 시각이 되면 목록을 다시 그려 '마감'으로 바꾼다.
         let _gDeadlineRerendered = 0;
@@ -5611,6 +5613,7 @@
                 const x = gDeadlineText(t);
                 if (el.innerHTML !== x.html) el.innerHTML = x.html;
                 el.classList.toggle('is-today', x.today);
+                el.classList.toggle('is-soon', !!x.soon && !x.urgent);
                 el.classList.toggle('is-urgent', x.urgent);
             });
             if (hit && Date.now() - _gDeadlineRerendered > 3000 && typeof renderList === 'function') {
@@ -12365,7 +12368,7 @@
                 if (s.auto !== false && !gTodayManual(now)) {
                     const mi = gHMOf(s.close, 900), d = new Date(); d.setHours(Math.floor(mi / 60), mi % 60, 0, 0);
                     const x = gDeadlineText(d.getTime());
-                    cd = ` · <span class="item-deadline hm-cd${x.urgent ? ' is-urgent' : ''}" data-exp="${d.getTime()}">${x.html}</span>`;
+                    cd = ` · <span class="item-deadline hm-cd${x.soon && !x.urgent ? ' is-soon' : ''}${x.urgent ? ' is-urgent' : ''}" data-exp="${d.getTime()}">${x.html}</span>`;
                 }
                 small = `당일배송 가능 상품만${cd}`;   // [수정 2026-10-03] '순서대로 배송' 대신 (사장님 요청)
             }
