@@ -13852,7 +13852,7 @@
                 footer.classList.remove('visible');
                 if (notice) notice.style.display = 'none';
             }
-            document.getElementById('total-qty-text').innerHTML = `총 <span onclick="openCartDetailModal()" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:#3d8f19; color:#fff; padding:3px 9px; border-radius:999px; font-size:13.5px; font-weight:700; margin:0 5px; line-height:1.2; vertical-align:1px; font-variant-numeric:tabular-nums;">${tQ}개</span> 선택 <span style="color:#dde0d5; margin:0 8px; font-weight:normal;">|</span> 합계 <span style="color:var(--nego-orange); font-size:20px; font-weight:700; margin-left:3px; font-variant-numeric:tabular-nums; vertical-align:-1px;">${tP.toLocaleString()}</span>원`;
+            document.getElementById('total-qty-text').innerHTML = `총 <span onclick="openCartDetailModal()" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:#3d8f19; color:#fff; padding:3px 9px; border-radius:999px; font-size:13.5px; font-weight:700; margin:0 5px; line-height:1.2; vertical-align:1px; font-variant-numeric:tabular-nums;">${tQ}개</span> 선택 <span style="color:#dde0d5; margin:0 8px; font-weight:normal;">|</span> 합계 <span style="color:var(--nego-orange); font-size:20px; font-weight:700; margin-left:3px; font-variant-numeric:tabular-nums; vertical-align:-1px;">${tP.toLocaleString()}원</span>`;   // [수정 2026-10-12] '원'도 금액과 같은 주황·크기 (사장님 요청)
         }
 
         function resetCart() {
