@@ -348,11 +348,12 @@
         /* [수정 2026-10-05] 홈 카드 이름도 두 줄에서 자르지 않고 다 보여 준다 (사장님 요청) */
         .hm-card .item-name { font-size: 14px !important; line-height: 1.3; word-break: keep-all; }
         .hm-card .item-deadline { font-size: 11.5px; }
-        .hm-card .hm-price { margin-top: auto; padding-top: 2px; font-size: 15.5px; font-weight: 800; color: #16200f; font-variant-numeric: tabular-nums; }
+        /* [수정 2026-10-12] 가격을 카드 아래로 밀어 옆 카드와 줄 맞추던 것(margin-top:auto)을 뺐다 — 마감 시각 바로 밑에 붙는다 (사장님 요청). 담기 단추는 그대로 맨 아래 */
+        .hm-card .hm-price { padding-top: 2px; font-size: 15.5px; font-weight: 800; color: #16200f; font-variant-numeric: tabular-nums; }
         .hm-card .hm-price.sale { color: #e11d48; }
         .hm-card .hm-orig { font-size: 11.5px; font-weight: 600; color: #a3ab9a; text-decoration: line-through; }
         /* [신규 2026-10-11] 홈 카드도 공구가 가격·정상가는 오른쪽 정렬 (사장님 요청) */
-        .hm-card .hm-price, .hm-card .hm-orig { text-align: right; }
+        /* [수정 2026-10-12] 오른쪽 정렬은 되돌렸다 — 예전처럼 왼쪽 ('공구가' 글자는 그대로, 사장님 요청) */
         .hm-card .add-cart-wrap { padding: 8px 9px 9px; }
         .hm-card .btn-add-cart { width: 100%; height: 34px; border-radius: 8px; border: 1.5px solid #4CAF20; background: #fff; color: #3d8f19; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
         .hm-card .add-cart-wrap.selected .btn-add-cart { background: #4CAF20; color: #fff; }
@@ -1371,6 +1372,13 @@
             opacity: 1;
         }
 
+        /* [신규 2026-10-12] 사진 없는 칸 — '이미지 없음'·'No Image' 대신 흐린 MOKET 글자 + '사진 준비 중' (사장님 요청).
+           홈 카드·목록 카드·상세 사진 칸이 같은 모양. 칸 너비에 맞춰 글자 크기가 변한다(cqw). 진한 로고는 상품 사진처럼 보여 흐리게 둔다 */
+        .mk-noimg { container-type: inline-size; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3em; width: 100%; height: 100%; background: #f4f6f0; }
+        .mk-noimg b { font-size: 17cqw; font-weight: 900; letter-spacing: -0.03em; line-height: 0.9; color: #cfe2c3; }
+        .mk-noimg small { font-size: max(11px, 6.5cqw); font-weight: 600; color: #a3ab98; }
+        .slider-no-img .mk-noimg b { font-size: 12cqw; }   /* 상세 사진 칸은 넓어서 조금 작게 */
+        .slider-no-img .mk-noimg small { font-size: max(13px, 4cqw); }
         .slider-no-img {
             width: 100%;
             height: 100%;
@@ -1643,17 +1651,17 @@
         .card-grid .item-rating { text-align: left; margin-top: 3px; font-size: 12.5px; }
         .card-grid .item-rating .stars5 i { font-size: 13px; }
         .card-grid .item-deadline { font-size: 12px; margin-top: 2px; }
-        .card-grid .item-orig-price { margin-top: auto; padding-top: 6px; justify-content: flex-start; font-size: 12.5px; margin-bottom: 0; }
+        /* [수정 2026-10-12] 정상가·가격 줄을 카드 아래로 밀던 margin-top:auto 를 뺐다 — 옆 카드와 줄 맞추지 않는다 (사장님 요청) */
+        .card-grid .item-orig-price { padding-top: 6px; justify-content: flex-start; font-size: 12.5px; margin-bottom: 0; }
         .card-grid .item-price-row { margin-top: 2px; justify-content: flex-start; }
         .card-grid .item-info-top { justify-content: flex-start !important; }
-        .card-grid .item-info-top > .item-price-row { margin-top: auto; padding-top: 6px; }
+        .card-grid .item-info-top > .item-price-row { padding-top: 6px; }
         .card-grid .item-info-top > .item-orig-price + .item-price-row { margin-top: 0 !important; padding-top: 0; }
         .card-grid .item-price-val { font-size: 19px !important; }
         /* [신규 2026-10-11] 상품목록(두 칸 카드) — 공구가 글씨 15% 크게, 공구가·정상가 줄 오른쪽 정렬 (사장님 요청) */
         /* [수정 2026-10-11] 공구가 12px, 가격과 사이 5px (사장님 요청) — 가격 줄의 .item-price-row span(12px·안쪽 여백 9px, !important)을 이겨야 해서 !important */
         .card-grid .item-price-row .gb-pw { font-size: 12px !important; margin-right: 5px !important; padding: 0 !important; border-radius: 0 !important; }
-        .card-grid .item-orig-price { justify-content: flex-end; text-align: right; }
-        .card-grid .item-price-row { justify-content: flex-end; }
+        /* [수정 2026-10-12] 공구가·정상가 줄 오른쪽 정렬은 되돌렸다 — 예전처럼 왼쪽 (사장님 요청) */
         /* [수정 2026-10-02] 수량 칸과 담기 단추가 칸 너비를 빈틈없이 나눠 채운다 (수량 : 담기 = 1 : 1.15) — 사장님 요청 */
         .card-grid .item-controls-bottom-v { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; align-self: stretch; width: auto !important; box-sizing: border-box; padding: 8px 10px 0; gap: 6px !important; grid-column: auto !important; grid-row: auto !important; }
         .card-grid .item-controls-bottom-v > :only-child { grid-column: 1 / -1; }   /* 품절 등 단추 하나뿐이면 한 줄 다 */
@@ -2707,6 +2715,8 @@
         .pg-items { margin-top: 16px; padding-top: 12px; border-top: 1px solid #eef1e9; }
         .pg-items-t { font-size: 13.5px; font-weight: 700; color: #16200f; margin-bottom: 4px; }
         /* [신규 2026-10-11] 가격 앞 '공구가' — 가격과 같은 색(물려받음), 작게 */
+        .pw-top { display: block; line-height: 1; margin-bottom: 4px; white-space: nowrap; text-align: left; }   /* [신규 2026-10-12] 가격 위 '공구가' 줄 */
+        .pw-top .gb-pw { vertical-align: baseline; }
         .gb-pw { font-size: 0.6em; font-weight: 800; color: inherit; margin-right: 4px; vertical-align: 0.12em; letter-spacing: -0.02em; }
         /* [신규 2026-10-11] 주문 완료 창 — 후기 안 쓴 지난 상품 권하기 (한 화면에 다 들어오게 작게) */
         .pg-rv { margin-top: 12px; border: 1.5px solid #b9de9f; background: #f1f9eb; border-radius: 12px; padding: 10px 11px; text-align: left; }
@@ -11594,7 +11604,7 @@
                 const _openArg = `onclick="openDetail('${escapeArg(p.name)}')" style="cursor:pointer;"`;
                 card.innerHTML = `<div class="card-top">` +
                     `<div class="thumb" ${_openArg}>` +
-                    (imgId ? `<img${gImgSeenCls(getImgUrl(imgId, 300))} src="${getImgUrl(imgId, 300)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain;" onload="gImgLoaded(this)" onerror="this.onerror=null; this.src=getImgUrl('${imgId}', 300, true); this.classList.add('loaded');">` : 'No Image') +
+                    (imgId ? `<img${gImgSeenCls(getImgUrl(imgId, 300))} src="${getImgUrl(imgId, 300)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain;" onload="gImgLoaded(this)" onerror="this.onerror=null; this.src=getImgUrl('${imgId}', 300, true); this.classList.add('loaded');">` : '<span class="mk-noimg"><b>MOKET</b><small>사진 준비 중</small></span>') +   // [수정 2026-10-12] 'No Image' 대신 흐린 MOKET
                     // [ver3] '예시이미지입니다.' 자리에 '상세보기'를 둔다.
                     //  사진을 누르면 상세가 열리니, 누를 수 있다는 것을 여기서 알린다.
                     `<div class="thumb-notice">상세보기 <span>›</span></div>` +
@@ -11625,7 +11635,7 @@
                             : `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`)
                         : '') +
                     `<div class="item-price-row">` +
-                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gGbPriceWord(p)}${gSalePctHtml(p)}${gCardPriceLabel(p)}</div>` +
+                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gPriceTopHtml(p)}${gCardPriceLabel(p)}</div>` +
                     // [수정 2026-10-03] 사장님 모드 잔여 수량은 가격 줄 오른쪽에 — 담기 위에 두면 담기가 수량보다 아래로 내려갔다 (사장님 요청)
                     (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800; margin-left:auto; padding-left:6px; font-size:12px; white-space:nowrap; align-self:center;">${stockText.replace(': ', ' ')}</div>` : '') +
                     `</div>` +
@@ -12079,6 +12089,11 @@
             return 'group';
         }
         // [신규 2026-10-11] 공동구매 상품 가격 앞 '공구가' — 박스 없이 가격과 같은 색 작은 글씨 (사장님 요청). 상시판매·사다드림에는 안 붙인다
+        // [신규 2026-10-12] '공구가'(와 할인 딱지)는 늘 가격 바로 위 한 줄에 — 할인 상품처럼 (사장님 요청). 둘 다 없으면 줄도 없다
+        function gPriceTopHtml(p) {
+            const top = gGbPriceWord(p) + gSalePctHtml(p);
+            return top ? `<div class="pw-top">${top}</div>` : '';
+        }
         function gGbPriceWord(p) { return (gIsGbProduct(p) && !gIsSadaProduct(p)) ? '<span class="gb-pw">공구가</span>' : ''; }
         function gIsGbProduct(p) {
             if (!p || p.name === '배달비') return false;
@@ -12275,7 +12290,7 @@
             return `<div class="product-card hm-card${sold ? ' soldout' : ''}${rank ? ' ranked' : ''}">` +
                 `<div class="hm-thumb" ${open}>` +
                 (rank ? `<span class="hm-rank${rank <= 3 ? ' top' : ''}">${rank}위</span>` : '') +   // [신규 2026-10-04] 주문 많은 순위
-                (img ? `<img src="${getImgUrl(img, 300)}" loading="lazy" referrerpolicy="no-referrer" alt="" onerror="this.onerror=null; this.src=getImgUrl('${img}', 300, true);">` : `<span class="hm-noimg">이미지 없음</span>`) +
+                (img ? `<img src="${getImgUrl(img, 300)}" loading="lazy" referrerpolicy="no-referrer" alt="" onerror="this.onerror=null; this.src=getImgUrl('${img}', 300, true);">` : `<span class="mk-noimg"><b>MOKET</b><small>사진 준비 중</small></span>`) +   // [수정 2026-10-12] '이미지 없음' 대신 흐린 MOKET
                 sale + `<div class="thumb-badges">${gStorageBadge(p)}${gTagBadges(p)}</div></div>` +
                 // [신규 2026-10-03] 받는 날 — 공동구매는 '10/6(화) 픽업·배달', 오늘·내일은 말로. 상시판매는 '상시판매' (사장님 요청 — 홈 카드에 날짜가 없었다)
                 `<div class="hm-info">${(() => {
@@ -12287,7 +12302,7 @@
                 gRatingHtml(p) + gDeadlineHtml(p, closed) +
                 // [수정 2026-10-05] 홈 카드도 목록 카드처럼 원 할인은 '정상가'와 빨간 n% 딱지 (사장님 요청)
                 (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</div>` : '') +
-                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gGbPriceWord(p)}${gSalePctHtml(p)}${gCardPriceLabel(p)}</div></div>` +
+                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gPriceTopHtml(p)}${gCardPriceLabel(p)}</div></div>` +
                 `<div class="add-cart-wrap${q > 0 ? ' selected' : ''}"${sold ? ' style="pointer-events:none;"' : ''}>` +
                 `<input type="hidden" class="qty-num" value="${q}" data-name="${gHomeEsc(p.name)}" data-price="${gHomeEsc(p.price)}" data-stock="${stock}">` +
                 `<button type="button" class="btn-add-cart${sold ? ' soldout' : ''}" onclick="gHomeAdd(this)">${label}</button></div></div>`;
@@ -14051,7 +14066,7 @@
                       + (gOrigWord(p) ? '' : `<span style="color:#e11d48;">${gDiscLabelOf(p)}</span>`)   // [수정 2026-10-02] 정상가 방식은 'n원 할인' 대신 n% 딱지
                       + `<span style="color:#8b9682; font-weight:700; text-decoration:line-through;">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</span></div>`
                     : '')
-                + gGbPriceWord(p) + gSalePctHtml(p) + gCardPriceLabel(p);
+                + gPriceTopHtml(p) + gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
             // 설명은 따로 받아 온다. 나머지 화면은 기다리지 않고 먼저 그린다.
             document.getElementById('detail-desc').innerText = "";
@@ -14081,7 +14096,7 @@
                         guide.style.display = 'none';
                     }
                 } else {
-                    slider.innerHTML = `<div class="slider-no-img">No Image</div>`;
+                    slider.innerHTML = `<div class="slider-no-img"><span class="mk-noimg"><b>MOKET</b><small>사진 준비 중</small></span></div>`;   // [수정 2026-10-12] 흐린 MOKET
                     counter.style.display = 'none';
                     guide.style.display = 'none';
                 }
