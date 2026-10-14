@@ -94,6 +94,22 @@
             document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
         })();
     </script>
+    <script>
+        /* [신규 2026-10-14] 홈·공동구매·상시판매 단추는 먼저 그려지는데, 단추가 부르는 switchDeliveryType 은 한참 아래 큰 코드에 있다.
+           느린 폰에서 코드를 다 읽기 전에 누르면 'switchDeliveryType is not defined' 오류가 났다 (10/13 손님 화면 오류).
+           그 사이에는 이 대신 함수가 눌린 탭을 기억해 두었다가, 진짜 함수가 생기면 그 탭으로 넘긴다 (진짜 함수가 생기면 이것을 덮어쓴다). */
+        (function () {
+            var stub = function (type) {
+                var tries = 0;
+                (function wait() {
+                    var f = window.switchDeliveryType;
+                    if (f && f !== stub) { try { f(type); } catch (e) { } return; }
+                    if (++tries < 150) setTimeout(wait, 100);   // 15초까지 기다린다
+                })();
+            };
+            window.switchDeliveryType = stub;
+        })();
+    </script>
     <link rel="preconnect" href="https://drive.google.com">
     <link rel="stylesheet" as="style" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
