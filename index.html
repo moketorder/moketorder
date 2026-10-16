@@ -14400,7 +14400,7 @@
                 for (const k in cart) {
                     if (!(cart[k] > 0)) continue;
                     const p = gFindCartProduct(k);
-                    const d = p && ymd(p.matchKey);
+                    const d = p && ymd(gIsSadaProduct(p) ? (p.date || p.matchKey) : p.matchKey);   // [수정 2026-10-16] 사다드림 날짜도 합배송 날짜 계산에 넣는다 (저장 쪽과 같게)
                     if (d && (!maxDate || d > maxDate)) maxDate = d;
                 }
                 if (maxDate) {
@@ -14822,7 +14822,10 @@
                     if (cart[name] > 0) {
                         const p = gFindCartProduct(name);
                         if (p) {
-                            const mk = String(p.matchKey || "").trim();
+                            /* [수정 2026-10-16] 사다드림은 날짜가 matchKey가 아니라 date에 있다 — 그 날짜도 넣어야
+                               사다드림보다 앞 날짜 상품이 사다드림 날로 미뤄져 함께 간다 (사장님 규칙: 신선·사다드림 날짜로 앞 상품은 미룰 수 있다).
+                               뒤 날짜 상품은 '함께 배달할 수 없어요' 창에서 이미 막힌다 */
+                            const mk = String((gIsSadaProduct(p) ? (p.date || p.matchKey) : p.matchKey) || "").trim();
                             const normalizedMk = normalizeDateString(mk);
                             const isDate = /^\d{4}-\d{2}-\d{2}$/.test(normalizedMk);
                             if (isDate) {
@@ -14929,7 +14932,8 @@
                         // [수정] 픽업주문은 합배송(날짜 통합) 제외 → 각 상품이 자기 날짜로 따로 처리됨. 배달주문에만 적용.
                         if (unifiedReserveDate && shippingMethod === '배달주문') {
                             const isSadaItem = _isSada;
-                            if ((unifiedReserveDate > todayStr || !isTodayOffOrAfterCutoff) && !isSadaItem) {
+                            // [버그수정 2026-10-16] 신선식품도 사다드림처럼 자기 날짜 그대로 (다른 상품만 그 날로 미룬다)
+                            if ((unifiedReserveDate > todayStr || !isTodayOffOrAfterCutoff) && !isSadaItem && !gIsFreshShip(pData)) {
                                 finalDate = unifiedReserveDate;
                             }
                         }
@@ -14948,7 +14952,7 @@
                            지금까지 주문에는 상품 '이름'만 남아, 같은 물건이라도 이름을 조금 바꿔 올리면
                            딴 물건으로 세어졌다 (계란 한 가지가 아홉 이름으로 갈렸다).
                            번호가 함께 남으면 이름이 어떻든 하나로 묶인다. */
-                        allItems.push({ kind: gKindOf(pData), isGb: gIsGbProduct(pData), name: itemName, productCode: String((pData && pData.productCode) || '').trim(), sid: String((pData && pData.sid) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
+                        allItems.push({ kind: gKindOf(pData), isGb: gIsGbProduct(pData), name: itemName, productCode: String((pData && pData.productCode) || '').trim(), sid: String((pData && pData.sid) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, isFresh: gIsFreshShip(pData), prodDate: (isSadaWithDate ? _sadaDate : (isDateItem ? normalizedMk : "")), cartKey: cartKey });   /* [신규 2026-10-16] isFresh — 신선식품은 합배송에서도 자기 날짜를 지킨다 */   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
                     }
                 }
 
@@ -15078,7 +15082,9 @@
                         if (maxReserveDate) {
                             allItems.forEach(it => {
                                 const isSadaItem = gIsSadaOrder(it);
-                                if (isSadaItem || it.name === "배달비") return;
+                                // [버그수정 2026-10-16] 신선식품도 사다드림처럼 날짜를 덮어쓰지 않는다 (사장님 지적 — 10/15 신선 김치가 10/16으로 밀림).
+                                //  날짜가 다르면 아래 '날짜 섞임' 검사에서 주문이 막힌다.
+                                if (isSadaItem || it.isFresh === true || it.name === "배달비") return;
                                 it.date = maxReserveDate;
                                 it.isCategorized = false;
                             });
@@ -15498,7 +15504,7 @@
                     if (maxReserveDate) {
                         allItems.forEach(it => {
                             const isSadaItem = gIsSadaOrder(it);
-                            if (isSadaItem) return;
+                            if (isSadaItem || it.isFresh === true) return;   // [버그수정 2026-10-16] 신선식품도 자기 날짜 그대로
                             it.date = maxReserveDate;
                             it.isCategorized = false;
                         });
@@ -15931,6 +15937,10 @@
                         agencyFee: it.agencyFee || 0,
                         // [신규] 사다드림 여부 (상품명 대신 이 값으로 판단)
                         isSada: (it.isSada === true),
+                        /* [신규 2026-10-16] 상품에 정해진 원래 입고일과 신선식품 여부 (사장님 요청 — 날짜가 밀린 원인을 나중에 가리려고).
+                           pickupDate 는 합배송으로 바뀔 수 있어, 상품 쪽 날짜를 따로 남긴다. 날짜 없는 상품은 빈칸 */
+                        prodDate: it.prodDate || "",
+                        isFresh: (it.isFresh === true),
                         // [신규] 판매통계 분류(fruit/sada/group/other).
                         //  나중에 상품이 목록에서 내려가면 분류를 알 방법이 없어 통계가 어긋났다.
                         //  주문할 때의 분류를 그대로 적어 둔다.
