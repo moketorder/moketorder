@@ -98,16 +98,28 @@
         /* [신규 2026-10-14] 홈·공동구매·상시판매 단추는 먼저 그려지는데, 단추가 부르는 switchDeliveryType 은 한참 아래 큰 코드에 있다.
            느린 폰에서 코드를 다 읽기 전에 누르면 'switchDeliveryType is not defined' 오류가 났다 (10/13 손님 화면 오류).
            그 사이에는 이 대신 함수가 눌린 탭을 기억해 두었다가, 진짜 함수가 생기면 그 탭으로 넘긴다 (진짜 함수가 생기면 이것을 덮어쓴다). */
+        /* [수정 2026-10-19] 단추 하나만이 아니라, 큰 코드보다 앞에 그려지는 단추가 부르는 기능 전부로 넓혔다
+           (10/19 'openHistoryModal is not defined' — 인터넷이 느린 손님이 주문내역 단추를 눌렀다가 25초 뒤에 다시 눌러도 났다).
+           느린 인터넷에서는 30초까지 기다렸다가 넘긴다. 진짜 기능이 생기면 이 대신 기능은 저절로 덮어써진다.
+           새 단추를 큰 코드 앞(첫 <script>const API_URL 보다 위) HTML 에 달면 그 기능 이름도 아래 목록에 넣는다. */
         (function () {
-            var stub = function (type) {
-                var tries = 0;
-                (function wait() {
-                    var f = window.switchDeliveryType;
-                    if (f && f !== stub) { try { f(type); } catch (e) { } return; }
-                    if (++tries < 150) setTimeout(wait, 100);   // 15초까지 기다린다
-                })();
-            };
-            window.switchDeliveryType = stub;
+            ['addFromDetail', 'changeSortMode', 'clearProductSearch', 'closeCartDetailModal', 'closeFullscreen', 'closeModal', 'copyToClipboard',
+             'filterStatus', 'gOpenMyPoints', 'gPaintNoteCount', 'gReviewPaint', 'gScrollToReviews', 'gSubmitReview', 'handleAdminClick',
+             'handleDeliveryOrderClick', 'handleGuestEntry', 'handleProductSearch', 'loginWithKakao', 'logoutKakao', 'openCartDetailModal',
+             'openFullscreen', 'openHistoryModal', 'openHoursModal', 'openShippingSelection', 'openSideModal', 'openSuggestModal', 'refreshAllData',
+             'resetCart', 'saveProfile', 'searchAddress', 'selectPickup', 'sendSuggestion', 'showCombinedDeliveryGuide', 'startFinalOrderProcess',
+             'stepQty', 'switchDeliveryType', 'toggleMenu', 'toggleSortDir', 'unlinkKakao'].forEach(function (name) {
+                if (window[name]) return;
+                var stub = function () {
+                    var args = arguments, self = this, tries = 0;
+                    (function wait() {
+                        var f = window[name];
+                        if (f && f !== stub) { try { f.apply(self, args); } catch (e) { } return; }
+                        if (++tries < 300) setTimeout(wait, 100);   // 30초까지 기다린다
+                    })();
+                };
+                window[name] = stub;
+            });
         })();
     </script>
     <link rel="preconnect" href="https://drive.google.com">
