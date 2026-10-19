@@ -6070,11 +6070,10 @@
                 const device = (/iPhone|iPad/.test(ua) ? '아이폰' : /Android/.test(ua) ? '안드로이드' : /Windows/.test(ua) ? '윈도우' : /Mac OS X/.test(ua) ? '맥' : '기타')
                     + ' · ' + (/KAKAOTALK/i.test(ua) ? '카톡' : /SamsungBrowser/.test(ua) ? '삼성 인터넷' : /NAVER/.test(ua) ? '네이버' : /CriOS|Chrome\//.test(ua) ? '크롬' : /Safari\//.test(ua) ? '사파리' : '브라우저');
                 const x = extra || {};
-                const nameEl = document.getElementById('input-name');
+                // [수정 2026-10-19] 이름은 보내지 않는다 — 주문관리가 우리 손님 정보에서 번호로 찾아 보여 준다 (사장님 요청: 같은 사람이 이름 있음·없음으로 갈렸다)
                 const rec = {
                     at: now.getTime(),
                     phone,
-                    name: String((nameEl && nameEl.value) || '').slice(0, 40),
                     where: String(where || '').slice(0, 40),
                     msg,
                     device,
