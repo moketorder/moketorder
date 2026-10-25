@@ -2770,7 +2770,7 @@
         .pw-mark:not(.joined) .gb-pw, .card-grid .item-price-row .pw-mark:not(.joined) .gb-pw { padding: 0.28em 0.45em 0.24em !important; border-radius: 3px !important; clip-path: none; }
         .pw-mark, .item-price-row .pw-mark { display: inline-flex; align-items: stretch; font-size: inherit !important; padding: 0 !important; border-radius: 0 !important; background: none; }   /* 가격 줄의 'span 12px' 딱지 규칙이 묶음에 걸리지 않게 */
         .pw-mark.joined .gb-pw, .card-grid .item-price-row .pw-mark.joined .gb-pw { margin-right: 0 !important; border-radius: 3px 0 0 3px !important; padding-left: 0.45em !important; }
-        .pw-mark .gb-pw.os-pw, .card-grid .item-price-row .pw-mark .gb-pw.os-pw { color: #0f766e !important; background: #ccfbf1 !important; }   /* [신규 2026-10-25] 상시가 — 청록 */
+        .pw-mark .gb-pw.os-pw, .card-grid .item-price-row .pw-mark .gb-pw.os-pw { color: var(--moket-green) !important; background: #e4f5da !important; }   /* [신규 2026-10-25] 상시가 — 모켓 초록 (사장님 요청) */
         .pw-mark.joined .sale-pct, .item-price-row .item-price-val .pw-mark.joined .sale-pct { margin-left: 0 !important; border-radius: 0 !important; vertical-align: 0 !important; }   /* 위 줄이 가격보다 넓으면 가격이 오른쪽으로 밀리던 것 */
         /* [신규 2026-10-12] '공구가'를 할인 % 딱지와 짝 맞춘 딱지로 (사장님 요청 — 빨간 % 옆에서 조화롭게).
            크기·높이는 % 딱지와 같게, 색은 가격색(보통 주황, 할인 빨강)을 연하게 깐 바탕 + 가격색 글씨 */
@@ -12164,7 +12164,7 @@
             return top ? `<div class="pw-top"><span class="pw-mark${gb && pct ? ' joined' : ''}">${top}</span></div>` : '';
         }
         function gGbPriceWord(p) { return (gIsGbProduct(p) && !gIsSadaProduct(p)) ? '<span class="gb-pw">공구가</span>' : ''; }
-        // [신규 2026-10-25] 상시판매 상품은 가격 앞에 '상시가' — 공구가와 같은 자리·모양, 색만 청록 (사장님 요청)
+        // [신규 2026-10-25] 상시판매 상품은 가격 앞에 '상시가' — 공구가와 같은 자리·모양, 색만 모켓 초록 (사장님 요청)
         function gOnsitePriceWord(p) {
             if (!p || p.name === '배달비' || gIsGbProduct(p) || gIsSadaProduct(p)) return '';
             return String(gDisplayTabOf(p) || '').startsWith('onsite-') ? '<span class="gb-pw os-pw">상시가</span>' : '';
