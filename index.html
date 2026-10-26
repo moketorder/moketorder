@@ -9933,6 +9933,30 @@
         })();
 
         let lastAutoLoadTime = 0;
+        /* [신규 2026-10-26] 상품을 새로 받을 때 보던 자리 지키기 (사장님 지적 — PC에서 스크롤을 내리다 보면 자꾸 위로 올라감).
+           가게에서 상품을 고치면 10분마다 확인(gCheckProductsFresh)에서 상품을 다시 받는데(loadData), 목록을 새로 그리는 동안
+           페이지 키가 잠깐 줄어 브라우저가 스크롤을 위로 당겼다 (시험: 2500 → 1117). 받는 동안 페이지 키를 붙잡아 두고,
+           다 그린 뒤 손님이 그사이 화면을 안 움직였으면 보던 높이로 되돌린다 */
+        (function () {
+            const orig = loadData;
+            loadData = async function (...args) {
+                const y = window.scrollY || 0;
+                if (y < 50) return orig.apply(this, args);
+                let moved = false;
+                const mark = () => { moved = true; };
+                const evs = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+                evs.forEach(ev => window.addEventListener(ev, mark, { passive: true }));
+                const keepH = document.documentElement.scrollHeight;
+                const prevMin = document.body.style.minHeight;
+                document.body.style.minHeight = keepH + 'px';
+                try { return await orig.apply(this, args); }
+                finally {
+                    const back = () => { if (!moved && Math.abs((window.scrollY || 0) - y) > 2) window.scrollTo(0, y); };
+                    back(); requestAnimationFrame(back); setTimeout(back, 300);
+                    setTimeout(() => { document.body.style.minHeight = prevMin; evs.forEach(ev => window.removeEventListener(ev, mark)); back(); }, 900);
+                }
+            };
+        })();
         const AUTO_LOAD_INTERVAL = 60000;
 
         // [신규] '번호: 상품' 꾸러미를 원래 자리에 꽂아 배열로 되돌린다 (이미 배열이면 그대로)
