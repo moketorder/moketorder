@@ -86,6 +86,8 @@
                         var srv = Date.parse(lm), mine = Date.parse(document.lastModified);
                         if (!srv || !mine || srv - mine <= 1000) return;   // 내 화면이 최신
                         try { if (sessionStorage.getItem('moket_reload_for') === lm) return; sessionStorage.setItem('moket_reload_for', lm); } catch (e) { }
+                        // [수정 2026-10-27] 새 판으로 저절로 새로고침할 때 보던 탭·높이를 기억했다가 되돌린다 (사장님 지적 — PC에서 저절로 맨 위로 올라감)
+                        try { if (typeof gSaveViewState === 'function') gSaveViewState(); } catch (e) { }
                         window.location.replace(window.location.href.split('#')[0].split('?')[0] + '?v=' + Date.now());
                     }).catch(function () { });
                 } catch (e) { }
@@ -9955,6 +9957,23 @@
                     back(); requestAnimationFrame(back); setTimeout(back, 300);
                     setTimeout(() => { document.body.style.minHeight = prevMin; evs.forEach(ev => window.removeEventListener(ev, mark)); back(); }, 900);
                 }
+            };
+        })();
+        /* [신규 2026-10-27] 목록을 다시 그릴 때도 보던 자리 지키기 (사장님 지적 — PC 상품목록에서 저절로 위로 올라감).
+           마감 시각이 지나거나 가게 설정·장바구니가 바뀌면 renderList 가 목록을 비우고 새로 그리는데, 사진이 다시 뜨는 동안
+           페이지 키가 잠깐 줄어 브라우저가 스크롤을 위로 당겼다. 내려 본 상태에서 다시 그리면 페이지(html) 키를 잠깐 붙잡아 둔다.
+           스크롤을 억지로 옮기지는 않는다 — 탭을 바꿔 맨 위로 가는 것은 그대로 된다 */
+        (function () {
+            const orig = renderList;
+            let rel = 0;
+            renderList = function (...args) {
+                if ((window.scrollY || 0) >= 50) {
+                    const de = document.documentElement, h = de.scrollHeight;
+                    if (h > (parseInt(de.style.minHeight) || 0)) de.style.minHeight = h + 'px';
+                    clearTimeout(rel);
+                    rel = setTimeout(() => { de.style.minHeight = ''; }, 2500);
+                }
+                return orig.apply(this, args);
             };
         })();
         const AUTO_LOAD_INTERVAL = 60000;
