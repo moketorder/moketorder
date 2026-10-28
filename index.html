@@ -405,6 +405,8 @@
         .hm-ask p b { color: #16200f; font-weight: 800; }
         .hm-ask-btn { flex: 0 0 auto; height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: #FEE500; color: #191600; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
         .hm-ask-btn:focus-visible { outline: 2px solid #3d8f19; outline-offset: 2px; }
+        .hm-ask-btn { transition: transform .12s ease, filter .12s ease; }
+        .hm-ask-btn:active { transform: scale(.96); filter: brightness(.94); }   /* [신규 2026-10-28] 누를 때 살짝 눌리는 느낌 — 파란 누름 표시를 없애서 반응이 없어 보였다 */
         .hm-closed { padding: 60px 10px; text-align: center; font-size: 15px; font-weight: 700; color: #8b9682; line-height: 1.7; }
 
         /* [신규 2026-10-28] 무료배송 쿠폰(가입 선물) — 홈 노랑 카드 + 안내창 (사장님이 고른 시안) */
@@ -3089,7 +3091,7 @@
         <div class="sm-sec">문의</div>
         <ul class="menu-list">
             <li onclick="openSuggestModal()"><span>공구상품 추천하기</span><span class="sm-arw">›</span></li>
-            <li class="sm-kakao" onclick="window.open('https://open.kakao.com/me/moketstore')"><span>카카오톡 문의하기</span><span class="sm-arw">›</span></li>
+            <li class="sm-kakao" onclick="gOpenKakaoAsk()"><span>카카오톡 문의하기</span><span class="sm-arw">›</span></li>
         </ul>
         <!-- [ver3] 주문자 변경 창 안에 숨어 있던 로그아웃·회원탈퇴를 맨 아래로. 메뉴를 열 때 보일지 정한다 -->
         <div class="sm-foot">
@@ -3319,6 +3321,20 @@
     <div id="home-view" class="hm-wrap"><div class="hm-today"><span class="hm-pill off hm-skel" style="width:96px;">&nbsp;</span><p class="hm-big hm-skel" style="width:70%;">&nbsp;</p><p class="hm-small hm-skel" style="width:50%;">&nbsp;</p></div></div>
     <div class="date-section-title hm-hide" id="main-section-title" style="display:none;"></div>
     <div class="container hm-hide" id="product-list"></div>
+    <script>
+        /* [신규 2026-10-28] 새 판으로 저절로 새로고침할 때 보던 화면이 홈이 아니면, 처음부터 홈을 그리지 않고 그 화면 모양으로 연다.
+           페이지는 늘 홈 모양으로 먼저 열려서, 공동구매·상시판매를 보다가 폰을 껐다 켜면 홈이 잠깐 보였다가 돌아갔다 (사장님 지적).
+           기억해 둔 화면 값(moket_view_state)은 여기서 읽기만 하고, 지우고 쓰는 것은 예전대로 뒤의 gTakeViewState 가 한다 */
+        (function () {
+            try {
+                var s = JSON.parse(sessionStorage.getItem('moket_view_state') || 'null');
+                if (!s || s.home || !s.deliveryType || !s.at || (Date.now() - s.at) > 5 * 60 * 1000) return;
+                document.getElementById('home-view').hidden = true;   // gApplyHomeView 와 같은 방식으로 숨긴다 (홈을 다시 열면 그대로 풀린다)
+                ['.sub-header-group', '#product-list'].forEach(function (sel) { var el = document.querySelector(sel); if (el) el.classList.remove('hm-hide'); });
+                document.querySelectorAll('.delivery-type-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-type') === s.deliveryType); });
+            } catch (e) { }
+        })();
+    </script>
     <div id="detail-overlay" class="modal-overlay" onclick="if(event.target === this) closeModal('detail-overlay')">
         <div class="modal-content">
             <div class="detail-scroll-area">
@@ -7811,6 +7827,12 @@
             }, 1500);
         }
 
+        /* [신규 2026-10-28] 카카오톡 1:1 문의 — 메뉴에서 눌렀으면 메뉴를 닫으면서 연다 (사장님 지적 — 메뉴가 열린 채 눌린 줄만 회색으로 남아 어색했다).
+           새 창 열기는 누른 그 순간에 해야 폰이 막지 않아서, 메뉴 닫기와 같이 바로 한다 */
+        function gOpenKakaoAsk() {
+            try { const sm = document.getElementById('side-menu'); if (sm && sm.classList.contains('open')) toggleMenu(); } catch (e) { }
+            window.open('https://open.kakao.com/me/moketstore');
+        }
         // [신규 2026-10-28] 화면 아래 작은 알림 — 초록 체크와 함께 올라왔다가 1.8초 뒤 내려가며 사라진다
         function gSaveToast(title, sub) {
             document.getElementById('save-toast')?.remove();
@@ -13235,7 +13257,7 @@
             out.push(`<section class="hm-sec">` +
                 // [신규 2026-10-03] 문의는 1:1 카톡으로 (사장님 요청) — 메뉴 '카카오톡 문의하기'와 같은 주소
                 `<div class="hm-ask"><p>배달·상품 문의와 AS 신청은<br><b>1:1 카톡</b>으로 문의해 주세요.</p>` +
-                `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
+                `<button type="button" class="hm-ask-btn" onclick="gOpenKakaoAsk()">카카오톡 문의하기 ›</button></div></section>`);
             gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
             box.querySelectorAll('[data-rail]').forEach(r => {
                 const k = keep[r.dataset.rail];
