@@ -510,12 +510,10 @@
            새 화면은 처음부터 보이는 채로 옆에서 밀려 들어오기만 한다. 위 분류 줄은 움직이지 않는다 */
         @keyframes tabFromR { from { transform: translateX(36px); } to { transform: none; } }
         @keyframes tabFromL { from { transform: translateX(-36px); } to { transform: none; } }
-        #home-view.tab-in, #product-list.tab-in { animation: tabFromR .26s cubic-bezier(.2,.8,.2,1) both; }
-        #home-view.tab-in.from-l, #product-list.tab-in.from-l { animation-name: tabFromL; }
-        /* 공동구매↔상시판매를 오갈 때 아래 분류 탭·날짜 칩 줄은 미끄러지지 않고 흐렸다가 또렷해진다 (사장님 요청).
-           완전 투명에서 시작하면 깜빡이므로 살짝 흐린 데서 시작한다 */
-        @keyframes tabSoft { from { opacity: .3; } to { opacity: 1; } }
-        #main-tabs-container.tab-in, #date-filters.tab-in { animation: tabSoft .24s ease-out both; }
+        /* [수정 2026-10-28] 공동구매↔상시판매를 오갈 때 아래 분류 탭·날짜 칩 줄도 목록과 함께 옆에서 밀려 들어온다 (사장님 요청 — 흐렸다 또렷해지는 것은 깜빡여 보였다) */
+        #home-view.tab-in, #product-list.tab-in, #main-tabs-container.tab-in, #date-filters.tab-in { animation: tabFromR .26s cubic-bezier(.2,.8,.2,1) both; }
+        #home-view.tab-in.from-l, #product-list.tab-in.from-l, #main-tabs-container.tab-in.from-l, #date-filters.tab-in.from-l { animation-name: tabFromL; }
+        @keyframes tabSoft { from { opacity: .3; } to { opacity: 1; } }   /* 분류 탭·날짜 칩을 누를 때 목록(.soft-in)만 쓴다 */
         #product-list.soft-in { animation: tabSoft .24s ease-out both; }   /* 분류 탭·날짜 칩을 누를 때 목록 — 미끄러지지 않고 흐림→또렷 */
         body { overflow-x: clip; }   /* 탭 줄·목록이 옆에서 밀려 들어오는 동안 오른쪽으로 삐져나가 화면이 흔들리지 않게 (clip 은 위 고정 탭 줄을 건드리지 않는다) */
         /* 움직임 줄이기를 켠 손님에게는 움직이지 않는다 */
@@ -2463,6 +2461,18 @@
             box-shadow: none;
             transform: none;
         }
+        /* [신규 2026-10-28] 하위 탭의 초록 알약이 눌린 탭으로 미끄러져 옮겨 간다 (사장님 요청).
+           알약(.mt-pill)을 따로 두고 눌린 탭 자리로 옮긴다. 알약이 준비되면 눌린 탭의 초록 바탕은 감춘다. 글자 색은 함께 바뀐다 */
+        /* [수정 2026-10-28] 더 부드럽게 (사장님 요청) — 알약이 옆 탭들의 회색 바탕 '뒤로' 지나가 중간에 가려졌다.
+           층을 셋으로 나눈다: 맨 아래 회색 바탕(탭의 ::before) → 그 위 알약 → 맨 위 글자. 그래서 알약이 지나가는 길이 다 보인다 */
+        #main-tabs-container, #date-filters { position: relative; isolation: isolate; }
+        #main-tabs-container .main-tab-btn, #date-filters .date-btn { position: relative; transition: color .22s ease, border-color .22s ease; }
+        #main-tabs-container.pill-on .main-tab-btn, #date-filters.pill-on .date-btn { background: transparent !important; border-color: transparent !important; }
+        #main-tabs-container.pill-on .main-tab-btn::before, #date-filters.pill-on .date-btn::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: #f1f4ec; z-index: -1; }
+        .mt-pill { position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 999px; background: var(--moket-green); z-index: 0; pointer-events: none;
+            transition: transform .3s cubic-bezier(.2,.8,.2,1), width .3s cubic-bezier(.2,.8,.2,1), height .3s cubic-bezier(.2,.8,.2,1); }   /* 속도는 처음 그대로 0.3초 (사장님) */
+        #date-filters .mt-pill { background: var(--item-black); }   /* 날짜 칩은 검은 알약 */
+        @media (prefers-reduced-motion: reduce) { .mt-pill, #main-tabs-container .main-tab-btn, #date-filters .date-btn { transition: none; } }
         /* 당일판매·예약판매 첫 줄은 칸을 똑같이 나눠 한 줄을 가득 채운다 (상시판매의 두 줄 격자는 그대로) */
         .main-tabs:not(.grid-tabs):not(.scroll-tabs) .main-tab-btn { flex: 1 1 0; min-width: 0; padding: 8px 10px; font-size: 14px; }
 
@@ -12741,6 +12751,43 @@
             else window.addEventListener('resize', () => place(true));
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => place(true));   // 글꼴이 늦게 와 탭 폭이 바뀌어도 맞춘다
         })();
+        /* [신규 2026-10-28] 하위 탭 초록 알약 — 눌린 탭으로 미끄러져 간다 (사장님 요청).
+           탭 줄은 탭을 고를 때마다 새로 그려지기도 해서, 마지막 알약 자리를 기억해 두었다가 거기서 새 자리로 옮긴다.
+           공동구매↔상시판매처럼 탭 모양(한 줄·두 줄)이 바뀌면 옮기지 않고 바로 놓는다 */
+        function gSlidePill(boxId, btnSel) {
+            const box = document.getElementById(boxId);
+            if (!box) return;
+            let last = null;   // { x, y, w, h, mode }
+            const place = () => {
+                let pill = box.querySelector(':scope > .mt-pill');
+                if (!pill) { pill = document.createElement('span'); pill.className = 'mt-pill'; box.insertBefore(pill, box.firstChild); }
+                const b = box.querySelector(btnSel + '.active');
+                if (!b || !b.offsetWidth) { pill.style.width = '0'; return; }
+                const mode = box.classList.contains('grid-tabs') ? 'grid' : 'row';
+                const now = { x: b.offsetLeft, y: b.offsetTop, w: b.offsetWidth, h: b.offsetHeight, mode };
+                const set = r => { pill.style.width = r.w + 'px'; pill.style.height = r.h + 'px'; pill.style.transform = `translate(${r.x}px, ${r.y}px)`; };
+                const fresh = !pill._placed;
+                if (fresh && last && last.mode === mode) {   // 새로 그려진 줄 — 지난 자리에서 출발
+                    pill.style.transition = 'none'; set(last); void pill.offsetWidth; pill.style.transition = '';
+                } else if (fresh || (last && last.mode !== mode)) {
+                    pill.style.transition = 'none'; set(now); void pill.offsetWidth; pill.style.transition = '';
+                }
+                set(now);
+                pill._placed = true;
+                last = now;
+                if (!box.classList.contains('pill-on')) box.classList.add('pill-on');
+            };
+            let queued = false;
+            const schedule = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; place(); }); };
+            // 탭이 새로 그려지거나 눌림 표시가 바뀌면 따라간다 (알약 자신의 변화는 무시)
+            //  탭 줄 자신의 표시(pill-on·more-right 등)는 보지 않는다 — 보면 알약을 놓을 때마다 또 불려 끝없이 돈다
+            new MutationObserver(ms => { if (ms.some(m => m.type === 'childList' || m.target !== box)) schedule(); })
+                .observe(box, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+            if (window.ResizeObserver) new ResizeObserver(() => { last = null; schedule(); }).observe(box);
+            schedule();
+        }
+        gSlidePill('main-tabs-container', '.main-tab-btn');   // 분류 탭 — 초록 알약
+        gSlidePill('date-filters', '.date-btn');              // [신규 2026-10-28] 날짜 칩 — 검은 알약 (사장님 요청)
         // [신규 2026-10-28] 분류 탭·날짜 칩을 누를 때 — 목록이 흐렸다가 또렷해진다 (자리는 그대로)
         function gSoftFade() {
             const el = document.getElementById('product-list');
