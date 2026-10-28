@@ -490,24 +490,17 @@
         .wc-back .wc-pop { animation: wcPopIn .32s cubic-bezier(.2,.8,.2,1) .04s both; }
         .wc-back.closing { animation: wcBackOut .22s ease-in both; }
         .wc-back.closing .wc-pop { animation: wcPopOut .22s ease-in both; }
-        /* [신규 2026-10-28] 앱을 켜고 홈이 처음 뜰 때만 칸들이 위에서부터 차례로 살짝 올라오며 나타난다 (사장님 요청) */
-        @keyframes hmIntro { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-        #home-view.hm-intro > * { animation: hmIntro .4s ease-out both; }
-        #home-view.hm-intro > *:nth-child(2) { animation-delay: .05s; }
-        #home-view.hm-intro > *:nth-child(3) { animation-delay: .1s; }
-        #home-view.hm-intro > *:nth-child(4) { animation-delay: .15s; }
-        #home-view.hm-intro > *:nth-child(n+5) { animation-delay: .2s; }
         /* [신규 2026-10-28] 홈·공동구매·상시판매를 옮길 때 페이지를 넘기듯 옆에서 밀려 들어온다 (사장님 요청).
            오른쪽 탭으로 가면 오른쪽에서, 왼쪽 탭으로 가면 왼쪽에서. 위에 붙어 있는 분류 줄은 흐려졌다 또렷해지기만 한다 */
-        @keyframes tabFromR { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
-        @keyframes tabFromL { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
-        @keyframes tabFade { from { opacity: 0; } to { opacity: 1; } }
-        #home-view.tab-in, #product-list.tab-in { animation: tabFromR .28s cubic-bezier(.2,.8,.2,1) both; }
+        /* [수정 2026-10-28] 투명하게 시작하면 바뀌는 첫 순간 화면이 하얗게 비어 깜빡여 보였다 (사장님 지적).
+           새 화면은 처음부터 보이는 채로 옆에서 밀려 들어오기만 한다. 위 분류 줄은 움직이지 않는다 */
+        @keyframes tabFromR { from { transform: translateX(36px); } to { transform: none; } }
+        @keyframes tabFromL { from { transform: translateX(-36px); } to { transform: none; } }
+        #home-view.tab-in, #product-list.tab-in { animation: tabFromR .26s cubic-bezier(.2,.8,.2,1) both; }
         #home-view.tab-in.from-l, #product-list.tab-in.from-l { animation-name: tabFromL; }
-        .sub-header-group.tab-in, #main-section-title.tab-in { animation: tabFade .2s ease-out both; }
         /* 움직임 줄이기를 켠 손님에게는 움직이지 않는다 */
         @media (prefers-reduced-motion: reduce) {
-            .wc-back, .wc-back .wc-pop, .wc-back.closing, .wc-back.closing .wc-pop, #home-view.hm-intro > *, .tab-in { animation: none !important; }
+            .wc-back, .wc-back .wc-pop, .wc-back.closing, .wc-back.closing .wc-pop, .tab-in { animation: none !important; }
         }
 
         /* 대분류 탭 스타일 */
@@ -2458,6 +2451,10 @@
         .item-controls-bottom-v { align-items: center; gap: 8px; }
         .item-controls-bottom-v .btn-detail { display: none; }
         /* 누를 수 있는 자리임을 손끝으로 알리는 정도만 */
+        /* [신규 2026-10-28] 핸드폰에서 단추·탭을 누를 때 덮이던 파란 누름 표시를 없앤다 (사장님 요청).
+           아래 상품 사진(.thumb·.item-head)의 옅은 초록 표시는 일부러 둔 것이라 그대로 남는다 */
+        html, body { -webkit-tap-highlight-color: transparent; }
+        .delivery-type-btn:focus:not(:focus-visible), .main-tab-btn:focus:not(:focus-visible) { outline: none; }
         .thumb, .item-head { -webkit-tap-highlight-color: rgba(76,175,32,0.08); }
         .product-card .item-head:active { opacity: 0.65; }
         .item-controls-bottom-v .qty-stepper.wide {
@@ -12708,7 +12705,7 @@
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => place(true));   // 글꼴이 늦게 와 탭 폭이 바뀌어도 맞춘다
         })();
         function gTabFade(dir) {   // dir: 1 = 오른쪽에서 들어온다, -1 = 왼쪽에서
-            const els = window.gHomeOn ? ['#home-view'] : ['.sub-header-group', '#main-section-title', '#product-list'];
+            const els = window.gHomeOn ? ['#home-view'] : ['#product-list'];
             els.forEach(sel => {
                 const el = document.querySelector(sel);
                 if (!el) return;
@@ -12983,14 +12980,6 @@
             [...parent.children].forEach(el => { if (!keep.has(el)) el.remove(); });
             list.forEach((el, i) => { if (parent.children[i] !== el) parent.insertBefore(el, parent.children[i] || null); });
         }
-        /* [신규 2026-10-28] 앱을 켜고 홈을 처음 그릴 때 한 번만 칸들이 차례로 나타나게 한다 (사장님 요청).
-           홈은 설정·상품이 올 때마다 몇 번 다시 그려지므로, 1.2초 뒤 표시를 떼어 그 뒤에 그린 것은 움직이지 않게 한다 */
-        function gHomeIntro(box) {
-            if (window.__hmIntroDone || !box || box.hidden) return;
-            window.__hmIntroDone = true;
-            box.classList.add('hm-intro');
-            setTimeout(() => box.classList.remove('hm-intro'), 1200);
-        }
         function gRenderHome() {
             const box = document.getElementById('home-view');
             if (!box) return;
@@ -13002,7 +12991,6 @@
             if (!isAdminMode && !isProductListEnabled) {
                 out.push(`<div class="hm-closed">현재는 주문이 불가능 합니다.<br>(주문 가능 시간 - 오전 10시 ~ 다음날 오전 6시)</div>`);
                 gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
-                gHomeIntro(box);
                 return;
             }
             const buy = (productsData || []).filter(p => p && gHomeBuyable(p));
@@ -13039,7 +13027,6 @@
                 `<div class="hm-ask"><p>배달·상품 문의와 AS 신청은<br><b>1:1 카톡</b>으로 문의해 주세요.</p>` +
                 `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
             gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
-            gHomeIntro(box);
             box.querySelectorAll('[data-rail]').forEach(r => {
                 const k = keep[r.dataset.rail];
                 r.scrollLeft = (k && k.left && k.first === firstOf(r)) ? k.left : 0;
