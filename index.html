@@ -512,9 +512,15 @@
         @keyframes tabFromL { from { transform: translateX(-36px); } to { transform: none; } }
         #home-view.tab-in, #product-list.tab-in { animation: tabFromR .26s cubic-bezier(.2,.8,.2,1) both; }
         #home-view.tab-in.from-l, #product-list.tab-in.from-l { animation-name: tabFromL; }
+        /* 공동구매↔상시판매를 오갈 때 아래 분류 탭·날짜 칩 줄은 미끄러지지 않고 흐렸다가 또렷해진다 (사장님 요청).
+           완전 투명에서 시작하면 깜빡이므로 살짝 흐린 데서 시작한다 */
+        @keyframes tabSoft { from { opacity: .3; } to { opacity: 1; } }
+        #main-tabs-container.tab-in, #date-filters.tab-in { animation: tabSoft .24s ease-out both; }
+        #product-list.soft-in { animation: tabSoft .24s ease-out both; }   /* 분류 탭·날짜 칩을 누를 때 목록 — 미끄러지지 않고 흐림→또렷 */
+        body { overflow-x: clip; }   /* 탭 줄·목록이 옆에서 밀려 들어오는 동안 오른쪽으로 삐져나가 화면이 흔들리지 않게 (clip 은 위 고정 탭 줄을 건드리지 않는다) */
         /* 움직임 줄이기를 켠 손님에게는 움직이지 않는다 */
         @media (prefers-reduced-motion: reduce) {
-            .wc-back, .wc-back .wc-pop, .wc-back.closing, .wc-back.closing .wc-pop, .tab-in { animation: none !important; }
+            .wc-back, .wc-back .wc-pop, .wc-back.closing, .wc-back.closing .wc-pop, .tab-in, .soft-in { animation: none !important; }
         }
 
         /* 대분류 탭 스타일 */
@@ -3736,7 +3742,7 @@
                 updateFooter();
                 // [수정 2026-10-03] 판매유형을 바꾸면 맨 위부터 보여 준다 — 홈에서 내려 둔 만큼 새 목록도 내려간 채로 보였다 (사장님 요청)
                 window.scrollTo(0, 0);
-                gTabFade((type === 'onsite' ? 2 : 1) >= _tabFrom ? 1 : -1);   // [신규 2026-10-28] 페이지를 넘기듯
+                gTabFade((type === 'onsite' ? 2 : 1) >= _tabFrom ? 1 : -1, true);   // [신규 2026-10-28] 페이지를 넘기듯 — 아래 탭 줄도 함께
                 return;
             }
 
@@ -4252,6 +4258,7 @@
 
             // 4. 스크롤을 맨 위로 (탭 전환 시 초기화 느낌)
             window.scrollTo({ top: 0, behavior: 'auto' });
+            gSoftFade();   // [신규 2026-10-28] 목록이 부드럽게 바뀌게 (사장님 요청 — 미끄러지지 않고)
         }
 
         /**
@@ -12308,7 +12315,7 @@
            · 쿠폰 줄이 취소되면 쿠폰을 돌려준다 (gWcCheckRestore). */
         const WC_MS = 7 * 86400000;
         const WC_WHY = '첫주문';
-        const WC_HERO = 'https://i.ibb.co/NgQyw54T/d1ce3943cf2e.jpg';   // 안내창 큰 사진 (귤·당도계)
+        const WC_HERO = 'https://i.ibb.co/v43NLn95/coupon-hero-680x420.jpg';   // 안내창 큰 사진 (귤·당도계) — [수정 2026-10-28] 보이는 띠만 잘라 680×420, 88KB → 46KB
         let gWc = null;        // 내 쿠폰 { startAt, usedAt, usedRef } — 대상이 아니거나 아직 모르면 null
         let gWcPhone = '';     // 쿠폰을 읽은 번호 (로그인 증표 속 번호)
         function gWcActive() {
@@ -12398,7 +12405,8 @@
             if (!gWcActive() || gIsGuestView()) return '';
             const left = Math.ceil((Number(gWc.startAt) + WC_MS - Date.now()) / 86400000);
             const dd = left <= 1 ? 'D-DAY' : `D-${left - 1}`;
-            const im = ['https://i.ibb.co/hJ6hpMKg/7604d9e909a2.jpg', 'https://i.ibb.co/G3Vg8ff7/f7b8b587ac03.jpg', 'https://i.ibb.co/NgQyw54T/d1ce3943cf2e.jpg'];
+            // [수정 2026-10-28] 지름 38짜리 동그라미에 1000px 사진(장당 90~100KB)을 쓰던 것을 96px(장당 4KB)로 줄였다 (사장님 지적 — 데이터)
+            const im = ['https://i.ibb.co/23Hp5vbq/coupon-c1-96.jpg', 'https://i.ibb.co/Tqgw55HG/coupon-c2-96.jpg', 'https://i.ibb.co/67cMpt7p/coupon-c3-96.jpg'];
             // [신규 2026-10-28] 카드 맨 위 — 아직 안 쓴 쿠폰이 있다는 한 줄 (사장님 요청)
             const top = `<span class="top"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>아직 사용하지 않은 쿠폰이 있습니다</span>`;
             return `<button type="button" class="wc-card" onclick="gWcShow()">${top}<span class="im">${im.map(s => `<img src="${s}" alt="">`).join('')}</span>` +
@@ -12653,6 +12661,7 @@
                         window.gGbPickedDate = d;
                         document.querySelectorAll('#date-filters .date-btn').forEach(b => b.classList.toggle('active', b === btn));
                         renderList(btn.dataset.date);
+                        gSoftFade();   // [신규 2026-10-28] 날짜 칩도 목록이 부드럽게 바뀌게
                         if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                     };
                     area.appendChild(btn);
@@ -12729,8 +12738,20 @@
             else window.addEventListener('resize', () => place(true));
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => place(true));   // 글꼴이 늦게 와 탭 폭이 바뀌어도 맞춘다
         })();
-        function gTabFade(dir) {   // dir: 1 = 오른쪽에서 들어온다, -1 = 왼쪽에서
-            const els = window.gHomeOn ? ['#home-view'] : ['#product-list'];
+        // [신규 2026-10-28] 분류 탭·날짜 칩을 누를 때 — 목록이 흐렸다가 또렷해진다 (자리는 그대로)
+        function gSoftFade() {
+            const el = document.getElementById('product-list');
+            if (!el) return;
+            gImgShowCached(el);
+            el.classList.remove('soft-in');
+            void el.offsetWidth;
+            el.classList.add('soft-in');
+            clearTimeout(el._softT);
+            el._softT = setTimeout(() => el.classList.remove('soft-in'), 280);
+        }
+        function gTabFade(dir, withTabs) {   // dir: 1 = 오른쪽에서 들어온다, -1 = 왼쪽에서 / withTabs: 아래 분류 탭·날짜 칩 줄도 함께
+            gImgShowCached(document.getElementById(window.gHomeOn ? 'home-view' : 'product-list'));
+            const els = window.gHomeOn ? ['#home-view'] : (withTabs ? ['#main-tabs-container', '#date-filters', '#product-list'] : ['#product-list']);
             els.forEach(sel => {
                 const el = document.querySelector(sel);
                 if (!el) return;
@@ -14481,10 +14502,17 @@
            그래서 다시 그릴 때마다 모든 사진이 한 번씩 사라졌다 나타났다. 한 번 다 받은 사진 주소를 기억해 두고,
            다시 그릴 때는 처음부터 보이게(.loaded) 붙인다. 처음 받는 사진만 지금처럼 서서히 나타난다. */
         const _gImgSeen = new Set();
-        function gImgSeenCls(src) { return _gImgSeen.has(src) ? ' class="loaded"' : ''; }
+        /* [수정 2026-10-28] 이미 본 사진은 다 펼친 다음 화면에 내보낸다(decoding="sync") — 탭을 바꿀 때 사진 자리가 한순간 비어 깜빡이던 것 (사장님 지적) */
+        function gImgSeenCls(src) { return _gImgSeen.has(src) ? ' class="loaded" decoding="sync"' : ''; }
         function gImgLoaded(img) {
             img.classList.add('loaded');
             try { _gImgSeen.add(img.getAttribute('src')); } catch (e) { }
+        }
+        // [신규 2026-10-28] 폰에 이미 받아 둔 사진(다시 켠 뒤 처음 그리는 것 포함)은 서서히 나타나지 않고 바로 보이게 — 탭 바꿀 때 깜빡임 줄이기
+        function gImgShowCached(root) {
+            (root || document).querySelectorAll('.thumb img:not(.loaded)').forEach(i => {
+                if (i.complete && i.naturalWidth) gImgLoaded(i);
+            });
         }
 
         function removeFromCart(name) {
