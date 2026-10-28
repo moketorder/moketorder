@@ -514,7 +514,6 @@
         #home-view.tab-in, #product-list.tab-in, #main-tabs-container.tab-in, #date-filters.tab-in { animation: tabFromR .26s cubic-bezier(.2,.8,.2,1) both; }
         #home-view.tab-in.from-l, #product-list.tab-in.from-l, #main-tabs-container.tab-in.from-l, #date-filters.tab-in.from-l { animation-name: tabFromL; }
         @keyframes tabSoft { from { opacity: .3; } to { opacity: 1; } }   /* 분류 탭·날짜 칩을 누를 때 목록(.soft-in)만 쓴다 */
-        #product-list.soft-in { animation: tabSoft .24s ease-out both; }   /* 분류 탭·날짜 칩을 누를 때 목록 — 미끄러지지 않고 흐림→또렷 */
         body { overflow-x: clip; }   /* 탭 줄·목록이 옆에서 밀려 들어오는 동안 오른쪽으로 삐져나가 화면이 흔들리지 않게 (clip 은 위 고정 탭 줄을 건드리지 않는다) */
         /* 움직임 줄이기를 켠 손님에게는 움직이지 않는다 */
         @media (prefers-reduced-motion: reduce) {
@@ -4269,6 +4268,7 @@
 
         // [대분류 탭 전환]
         function switchMainTab(type) {
+            const _photo = gPhotoSwap();   // [신규 2026-10-28] 사진만 부드럽게
             currentMainTab = type;
             // 1. 버튼 활성화 상태 표시
             document.querySelectorAll('.main-tab-btn').forEach(btn => {
@@ -4284,7 +4284,7 @@
 
             // 4. 스크롤을 맨 위로 (탭 전환 시 초기화 느낌)
             window.scrollTo({ top: 0, behavior: 'auto' });
-            gSoftFade();   // [신규 2026-10-28] 목록이 부드럽게 바뀌게 (사장님 요청 — 미끄러지지 않고)
+            _photo();   // [신규 2026-10-28] 목록은 바로 바뀌고 사진만 부드럽게 (사장님 결정)
         }
 
         /**
@@ -8459,17 +8459,19 @@
         }
 
         /* [신규] 주문내역을 못 받았을 때 — 동그라미만 돌지 않게 까닭을 적고 다시 받을 길을 준다 */
+        /* [수정 2026-10-28] 로그인 문제여도 '카카오 로그인' 대신 새로고침을 안내한다 (사장님 — 들어올 때 로그인을 확인하므로 새로고침이면 된다) */
         function gHistoryLoadFailed(needLogin) {
             const box = document.getElementById('history-list');
             const modal = document.getElementById('history-modal');
             if (!box || !modal || modal.style.display !== 'flex') return;
             // 이미 내역을 그려 둔 참이면 건드리지 않는다 (뒤에서 조용히 갱신하다 실패한 경우)
-            if (!box.querySelector('.loading-spinner') && Array.isArray(fullHistoryData) && fullHistoryData.length) return;
+            const _waiting = !!box.querySelector('.loading-spinner, .hist-sk-wrap');
+            if (!_waiting && Array.isArray(fullHistoryData) && fullHistoryData.length) return;
             const _btn = 'padding:9px 20px; border:1px solid #dde0d5; background:#fff; border-radius:8px; font-size:13px; font-weight:800; color:#4f5b46; cursor:pointer;';
             box.innerHTML = needLogin
                 ? `<div style="display:flex; flex-direction:column; align-items:center; gap:12px; padding:44px 0; color:#8b9682; font-weight:700; line-height:1.6; text-align:center;">
-                    <div>로그인이 풀렸습니다.<br>카카오 로그인을 다시 해 주세요.</div>
-                    <button type="button" onclick="gOpenLoginForced()" style="${_btn}">카카오 로그인</button>
+                    <div>잠시 연결이 끊겼어요.<br>새로고침해 주세요.</div>
+                    <button type="button" onclick="location.reload()" style="${_btn}">새로고침</button>
                 </div>`
                 : `<div style="display:flex; flex-direction:column; align-items:center; gap:12px; padding:44px 0; color:#8b9682; font-weight:700; line-height:1.6; text-align:center;">
                     <div>주문내역을 불러오지 못했습니다.<br>인터넷 연결을 확인해 주세요.</div>
@@ -8528,24 +8530,16 @@
             const cacheKey = `history_cache_${name}_${cleanPhone}`;
             const cached = localStorage.getItem(cacheKey);
 
-            if (cached) {
-                fullHistoryData = JSON.parse(cached);
-                if (!isSilent) {
-                    setupHistoryUI(name);
-                    renderHistory();
-                }
-            }
-
-            /* 새로고침이면 저장해 둔 내역을 지우고 동그라미를 띄운다.
-               주문 상태(입금·취소·픽업)는 수시로 바뀌므로, 옛 내역을 그대로 두면
-               취소된 주문이 살아 있는 것처럼 보일 수 있다. 받아 온 뒤에 그린다. */
-            if (!isSilent && (!cached || isRefresh)) {
+            /* [수정 2026-10-28] 담아 둔 내역은 먼저 보여 주지 않는다 (사장님 결정 — 서버만 보기).
+               먼저 보여 주면 서버 답이 왔을 때 상태가 바뀐 주문·보관함으로 옮겨진 주문이 '떴다가 바뀌었다'.
+               열면 회색 자리만 보여 주고 서버 자료로 한 번에 그린다. 서버가 안 되면 안내만 띄운다 (gHistoryLoadFailed — 사장님 결정).
+               담아 둔 내역은 화면에는 안 쓰고 다른 기능(배달비 셈 등)에만 쓴다 */
+            if (cached) fullHistoryData = JSON.parse(cached);
+            if (!isSilent) {
                 setupHistoryUI(name);
-                document.getElementById('history-list').innerHTML = `
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:50px 0; color:#8b9682;">
-                        <div class="loading-spinner" style="margin-bottom:15px;"></div>
-                        주문내역을 확인중입니다...
-                    </div>`;
+                const _row = `<div style="display:flex; flex-direction:column; gap:8px; padding:14px 0; border-top:1px solid #eef1ea;">` +
+                    `<div class="hm-sk" style="width:120px; height:16px;"></div><div class="hm-sk" style="width:220px; height:18px;"></div><div class="hm-sk" style="width:160px; height:14px;"></div></div>`;
+                document.getElementById('history-list').innerHTML = `<div class="hist-sk-wrap">${_row.repeat(4)}</div>`;
             }
 
             try {
@@ -10965,7 +10959,7 @@
                             document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
                             btn.classList.add('active');
                             renderList(cat.key);
-                            if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                            if (isUserAction) gChipCenter(btn);
                         };
                         filterAreaCategories.appendChild(btn);
                     });
@@ -11022,7 +11016,7 @@
                         document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         renderList(date);
-                        if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        if (isUserAction) gChipCenter(btn);
                     };
                     filterAreaDates.appendChild(btn);
                 });
@@ -11127,7 +11121,7 @@
                         document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         renderList(cat.key);
-                        if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        if (isUserAction) gChipCenter(btn);
                     };
                     filterAreaCategories.appendChild(btn);
                 });
@@ -11162,7 +11156,7 @@
                         document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         renderList(cat);
-                        if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        if (isUserAction) gChipCenter(btn);
                     };
                     filterAreaCategories.appendChild(btn);
                 });
@@ -12690,11 +12684,12 @@
                     btn.dataset.date = `gb:${kindKey}:${d}`;
                     btn.innerText = d === 'all' ? '전체' : (d === t ? '오늘' : gShortDateLabel(formatDateWithDay(d)));
                     btn.onclick = () => {
+                        const _photo = gPhotoSwap();   // [신규 2026-10-28] 사진만 부드럽게
                         window.gGbPickedDate = d;
                         document.querySelectorAll('#date-filters .date-btn').forEach(b => b.classList.toggle('active', b === btn));
                         renderList(btn.dataset.date);
-                        gSoftFade();   // [신규 2026-10-28] 날짜 칩도 목록이 부드럽게 바뀌게
-                        if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        _photo();
+                        if (isUserAction) gChipCenter(btn);
                     };
                     area.appendChild(btn);
                 });
@@ -12836,16 +12831,40 @@
             el.classList.remove('soft-in'); void el.offsetWidth; el.classList.add('soft-in');
             clearTimeout(el._softT); el._softT = setTimeout(() => el.classList.remove('soft-in'), 280);
         }
-        // [신규 2026-10-28] 분류 탭·날짜 칩을 누를 때 — 목록이 흐렸다가 또렷해진다 (자리는 그대로)
-        function gSoftFade() {
-            const el = document.getElementById('product-list');
-            if (!el) return;
-            gImgShowCached(el);
-            el.classList.remove('soft-in');
-            void el.offsetWidth;
-            el.classList.add('soft-in');
-            clearTimeout(el._softT);
-            el._softT = setTimeout(() => el.classList.remove('soft-in'), 280);
+        /* [신규 2026-10-28] 분류 탭·날짜 칩을 누를 때 사진만 부드럽게 바뀐다 (사장님 요청).
+           목록은 바로 바뀌고, 같은 자리에 있던 예전 사진(이미 그려져 있던 그 사진)을 새 사진 위에 잠깐 얹었다가 0.2초 동안 걷는다.
+           글씨·가격·단추는 움직이지 않는다. 쓰는 법: const done = gPhotoSwap(); (새로 그리기) done(); */
+        function gPhotoSwap() {
+            const list = document.getElementById('product-list');
+            if (!list || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return () => { gImgShowCached(list); };
+            const H = window.innerHeight;
+            const olds = [...list.querySelectorAll('.thumb img')].map(img => ({ img, r: img.getBoundingClientRect() }))
+                .filter(o => o.r.bottom > 0 && o.r.top < H && o.r.width > 0 && o.img.complete && o.img.naturalWidth);
+            return () => {
+                gImgShowCached(list);
+                [...list.querySelectorAll('.thumb img')].forEach(img => {
+                    const r = img.getBoundingClientRect();
+                    if (r.bottom <= 0 || r.top >= H) return;
+                    const o = olds.find(x => Math.abs(x.r.top - r.top) < 3 && Math.abs(x.r.left - r.left) < 3);
+                    if (!o || o.img.getAttribute('src') === img.getAttribute('src')) return;
+                    const thumb = img.parentElement;
+                    const ov = o.img;   // 예전 사진 그대로 (다시 펼칠 필요 없다)
+                    ov.removeAttribute('onload'); ov.removeAttribute('onerror');
+                    ov.className = 'loaded photo-out';
+                    ov.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; object-fit:' + getComputedStyle(img).objectFit + '; z-index:2; pointer-events:none; transition:opacity .2s ease;';
+                    if (getComputedStyle(thumb).position === 'static') thumb.style.position = 'relative';
+                    thumb.appendChild(ov);
+                    requestAnimationFrame(() => requestAnimationFrame(() => { ov.style.opacity = '0'; }));
+                    setTimeout(() => ov.remove(), 260);
+                });
+            };
+        }
+        // [신규 2026-10-28] 날짜·분류 칩을 가운데로 — 칩 줄만 옆으로 민다. scrollIntoView 는 페이지까지 위아래로 끌어 올렸다 (사장님 지적: 위치가 조정된다)
+        function gChipCenter(btn) {
+            const box = btn && btn.parentElement;
+            if (!box) return;
+            const br = btn.getBoundingClientRect(), xr = box.getBoundingClientRect();
+            box.scrollTo({ left: box.scrollLeft + (br.left - xr.left) - (box.clientWidth - br.width) / 2, behavior: 'smooth' });
         }
         function gTabFade(dir, withTabs) {   // dir: 1 = 오른쪽에서 들어온다, -1 = 왼쪽에서 / withTabs: 아래 분류 탭·날짜 칩 줄도 함께
             gImgShowCached(document.getElementById(window.gHomeOn ? 'home-view' : 'product-list'));
