@@ -4031,6 +4031,7 @@
 
                 // [수정] 분류가 많아서 한 줄로는 다 안 보인다. 두 줄(5칸씩)로 펼쳐 전체를 한눈에 보여준다.
                 tabContainer.classList.add('grid-tabs');
+                const _prevLeft = tabContainer.classList.contains('grid-tabs') ? tabContainer.scrollLeft : 0;   // [신규 2026-10-28] 다시 그리기 전 보던 자리
                 tabContainer.innerHTML = _tabs.map(c =>
                     `<button class="main-tab-btn ${currentMainTab === c.key ? 'active' : ''}" data-tab="${c.key}" onclick="switchMainTab('${c.key}')">${c.label}</button>`
                 ).join('');
@@ -4047,7 +4048,9 @@
                     const act = tabContainer.querySelector('.main-tab-btn.active');
                     if (act) {
                         const mid = act.offsetLeft - (tabContainer.clientWidth - act.offsetWidth) / 2;
-                        tabContainer.scrollLeft = Math.max(0, mid);
+                        /* [수정 2026-10-28] 순간이동하지 않고 보던 자리에서 고른 탭까지 부드럽게 민다 (사장님 요청) */
+                        tabContainer.scrollLeft = _prevLeft;
+                        tabContainer.scrollTo({ left: Math.max(0, mid), behavior: 'smooth' });
                     }
                 });
             } else {
