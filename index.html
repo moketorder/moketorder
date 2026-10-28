@@ -413,7 +413,7 @@
         .wc-card .t em { display: block; font-style: normal; font-size: 18px; color: #E8410C; }
         .wc-card .s { font-size: 12px; font-weight: 700; color: #6b5a00; margin-top: 2px; line-height: 1.4; word-break: keep-all; }
         .wc-card .dd { flex: 0 0 auto; background: #16200f; color: #FFE14D; font-size: 13px; font-weight: 900; border-radius: 8px; padding: 6px 8px; }
-        .wc-back { position: fixed; inset: 0; z-index: 9000; background: rgba(22,32,15,.55); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 20px 16px 40px; box-sizing: border-box; }
+        .wc-back { position: fixed; inset: 0; z-index: 9000; background: rgba(22,32,15,.55); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; overscroll-behavior: contain; padding: 20px 16px 40px; box-sizing: border-box; }   /* overscroll — 창 안을 끝까지 내려도 뒤 화면이 끌려가지 않게 */
         .wc-pop { position: relative; width: 100%; max-width: 340px; margin: auto; border-radius: 16px; overflow: hidden; background: #18301f; color: #f3f1e8; box-shadow: 0 24px 50px rgba(0,0,0,.35); font-family: Pretendard, sans-serif; }
         .wc-pop .hero { position: relative; height: 210px; overflow: hidden; }
         .wc-pop .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -439,6 +439,76 @@
         .wc-pop dd { margin: 0; font-size: 13.5px; font-weight: 500; line-height: 1.5; word-break: keep-all; color: #f3f1e8; }
         .wc-pop .go { display: block; width: 100%; height: 50px; margin-top: 20px; border: 0; border-radius: 10px; background: #FFE14D; color: #18301f; font: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer; }
         .wc-pop .fine { margin-top: 12px; font-size: 11.5px; line-height: 1.6; color: #8fa38f; text-align: center; word-break: keep-all; }
+        /* [신규 2026-10-28] 저장 알림 — 화면 아래에서 올라왔다 사라지는 작은 알림 (gSaveToast) */
+        @keyframes stIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        @keyframes stOut { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 12px); } }
+        #save-toast { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); z-index: 9500; display: flex; align-items: center; gap: 10px; padding: 13px 18px 13px 14px; border-radius: 14px; background: #16200f; color: #fff; font-family: Pretendard, sans-serif; font-size: 14.5px; font-weight: 700; line-height: 1.35; box-shadow: 0 10px 28px rgba(0,0,0,.25); white-space: nowrap; animation: stIn .3s cubic-bezier(.2,.8,.2,1) both; }
+        #save-toast.out { animation: stOut .25s ease-in both; }
+        #save-toast .ck { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; background: #4CAF20; display: flex; align-items: center; justify-content: center; }
+        #save-toast small { display: block; font-size: 12px; font-weight: 600; color: #c9d6c4; margin-top: 1px; }
+        @media (prefers-reduced-motion: reduce) { #save-toast, #save-toast.out { animation: none; } }
+        /* [신규 2026-10-28] 주문내역은 다른 페이지로 넘어가듯 오른쪽에서 밀려 들어온다 (사장님 요청).
+           창이 숨겨졌다(display:none) 보일 때마다 저절로 다시 움직인다 — 여는 곳이 여러 군데라 CSS 로만 건다 */
+        @keyframes histBg { from { background-color: rgba(0,0,0,0); } }
+        @keyframes histIn { from { transform: translateX(100%); } to { transform: none; } }
+        #history-modal { animation: histBg .28s ease-out both; }
+        #history-modal > .modal-content { animation: histIn .3s cubic-bezier(.2,.8,.2,1) both; }
+        /* 닫을 때는 반대로 오른쪽으로 빠져나간다 (closeModal 이 .hist-out 을 붙였다가 0.26초 뒤 숨긴다) */
+        @keyframes histBgOut { to { background-color: rgba(0,0,0,0); } }
+        @keyframes histOut { from { transform: none; } to { transform: translateX(100%); } }
+        #history-modal.hist-out { animation: histBgOut .26s ease-in both; }
+        #history-modal.hist-out > .modal-content { animation: histOut .26s cubic-bezier(.4,0,.8,.4) both; }
+        @media (prefers-reduced-motion: reduce) { #history-modal, #history-modal > .modal-content, #history-modal.hist-out, #history-modal.hist-out > .modal-content { animation: none; } }
+        /* [신규 2026-10-28] 메뉴에서 여는 창(매장 위치·영업 시간·배송 안내·계좌번호·공구상품 추천·내 포인트)도
+           쿠폰 안내창처럼 뒤가 서서히 어두워지고 창이 아래에서 살짝 올라온다 (사장님 요청). 보일 때마다 저절로 움직인다 */
+        #location-modal, #hours-modal, #delivery-guide-modal, #bank-modal, #suggest-modal, #points-modal { animation: histBg .25s ease-out both; }
+        #location-modal > .modal-content, #hours-modal > .modal-content, #delivery-guide-modal > .modal-content,
+        #bank-modal > .modal-content, #suggest-modal > .modal-content, #points-modal > .modal-content { animation: wcPopIn .3s cubic-bezier(.2,.8,.2,1) .03s both; }
+        /* 닫을 때는 반대로 스르르 내려가며 사라진다 (closeModal 이 .pop-out 을 붙였다가 0.22초 뒤 숨긴다) */
+        .modal-overlay.pop-out { animation: histBgOut .22s ease-in both !important; }   /* !important — 위의 창 이름(#…) 움직임보다 앞서게 */
+        .modal-overlay.pop-out > .modal-content { animation: wcPopOut .22s ease-in both !important; }
+        @media (prefers-reduced-motion: reduce) {
+            .modal-overlay.pop-out, .modal-overlay.pop-out > .modal-content,
+            #location-modal, #hours-modal, #delivery-guide-modal, #bank-modal, #suggest-modal, #points-modal,
+            #location-modal > .modal-content, #hours-modal > .modal-content, #delivery-guide-modal > .modal-content,
+            #bank-modal > .modal-content, #suggest-modal > .modal-content, #points-modal > .modal-content { animation: none; }
+        }
+        /* 키가 작은 폰(아이폰 SE 등)에서는 사진을 줄여 덜 내려도 단추가 보이게 */
+        @media (max-height: 700px) {
+            .wc-pop .hero { height: 150px; }
+            .wc-pop .b { font-size: 36px; }
+            .wc-pop hr { margin: 14px 0 10px; }
+            .wc-pop dl { gap: 6px; }
+            .wc-pop .go { margin-top: 14px; }
+        }
+        /* [신규 2026-10-28] 안내창 열고 닫기를 부드럽게 — 뒤는 서서히 어두워지고 창은 아래에서 살짝 올라온다 (사장님 요청) */
+        @keyframes wcBackIn { from { background: rgba(22,32,15,0); } to { background: rgba(22,32,15,.55); } }
+        @keyframes wcPopIn { from { opacity: 0; transform: translateY(24px) scale(.98); } to { opacity: 1; transform: none; } }
+        @keyframes wcBackOut { from { background: rgba(22,32,15,.55); } to { background: rgba(22,32,15,0); } }
+        @keyframes wcPopOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(16px) scale(.98); } }
+        .wc-back { animation: wcBackIn .28s ease-out both; }
+        .wc-back .wc-pop { animation: wcPopIn .32s cubic-bezier(.2,.8,.2,1) .04s both; }
+        .wc-back.closing { animation: wcBackOut .22s ease-in both; }
+        .wc-back.closing .wc-pop { animation: wcPopOut .22s ease-in both; }
+        /* [신규 2026-10-28] 앱을 켜고 홈이 처음 뜰 때만 칸들이 위에서부터 차례로 살짝 올라오며 나타난다 (사장님 요청) */
+        @keyframes hmIntro { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        #home-view.hm-intro > * { animation: hmIntro .4s ease-out both; }
+        #home-view.hm-intro > *:nth-child(2) { animation-delay: .05s; }
+        #home-view.hm-intro > *:nth-child(3) { animation-delay: .1s; }
+        #home-view.hm-intro > *:nth-child(4) { animation-delay: .15s; }
+        #home-view.hm-intro > *:nth-child(n+5) { animation-delay: .2s; }
+        /* [신규 2026-10-28] 홈·공동구매·상시판매를 옮길 때 페이지를 넘기듯 옆에서 밀려 들어온다 (사장님 요청).
+           오른쪽 탭으로 가면 오른쪽에서, 왼쪽 탭으로 가면 왼쪽에서. 위에 붙어 있는 분류 줄은 흐려졌다 또렷해지기만 한다 */
+        @keyframes tabFromR { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+        @keyframes tabFromL { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+        @keyframes tabFade { from { opacity: 0; } to { opacity: 1; } }
+        #home-view.tab-in, #product-list.tab-in { animation: tabFromR .28s cubic-bezier(.2,.8,.2,1) both; }
+        #home-view.tab-in.from-l, #product-list.tab-in.from-l { animation-name: tabFromL; }
+        .sub-header-group.tab-in, #main-section-title.tab-in { animation: tabFade .2s ease-out both; }
+        /* 움직임 줄이기를 켠 손님에게는 움직이지 않는다 */
+        @media (prefers-reduced-motion: reduce) {
+            .wc-back, .wc-back .wc-pop, .wc-back.closing, .wc-back.closing .wc-pop, #home-view.hm-intro > *, .tab-in { animation: none !important; }
+        }
 
         /* 대분류 탭 스타일 */
         .main-tabs {
@@ -2346,6 +2416,13 @@
             box-shadow: none;
             font-weight: 900;
         }
+        /* [신규 2026-10-28] 눌린 탭 밑줄이 탭을 따라 미끄러져 옮겨 간다 (사장님 요청).
+           밑줄 하나(.dt-ink)를 따로 두고 눌린 탭 아래로 옮긴다. 밑줄이 준비되면 탭마다 있던 밑줄은 감춘다 */
+        .delivery-type-tabs { position: relative; }
+        .delivery-type-tabs .dt-ink { position: absolute; left: 0; bottom: 0; height: 3.5px; width: 0; background: var(--moket-green); pointer-events: none; z-index: 3;
+            transition: transform .28s cubic-bezier(.2,.8,.2,1), width .28s cubic-bezier(.2,.8,.2,1); }
+        .delivery-type-tabs.ink-on .delivery-type-btn.active { border-bottom-color: transparent; }
+        @media (prefers-reduced-motion: reduce) { .delivery-type-tabs .dt-ink { transition: none; } }
 
         /* ① 대분류 탭(공동구매·사다드림) — 시안처럼 왼쪽에 붙는 작은 알약 */
         .main-tabs {
@@ -3628,7 +3705,11 @@
 
         function switchDeliveryType(type) {
             // [신규 2026-10-03] 홈 — 판매유형은 그대로 두고 홈 화면만 띄운다
-            if (type === 'home') { gOpenHome(); return; }
+            if (type === 'home') { if (!window.gHomeOn) { gOpenHome(); gTabFade(-1); } else gOpenHome(); return; }   // 홈은 맨 왼쪽 — 늘 왼쪽에서
+            const _tabFrom = window.gHomeOn ? 0 : (currentDeliveryType === 'onsite' ? 2 : 1);   // [신규 2026-10-28] 어느 쪽 탭에서 왔나 (밀려 들어올 방향)
+            /* [버그수정 2026-10-28] 앱을 켜고 상품을 처음 그리기 전에 다른 탭을 누르면, 첫 그리기(renderList)가 '처음엔 홈' 표시를 보고
+               홈을 다시 띄워 홈으로 튕겨 돌아왔다. 손님이 직접 탭을 골랐으면 그 표시는 지운다 */
+            window.gHomeStart = false;
             // 홈에서 나가면 같은 판매유형이라도 목록을 새로 그린다 (홈에서 담느라 판매유형이 바뀌어 있을 수 있다)
             if (window.gHomeOn) { gCloseHome(); currentDeliveryType = ''; }
             if (type === 'today') type = 'reserve';   // [수정 2026-09-30] 당일판매는 공동구매로 합쳤다
@@ -3644,6 +3725,7 @@
                 updateFooter();
                 // [수정 2026-10-03] 판매유형을 바꾸면 맨 위부터 보여 준다 — 홈에서 내려 둔 만큼 새 목록도 내려간 채로 보였다 (사장님 요청)
                 window.scrollTo(0, 0);
+                gTabFade((type === 'onsite' ? 2 : 1) >= _tabFrom ? 1 : -1);   // [신규 2026-10-28] 페이지를 넘기듯
                 return;
             }
 
@@ -6934,6 +7016,16 @@
                 }
             }
             const el = document.getElementById(id);
+            /* [신규 2026-10-28] 주문내역은 오른쪽으로 빠져나가고, 메뉴 창들은 스르르 내려가며 닫힌다 (사장님 요청) — 다 나간 뒤에 숨긴다 */
+            const outCls = id === 'history-modal' ? 'hist-out'
+                : ['location-modal', 'hours-modal', 'delivery-guide-modal', 'bank-modal', 'suggest-modal', 'points-modal'].includes(id) ? 'pop-out' : '';
+            if (el && outCls && el.style.display !== 'none' && !el.classList.contains(outCls)
+                && !(id === 'bank-modal' && window.isSadaOrderFinished)   // 사다드림 주문 뒤 계좌창은 닫으면서 새로고침해야 해서 예전대로
+                && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+                el.classList.add(outCls);
+                setTimeout(() => { el.classList.remove(outCls); el.style.display = 'none'; checkScrollLock(); }, outCls === 'hist-out' ? 260 : 220);
+                return;
+            }
             if (el) {
                 el.style.display = 'none';
                 // [추가] 높아졌던 Z-Index 초기화
@@ -7663,16 +7755,27 @@
 
             gSetProfileClosable(true);   // [신규] 가입을 마쳤으니 이제 닫기를 다시 쓸 수 있다
             closeModal('profile-modal');
-            const confirmModal = document.getElementById('save-confirm-modal');
-            confirmModal.style.display = 'flex';
+            /* [수정 2026-10-28] 가운데 큰 '저장되었습니다' 상자 대신 화면 아래 작은 알림으로 (사장님 요청 — 투박하다).
+               처음 가입이면 '가입이 완료됐어요', 정보만 고쳤으면 '저장했어요' */
+            gSaveToast(isFirstJoin ? '가입이 완료됐어요' : '저장했어요', isFirstJoin ? '모켓 가족이 되신 걸 환영해요' : '');
 
             setTimeout(() => {
-                confirmModal.style.display = 'none';
                 checkScrollLock();
                 // [추가] 프로필 저장 완료 후 미픽업 알림 체크 실행
                 setTimeout(checkUnpickedOrders, 500);
                 setTimeout(gWcLoad, 800);   // [신규 2026-10-28] 가입 직후 — 무료배송 쿠폰 명단에 넣고 안내창
             }, 1500);
+        }
+
+        // [신규 2026-10-28] 화면 아래 작은 알림 — 초록 체크와 함께 올라왔다가 1.8초 뒤 내려가며 사라진다
+        function gSaveToast(title, sub) {
+            document.getElementById('save-toast')?.remove();
+            const d = document.createElement('div');
+            d.id = 'save-toast';
+            d.innerHTML = `<span class="ck"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12.5 10 17 19 7"/></svg></span>` +
+                `<span>${title}${sub ? `<small>${sub}</small>` : ''}</span>`;
+            document.body.appendChild(d);
+            setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 260); }, 1800);
         }
 
         // [추가] 앱 캐시 및 데이터 완전 초기화 (로그아웃 버튼)
@@ -12305,15 +12408,23 @@
                 `<div class="fine">쿠폰은 일주일 동안 사용 가능하며,<br>과일을 포함한 당일배송 서비스 이용 시 자동으로 1회 적용됩니다.<br>과일이 없는 주문에는 적용되지 않습니다.</div></div></div>`;
             back.onclick = e => {
                 e.stopPropagation();   // 창을 닫은 뒤 같은 누름이 아래 화면에 닿지 않게
-                if (e.target === back || e.target.closest('.x')) { back.remove(); checkScrollLock(); }
+                if (e.target === back || e.target.closest('.x')) gWcClose(back);
                 else if (e.target.closest('.go')) setTimeout(gWcGoFruit, 0);
             };
             document.body.appendChild(back);
+            document.body.style.overflow = 'hidden';   // 창이 떠 있는 동안 뒤 화면은 안 움직이게 (닫으면 checkScrollLock 이 푼다)
+        }
+        // 안내창 닫기 — 스르르 내려가며 사라진다 (0.22초 뒤 지운다)
+        function gWcClose(back) {
+            if (!back || back.classList.contains('closing')) return;
+            back.classList.add('closing');
+            setTimeout(() => { back.remove(); try { checkScrollLock(); } catch (e) { } }, 230);
         }
         // '오늘 과일 보러 가기' — 공동구매 › 과일 탭 맨 위로
         function gWcGoFruit(n) {
-            document.getElementById('wc-pop')?.remove();
-            try { checkScrollLock(); } catch (e) { }
+            const _pop = document.getElementById('wc-pop');
+            if (_pop) gWcClose(_pop);   // [수정 2026-10-28] 여기서도 스르르 내려가며 닫는다 — 그동안 뒤에서 과일 탭이 밀려 들어온다
+            else { try { checkScrollLock(); } catch (e) { } }
             switchDeliveryType('reserve');
             setTimeout(() => {
                 if (document.querySelector('.main-tab-btn[data-tab="gb-fruit"]')) switchMainTab('gb-fruit');
@@ -12568,6 +12679,47 @@
             if (!silent) window.scrollTo(0, 0);
         }
         function gCloseHome() { gApplyHomeView(false); }
+        /* [신규 2026-10-28] 판매유형 탭을 옮긴 뒤 보이는 칸에 '옆에서 밀려 들어오기'를 한 번 건다 (사장님 요청).
+           같은 표시를 다시 걸어야 다시 움직이므로 떼었다가 붙이고, 끝나면 뗀다 */
+        /* [신규 2026-10-28] 판매유형 탭 밑줄 — 눌린 탭(.active) 아래로 미끄러져 옮겨 간다.
+           탭의 눌림 표시가 바뀌는 곳이 여러 군데라, 표시가 바뀌는 것을 지켜보다가 따라간다 */
+        (function gTabInk() {
+            const box = document.querySelector('.delivery-type-tabs');
+            if (!box) return;
+            const ink = document.createElement('span');
+            ink.className = 'dt-ink';
+            box.appendChild(ink);
+            const place = (instant) => {
+                const b = box.querySelector('.delivery-type-btn.active');
+                if (!b || !b.offsetWidth) { ink.style.width = '0'; return; }
+                if (instant) ink.style.transition = 'none';
+                ink.style.width = b.offsetWidth + 'px';
+                ink.style.transform = `translateX(${b.offsetLeft}px)`;
+                if (instant) { void ink.offsetWidth; ink.style.transition = ''; }
+                if (!box.classList.contains('ink-on')) box.classList.add('ink-on');   // 이미 있으면 건드리지 않는다 — 건드리면 아래 지켜보기가 또 불려 끝없이 돈다
+            };
+            place(true);
+            // 탭 단추들의 눌림 표시만 지켜본다 (탭 줄 자신의 표시는 보지 않는다)
+            const mo = new MutationObserver(() => place(false));
+            box.querySelectorAll('.delivery-type-btn').forEach(b => mo.observe(b, { attributes: true, attributeFilter: ['class'] }));
+            // 탭 줄 폭이 바뀌면(화면 돌림·스크롤 막대·글꼴) 바로 맞춘다
+            if (window.ResizeObserver) new ResizeObserver(() => place(true)).observe(box);
+            else window.addEventListener('resize', () => place(true));
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => place(true));   // 글꼴이 늦게 와 탭 폭이 바뀌어도 맞춘다
+        })();
+        function gTabFade(dir) {   // dir: 1 = 오른쪽에서 들어온다, -1 = 왼쪽에서
+            const els = window.gHomeOn ? ['#home-view'] : ['.sub-header-group', '#main-section-title', '#product-list'];
+            els.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (!el) return;
+                el.classList.remove('tab-in');
+                el.classList.toggle('from-l', dir < 0);
+                void el.offsetWidth;
+                el.classList.add('tab-in');
+                clearTimeout(el._tabFadeT);
+                el._tabFadeT = setTimeout(() => el.classList.remove('tab-in'), 320);
+            });
+        }
         // 홈에서 다른 화면으로 — 판매유형 탭, 받는 날을 고른 공동구매
         function gHomeGo(type) { switchDeliveryType(type); window.scrollTo(0, 0); }
         function gHomeGoDate(d) {
@@ -12831,6 +12983,14 @@
             [...parent.children].forEach(el => { if (!keep.has(el)) el.remove(); });
             list.forEach((el, i) => { if (parent.children[i] !== el) parent.insertBefore(el, parent.children[i] || null); });
         }
+        /* [신규 2026-10-28] 앱을 켜고 홈을 처음 그릴 때 한 번만 칸들이 차례로 나타나게 한다 (사장님 요청).
+           홈은 설정·상품이 올 때마다 몇 번 다시 그려지므로, 1.2초 뒤 표시를 떼어 그 뒤에 그린 것은 움직이지 않게 한다 */
+        function gHomeIntro(box) {
+            if (window.__hmIntroDone || !box || box.hidden) return;
+            window.__hmIntroDone = true;
+            box.classList.add('hm-intro');
+            setTimeout(() => box.classList.remove('hm-intro'), 1200);
+        }
         function gRenderHome() {
             const box = document.getElementById('home-view');
             if (!box) return;
@@ -12842,6 +13002,7 @@
             if (!isAdminMode && !isProductListEnabled) {
                 out.push(`<div class="hm-closed">현재는 주문이 불가능 합니다.<br>(주문 가능 시간 - 오전 10시 ~ 다음날 오전 6시)</div>`);
                 gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
+                gHomeIntro(box);
                 return;
             }
             const buy = (productsData || []).filter(p => p && gHomeBuyable(p));
@@ -12878,6 +13039,7 @@
                 `<div class="hm-ask"><p>배달·상품 문의와 AS 신청은<br><b>1:1 카톡</b>으로 문의해 주세요.</p>` +
                 `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
             gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
+            gHomeIntro(box);
             box.querySelectorAll('[data-rail]').forEach(r => {
                 const k = keep[r.dataset.rail];
                 r.scrollLeft = (k && k.left && k.first === firstOf(r)) ? k.left : 0;
