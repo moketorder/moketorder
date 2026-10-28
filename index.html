@@ -513,8 +513,9 @@
         @keyframes tabFromR { from { transform: translateX(36px); } to { transform: none; } }
         @keyframes tabFromL { from { transform: translateX(-36px); } to { transform: none; } }
         /* [수정 2026-10-28] 공동구매↔상시판매를 오갈 때 아래 분류 탭·날짜 칩 줄도 목록과 함께 옆에서 밀려 들어온다 (사장님 요청 — 흐렸다 또렷해지는 것은 깜빡여 보였다) */
-        #home-view.tab-in, #product-list.tab-in, #main-tabs-container.tab-in, #date-filters.tab-in { animation: tabFromR .26s cubic-bezier(.2,.8,.2,1) both; }
-        #home-view.tab-in.from-l, #product-list.tab-in.from-l, #main-tabs-container.tab-in.from-l, #date-filters.tab-in.from-l { animation-name: tabFromL; }
+        /* [수정 2026-10-28] 큰 탭을 옮길 때는 아래 전부(분류 탭·날짜·검색 칸 묶음 · 판매 안내 · 상품 목록)가 한 장처럼 같이 밀려 들어온다 (사장님 요청) */
+        #home-view.tab-in, #product-list.tab-in, .sub-header-group.tab-in, #main-section-title.tab-in { animation: tabFromR .26s cubic-bezier(.2,.8,.2,1) both; }
+        #home-view.tab-in.from-l, #product-list.tab-in.from-l, .sub-header-group.tab-in.from-l, #main-section-title.tab-in.from-l { animation-name: tabFromL; }
         @keyframes tabSoft { from { opacity: .3; } to { opacity: 1; } }   /* 분류 탭·날짜 칩을 누를 때 목록(.soft-in)만 쓴다 */
         body { overflow-x: clip; }   /* 탭 줄·목록이 옆에서 밀려 들어오는 동안 오른쪽으로 삐져나가 화면이 흔들리지 않게 (clip 은 위 고정 탭 줄을 건드리지 않는다) */
         /* 움직임 줄이기를 켠 손님에게는 움직이지 않는다 */
@@ -12890,7 +12891,7 @@
         }
         function gTabFade(dir, withTabs) {   // dir: 1 = 오른쪽에서 들어온다, -1 = 왼쪽에서 / withTabs: 아래 분류 탭·날짜 칩 줄도 함께
             gImgShowCached(document.getElementById(window.gHomeOn ? 'home-view' : 'product-list'));
-            const els = window.gHomeOn ? ['#home-view'] : (withTabs ? ['#main-tabs-container', '#date-filters', '#product-list'] : ['#product-list']);
+            const els = window.gHomeOn ? ['#home-view'] : (withTabs ? ['.sub-header-group', '#main-section-title', '#product-list'] : ['#product-list']);
             els.forEach(sel => {
                 const el = document.querySelector(sel);
                 if (!el) return;
