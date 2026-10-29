@@ -4267,9 +4267,12 @@
             } else if (key.startsWith('gb:fruit:')) {
                 kind = 'fruit';
                 // [신규 2026-09-30] 공동구매 › 과일 탭 안내 — 예전 당일판매(과일) 안내를 바탕으로 쓴다
-                html = gTypeNoticeCard('', '과일', '#3d8f19', '#eef7e7', [
+                // [수정 2026-10-29] 탭 이름이 '과일·야채'면 안내 제목도 '과일·야채' (사장님 요청) — 탭과 같은 잣대(야채 상품이 있는지)
+                const _fvVeg = (typeof productsData !== 'undefined' ? productsData : []).filter(gGbVisible).some(p => gKindOf(p) === 'veg');
+                const _fvWord = _fvVeg ? '과일·야채' : '과일';
+                html = gTypeNoticeCard('', _fvWord, '#3d8f19', '#eef7e7', [
                     `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
-                    `오늘 과일은 <b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 <b style="color:#3d8f19;">오후 6시</b> 전에 받을 수 있어요`,
+                    `오늘 ${_fvWord}${_fvVeg ? "는" : "은"} <b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 <b style="color:#3d8f19;">오후 6시</b> 전에 받을 수 있어요`,
                     `${isSundayAsWeekday ? "공휴일은 쉬어요" : "일요일·공휴일은 쉬어요"}`
                 ]);
             } else if (currentDeliveryType === 'reserve') {
