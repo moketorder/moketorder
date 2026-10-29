@@ -13895,6 +13895,16 @@
         function gCartKey(name, signature) { return signature ? (name + CART_SEP + signature) : name; }
         function gCartName(key) { return String(key || '').split(CART_SEP)[0]; }
         function gCartProduct(key) { const n = gCartName(key); return productsData.find(pd => pd.name === n); }
+        // [신규 2026-10-29] 장바구니에서 옵션을 안 고른 옵션 상품 이름들 (주문 전에 막는다 — 사장님 요청)
+        function gCartMissingOptions() {
+            return Object.keys(cart || {}).filter(k => {
+                if (!(cart[k] > 0)) return false;
+                const p = gCartProduct(k);
+                if (!p || !gHasChoiceOptions(p)) return false;
+                const o = cartOptions[k];
+                return !(o && Array.isArray(o.picks) && o.picks.length);
+            }).map(gCartName);
+        }
 
         // 고른 옵션을 조합 서명으로 (같은 조합이면 같은 문자열이 되도록 정렬)
         function gOptionSignature(picks) {
@@ -14163,6 +14173,8 @@
 
             // 검증
             const errors = [];
+            // [신규 2026-10-29] 고를 옵션이 있는 상품은 하나도 안 고르면 못 담는다 (사장님 요청 — 여러 개 고르기 옵션은 안 골라도 담겼다)
+            if (gHasChoiceOptions(p) && picked.length === 0) errors.push('옵션을 하나 이상 골라 주세요.');
             groups.forEach((g, gi) => {
                 if (g.selectType !== 'multi' && (g.items || []).length > 0 && Object.keys(st.picks[gi] || {}).length === 0) {
                     errors.push(`'${g.name || '옵션'}'에서 하나를 선택해 주세요.`);
@@ -15212,6 +15224,13 @@
             if (Object.keys(cart).length === 0) {
                 showSystemModal("상품이 없습니다. 상품을 선택해 주세요.", 'alert');
                 return;
+            }
+            {   // [신규 2026-10-29] 옵션을 안 고른 옵션 상품이 있으면 주문을 못 한다 (사장님 요청)
+                const miss = [...new Set(gCartMissingOptions())];
+                if (miss.length) {
+                    showSystemModal(`옵션을 고르지 않은 상품이 있어요.<br><b>${miss.slice(0, 3).map(n => String(n).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';')).join(', ')}${miss.length > 3 ? ' 외 ' + (miss.length - 3) + '개' : ''}</b><br>장바구니에서 빼고 다시 담아 주세요.`, 'alert');
+                    return;
+                }
             }
 
             /* [신규] 주문에 실릴 주소·현관비번을 서버와 맞춘 뒤 간다.
