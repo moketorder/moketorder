@@ -6258,7 +6258,9 @@
             try {
                 if (isAdminMode) return;
                 const msg = String((err && err.message) || err || '').replace(/\s+/g, ' ').trim().slice(0, 300);
-                if (!msg || /^Script error\.?$/i.test(msg) || /Failed to fetch|Load failed|NetworkError|network error|AbortError|ResizeObserver|Indexed ?Database|IndexedDB|in-progress transaction|TransactionInactiveError/i.test(msg)) return;   // [수정 2026-10-01] 아이폰 저장 공간 끊김은 남기지 않는다
+                if (!msg || /^Script error\.?$/i.test(msg) || /Failed to fetch|Load failed|NetworkError|network error|AbortError|ResizeObserver|Indexed ?Database|IndexedDB|in-progress transaction|TransactionInactiveError/i.test(msg)) return;
+                // [신규 2026-10-30] 크롬 확장 프로그램이 저 혼자 내는 오류는 남기지 않는다 (사장님 요청 — 주문서와 상관없는데 오류 칸에 쌓였다)
+                if (/Receiving end does not exist|Could not establish connection|Extension context invalidated|chrome-extension:|moz-extension:/i.test(msg)) return;   // [수정 2026-10-01] 아이폰 저장 공간 끊김은 남기지 않는다
                 const phone = (typeof window.gFirebasePhone === 'function') ? await window.gFirebasePhone() : '';
                 if (!phone) return;
                 const now = new Date(), day = gYmdOf(now), sig = `${where}|${msg}`;
@@ -12145,11 +12147,11 @@
         }
         function gOrigPriceLabel(p) {
             if (!gIsSale(p)) return '';
-            if (gListPrice(p)) return gListPrice(p).toLocaleString() + '원';   // [신규 2026-10-11] 정상가를 따로 적었으면 그 값을 긋는다
+            if (gListPrice(p)) return (gListPrice(p) + gCalcAgencyFee(p, parseInt(p.price) || 0)).toLocaleString() + '원';   // [신규 2026-10-11] 정상가를 따로 적었으면 그 값을 긋는다
             const base = parseInt(p && p.price) || 0;
             const before = !gHasChoiceOptions(p) ? base : (base > 0 ? base : gMinOptionAdd(p));
             if (before <= 0) return '';
-            return before.toLocaleString() + '원';
+            return (before + gCalcAgencyFee(p, before)).toLocaleString() + '원';   // [수정 2026-10-29] 정상가도 대행료 포함 — 아래 금액과 같은 잣대
         }
 
         // [신규] 보관방법(냉동·냉장·상온) 표시. 받아서 어디에 둬야 하는지 카드에서 바로 보이게 한다.
@@ -12292,9 +12294,11 @@
         function gCardPriceLabel(p) {
             const base = parseInt(p && p.price) || 0;
             // [수정] 할인 상품은 깎인 금액을 보여 준다. 할인 전 금액은 gOrigPriceLabel로 그 위에 따로 적는다.
-            if (!gHasChoiceOptions(p)) return gPriceLabel(gApplyDiscount(p, base));
-            if (base > 0) return gApplyDiscount(p, base).toLocaleString() + '원~';
-            return gApplyDiscount(p, gMinOptionAdd(p)).toLocaleString() + '원~';
+            /* [수정 2026-10-29] 사다드림 대행료를 더한 금액으로 보여 준다 (사장님 요청 — 카드엔 2만원인데 장바구니에선 2만4천원이라 헷갈렸다).
+               대행료는 개당·할인 전 금액으로 구간을 정한다(gCalcAgencyFee). 고를 옵션이 있으면 가장 싼 금액 + 그 대행료로 '~' */
+            if (!gHasChoiceOptions(p)) return gPriceLabel(gApplyDiscount(p, base) + gCalcAgencyFee(p, base));
+            const raw = base > 0 ? base : gMinOptionAdd(p);
+            return (gApplyDiscount(p, raw) + gCalcAgencyFee(p, raw)).toLocaleString() + '원~';
         }
 
         // [신규] 수량 박스 너비를 '장바구니 담기' 버튼과 똑같이 맞춘다.
