@@ -6907,7 +6907,22 @@
             if (!ptRows.length) return 0;
             if (rows.some(d => !isOrderCancelled(d) && !gIsPointRow(d.item) && !gIsFeeRow(d.item))) return 0;   // 상품이 남았다
             let sum = 0;
-            for (const o of ptRows) {
+            // [신규 2026-11-05] 과일 할인 쿠폰 줄 — 상품을 모두 취소했으면 쿠폰 줄도 취소하고 쿠폰을 돌려준다
+            for (const o of ptRows.filter(gIsFcRow)) {
+                const key = o.__fbKey || (fSafeKey(o.timestamp) + '_' + fSafeKey(FC_NAME));
+                try {
+                    const up = {};
+                    up[`orders/${ph}/${key}/item`] = '[취소] ' + FC_NAME;
+                    up[`orders/${ph}/${key}/received`] = '취소완료';
+                    up[`orders/${ph}/${key}/canceled`] = true;
+                    const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
+                    if (res.ok) {
+                        o.item = '[취소] ' + FC_NAME; o.received = '취소완료'; o.canceled = true;
+                        if (gFc && gFc.usedRef === key) await gFcRestoreNow();
+                    }
+                } catch (e) { console.warn('과일 쿠폰 되돌리기 실패:', e); }
+            }
+            for (const o of ptRows.filter(d => !gIsFcRow(d))) {
                 const key = o.__fbKey || (fSafeKey(o.timestamp) + '_' + fSafeKey(POINT_USE_NAME));
                 const got = await gRefundPointUse(ph, key);
                 if (got > 0) { sum += got; o.item = '[취소] ' + POINT_USE_NAME; o.received = '취소완료'; o.canceled = true; }
@@ -12379,8 +12394,10 @@
         // [신규 2026-10-02] 주문할 때 쓴 포인트 줄 — 상품도 배달비도 아니다 (재고·무료배달 기준·물건 개수에서 뺀다)
         //  이 이름은 규칙관리가 그대로 본다. 바꾸면 규칙도 같이 바꿔야 한다
         const POINT_USE_NAME = '포인트 사용';
+        // [수정 2026-11-05] 과일 할인 쿠폰 줄(FC_NAME)도 포인트 줄처럼 물건이 아닌 마이너스 줄로 본다 — 개수·무료배달 기준·취소 대상에서 빠진다
         function gIsPointRow(itemName) {
-            return String(itemName || '').replace(/\[취소\]/g, '').trim() === '포인트 사용';
+            const n = String(itemName || '').replace(/\[취소\]/g, '').trim();
+            return n === '포인트 사용' || n === '과일 할인 쿠폰';
         }
 
         /* ===== [신규 2026-10-28] 무료배송 쿠폰 (가입 선물) — 사장님 요청 =====
@@ -12419,12 +12436,8 @@
                 const r = await fetch(`${FIREBASE_DB_URL}welcome_coupon/${ph}.json?t=${Date.now()}`);
                 if (!r.ok) return;   // 규칙을 아직 안 올렸으면 여기서 멈춘다 (주문은 예전 그대로)
                 let v = await r.json();
-                if (!v && localStorage.getItem(noKey) !== '1') {
-                    // 처음 들어왔다 — 내 칸을 만든다. 주문이 있으면 규칙이 막는다
-                    const w = await fetch(`${FIREBASE_DB_URL}welcome_coupon/${ph}.json`, { method: 'PUT', body: JSON.stringify({ startAt: { '.sv': 'timestamp' } }) });
-                    if (w.ok) { try { v = await w.json(); } catch (e) { v = null; } if (!v || !Number(v.startAt)) v = { startAt: Date.now() }; }
-                    else if (w.status === 401 || w.status === 403) localStorage.setItem(noKey, '1');
-                }
+                // [수정 2026-11-05] 무료배송 쿠폰은 새로 주지 않는다 (사장님 결정 — 과일 할인 쿠폰으로 바꿈). 이미 받은 손님만 기간 끝날 때까지 쓴다
+                void noKey;
                 gWc = (v && typeof v === 'object' && Number(v.startAt)) ? v : null;
                 if (gWcActive()) { const _im = new Image(); _im.decoding = 'async'; _im.src = WC_HERO; }   // [신규 2026-10-28] 안내창 사진을 미리 받아 둔다 — 창이 뜨는 순간 사진을 읽느라 끊기지 않게
                 gWcCheckRestore();
@@ -12541,6 +12554,143 @@
             }, 50);
             // 앱을 막 켠 때는 처음 그리기가 홈을 다시 띄울 수 있어, 조금 뒤에 한 번 더 확인한다
             if (!n) setTimeout(() => { if (window.gHomeOn) gWcGoFruit(1); }, 700);
+        }
+
+        /* ===== [신규 2026-11-05] 과일 할인 쿠폰 3,000원 — 사장님 요청 (무료배송 쿠폰을 바꿈) =====
+           · 대상: 과일·야채를 한 번도 안 산 손님 + 새 가입자. 명단은 fruit_coupon/<번호> = { grantedAt?, startAt?, usedAt?, usedRef? }
+             - 가게가 주문관리 '이벤트'에서 나눠 준 칸은 grantedAt 만 있다 → 손님이 처음 들어온 때 startAt 을 적는다
+             - 주문이 하나도 없는 손님은 처음 들어온 때 자기 칸을 만든다 (주문이 있으면 규칙이 막는다)
+           · 기간: startAt 부터 7일. 과일·야채(사다드림 빼고)를 5,000원 이상 담으면 주문할 때 3,000원이 한 번 빠진다 (픽업·배달 모두)
+           · 기록: 주문 줄 '과일 할인 쿠폰'(마이너스 3,000원). 포인트 줄처럼 물건이 아닌 줄로 본다 (gIsPointRow)
+           · 그 주문 상품을 모두 취소하면 쿠폰 줄도 취소하고 쿠폰을 돌려준다 (gRefundPointsOfOrder) */
+        const FC_MS = 7 * 86400000;
+        const FC_NAME = '과일 할인 쿠폰';   // 규칙관리가 이 이름을 본다 — 바꾸면 규칙·주문관리도 같이
+        const FC_AMT = 3000, FC_MIN = 5000;
+        let gFc = null;        // 내 쿠폰 { grantedAt?, startAt, usedAt?, usedRef? } — 대상이 아니거나 아직 모르면 null
+        let gFcPhone = '';
+        function gFcActive() {
+            return !!(gFc && Number(gFc.startAt) && !gFc.usedRef && Date.now() < Number(gFc.startAt) + FC_MS);
+        }
+        function gIsFcRow(o) {
+            return String((o && (o.item !== undefined ? o.item : o.name)) || '').replace(/\[취소\]/g, '').trim() === FC_NAME;
+        }
+        function gFcBase() {
+            const b = { startAt: Number(gFc.startAt) };
+            if (Number(gFc.grantedAt)) b.grantedAt = Number(gFc.grantedAt);
+            return b;
+        }
+        async function gFcLoad() {
+            try {
+                if (typeof gFirebasePhone !== 'function') return;
+                const ph = await gFirebasePhone();
+                if (!ph) return;   // 로그인 전
+                gFcPhone = ph;
+                const noKey = 'moket_fc_no_' + ph;
+                const url = `${FIREBASE_DB_URL}fruit_coupon/${ph}.json`;
+                const r = await fetch(`${url}?t=${Date.now()}`);
+                if (!r.ok) return;   // 규칙을 아직 안 올렸으면 여기서 멈춘다 (주문은 예전 그대로)
+                let v = await r.json();
+                if (!v && localStorage.getItem(noKey) !== '1') {
+                    // 주문이 하나도 없는 손님 — 내 칸을 만든다. 주문이 있으면 규칙이 막는다
+                    const w = await fetch(url, { method: 'PUT', body: JSON.stringify({ startAt: { '.sv': 'timestamp' } }) });
+                    if (w.ok) { try { v = await w.json(); } catch (e) { v = null; } if (!v || !Number(v.startAt)) v = { startAt: Date.now() }; }
+                    else if (w.status === 401 || w.status === 403) localStorage.setItem(noKey, '1');
+                } else if (v && !Number(v.startAt) && Number(v.grantedAt)) {
+                    // 가게가 나눠 준 쿠폰을 처음 본다 — 오늘부터 7일
+                    const w = await fetch(url, { method: 'PUT', body: JSON.stringify({ grantedAt: Number(v.grantedAt), startAt: { '.sv': 'timestamp' } }) });
+                    if (w.ok) { try { v = await w.json(); } catch (e) { v = null; } if (!v || !Number(v.startAt)) v = { grantedAt: Number(v && v.grantedAt), startAt: Date.now() }; }
+                }
+                gFc = (v && typeof v === 'object' && Number(v.startAt)) ? v : null;
+                gFcCheckRestore();
+                if (gHomeReady) {
+                    const _had = !!document.querySelector('#home-view .fc-card');
+                    try { gRenderHome(); } catch (e) { }
+                    const _c = document.querySelector('#home-view .fc-card');
+                    if (_c && !_had) { _c.style.setProperty('--wc-h', _c.offsetHeight + 'px'); _c.classList.add('wc-in'); }
+                }
+                gWhenHomeReady(() => setTimeout(gFcPopupMaybe, 900));
+            } catch (e) { console.warn('과일 쿠폰 확인 실패:', e); }
+        }
+        // 쓴 쿠폰 줄이 취소됐으면 쿠폰을 돌려받는다 (가게가 취소해도 다음에 주문내역을 받을 때 돌아온다)
+        async function gFcCheckRestore() {
+            try {
+                if (!gFc || !gFc.usedRef || !gFcPhone || !Array.isArray(fullHistoryData)) return;
+                const row = fullHistoryData.find(o => o && o.__fbKey === gFc.usedRef);
+                if (!row || !isOrderCancelled(row)) return;
+                await gFcRestoreNow();
+            } catch (e) { }
+        }
+        async function gFcRestoreNow() {
+            if (!gFc || !gFc.usedRef || !gFcPhone) return;
+            const r = await fetch(`${FIREBASE_DB_URL}fruit_coupon/${gFcPhone}.json`, { method: 'PUT', body: JSON.stringify(gFcBase()) });
+            if (r.ok) { gFc = gFcBase(); try { gRenderHome(); } catch (e) { } }
+        }
+        async function gFcMarkUsed(cleanPhone, orderKey) {
+            if (!gFc || !orderKey || cleanPhone !== gFcPhone) return;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}fruit_coupon/${gFcPhone}.json`, { method: 'PUT', body: JSON.stringify({ ...gFcBase(), usedAt: { '.sv': 'timestamp' }, usedRef: orderKey }) });
+                if (!r.ok) console.warn('과일 쿠폰 사용 기록 실패:', r.status);
+            } catch (e) { console.warn('과일 쿠폰 사용 기록 실패:', e); }
+            gFc = { ...gFcBase(), usedAt: Date.now(), usedRef: orderKey };
+            try { gRenderHome(); } catch (e) { }
+        }
+        // 장바구니의 과일·야채 금액 (사다드림 빼고)
+        function gFcFruitSum() {
+            let s = 0;
+            for (const k in cart) {
+                if (!(cart[k] > 0)) continue;
+                const p = gFindCartProduct(k);
+                if (!p || gIsSadaProduct(p)) continue;
+                const kd = gKindOf(p);
+                if (kd === 'fruit' || kd === 'veg') s += gCartLineTotal(p, k);
+            }
+            return s;
+        }
+        function gFcCartFits() {
+            if (!gFcActive() || gFcPhone !== gKeyPhone(localStorage.getItem('moket_user_phone') || '')) return false;
+            return gFcFruitSum() >= FC_MIN;
+        }
+        // 홈 노랑 카드 — 무료배송 쿠폰 카드와 같은 모양
+        function gFcCardHtml() {
+            if (!gFcActive() || gIsGuestView()) return '';
+            const left = Math.ceil((Number(gFc.startAt) + FC_MS - Date.now()) / 86400000);
+            const dd = left <= 1 ? 'D-DAY' : `D-${left - 1}`;
+            const im = ['https://i.ibb.co/23Hp5vbq/coupon-c1-96.jpg', 'https://i.ibb.co/Tqgw55HG/coupon-c2-96.jpg', 'https://i.ibb.co/67cMpt7p/coupon-c3-96.jpg'];
+            const top = `<span class="top"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>아직 사용하지 않은 쿠폰이 있습니다</span>`;
+            return `<button type="button" class="wc-card fc-card" onclick="gFcShow()">${top}<span class="im">${im.map(s => `<img src="${s}" alt="">`).join('')}</span>` +
+                `<span class="tx"><span class="t">과일 5천원 이상이면 <em>3,000원 할인!</em></span><span class="s" style="display:block;">과일·야채 5,000원 이상 · 픽업·배달 모두 자동 적용</span></span>` +
+                `<span class="dd">${dd}</span></button>`;
+        }
+        function gFcPopupMaybe() {
+            if (!gFcActive() || gIsGuestView()) return;
+            const pm = document.getElementById('profile-modal');
+            if (pm && pm.style.display === 'flex') return;
+            if (document.getElementById('wc-pop')) return;   // 무료배송 쿠폰 안내창이 떠 있으면 오늘은 그것만
+            const key = 'moket_fc_pop_' + gFcPhone, t = gTodayYmd();
+            try { if (localStorage.getItem(key) === t) return; localStorage.setItem(key, t); } catch (e) { }
+            gFcShow();
+        }
+        function gFcShow() {
+            if (!gFcActive()) return;
+            document.getElementById('wc-pop')?.remove();
+            const pts = [['직접', '매일 새벽, 사장님이 직접 시장에 다녀옵니다'], ['선별', '맛과 당도로 선별한 최고의 과일만 보내드립니다'], ['당일', '당일 매입 당일 배송, 가장 신선한 과일입니다']];
+            const back = document.createElement('div');
+            back.className = 'wc-back'; back.id = 'wc-pop';
+            back.innerHTML = `<div class="wc-pop"><div class="hero"><img src="${WC_HERO}" alt="" decoding="async">` +
+                `<button type="button" class="x" aria-label="닫기"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>` +
+                `<div class="in"><div class="ey">MOKET · FRUIT</div><div class="hi">모켓 과일, 한 번 맛보세요</div>` +
+                `<div class="cp"><div class="cl">과일 할인 쿠폰 1장</div><div class="m">과일 <b>5,000원</b> 이상 주문하면</div><div class="b"><em>3,000원</em> 할인</div></div>` +
+                `<hr><div class="q">모켓의 대표상품 과일, 뭐가 다를까요?</div>` +
+                `<dl>${pts.map(p => `<div><dt>${p[0]}</dt><dd>${p[1]}</dd></div>`).join('')}</dl>` +
+                `<button type="button" class="go">오늘 과일 보러 가기</button>` +
+                `<div class="fine">쿠폰은 일주일 동안 사용 가능하며,<br>과일·야채를 5,000원 이상 담으면 주문할 때 자동으로 1회 적용됩니다.<br>픽업·배달 모두 쓸 수 있고, 사다드림 상품은 금액에 넣지 않습니다.</div></div></div>`;
+            back.onclick = e => {
+                e.stopPropagation();
+                if (e.target === back || e.target.closest('.x')) gWcClose(back);
+                else if (e.target.closest('.go')) setTimeout(gWcGoFruit, 0);
+            };
+            document.body.appendChild(back);
+            document.body.style.overflow = 'hidden';
         }
 
         // [신규] 주문내역에서 배달비·배달비 차감은 상품 뒤에 오도록 정렬한다.
@@ -13245,7 +13395,7 @@
             // 다시 그려도 밀어 둔 자리는 그대로 — [수정 2026-10-08] 단, 맨 앞 상품이 바뀌면(새 상품이 올라오면) 처음으로 (사장님 요청)
             const firstOf = r => { const n = r.querySelector('.item-name'); return n ? n.textContent : ''; };
             box.querySelectorAll('[data-rail]').forEach(r => { keep[r.dataset.rail] = { left: r.scrollLeft, first: firstOf(r) }; });
-            const out = [gHomeTodayHtml(), gHomeNoticeHtml(), gWcCardHtml()];   // [신규 2026-10-28] 무료배송 쿠폰 카드 (대상 손님에게만)
+            const out = [gHomeTodayHtml(), gHomeNoticeHtml(), gWcCardHtml(), gFcCardHtml()];   // [신규 2026-11-05] 과일 할인 쿠폰 카드   // [신규 2026-10-28] 무료배송 쿠폰 카드 (대상 손님에게만)
             if (!isAdminMode && !isProductListEnabled) {
                 out.push(`<div class="hm-closed">현재는 주문이 불가능 합니다.<br>(주문 가능 시간 - 오전 10시 ~ 다음날 오전 6시)</div>`);
                 gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
@@ -15086,6 +15236,19 @@
                 }
             }
 
+            // [신규 2026-11-05] 과일 할인 쿠폰 — 과일·야채가 5,000원 이상이면 첫 과일 묶음에 3,000원을 빼는 줄 (픽업·배달 모두)
+            window.gFcUse = false;
+            if (gFcCartFits()) {
+                const _isFv = it => { const kd = gKindOf(it); return (kd === 'fruit' || kd === 'veg') && !gIsSadaProduct(it); };
+                const fk = Object.keys(grouped).find(k => grouped[k].some(_isFv));
+                if (fk !== undefined) {
+                    const base = grouped[fk].find(_isFv);
+                    grouped[fk].push({ name: FC_NAME, price: -FC_AMT, qty: 1, lineTotal: -FC_AMT, displayDate: fk, matchKey: (base && base.matchKey) || '', isSada: false });
+                    totalSum -= FC_AMT;
+                    window.gFcUse = true;
+                }
+            }
+
             const sortedDates = Object.keys(grouped).filter(d => d !== "배달비").sort((a, b) => {
                 // 상시판매 묶음은 날짜 묶음들 뒤에 둔다
                 if ((a === '상시판매') !== (b === '상시판매')) return a === '상시판매' ? 1 : -1;
@@ -15176,7 +15339,7 @@
 
                 // 배달비·배달비 차감은 상품 뒤에 오도록 맞춘다 (읽는 순서: 상품 → 배달비 → 차감)
                 const rows = grouped[date].slice().sort((a, b) => {
-                    const rank = (n) => (n === FEE_REFUND_NAME ? 2 : (n === "배달비" ? 1 : 0));
+                    const rank = (n) => (n === FEE_REFUND_NAME ? 2 : (n === "배달비" ? 1 : (n === FC_NAME ? 0.5 : 0)));   // [신규 2026-11-05] 과일 할인 쿠폰은 상품 뒤
                     return rank(a.name) - rank(b.name);
                 });
                 rows.forEach((p, idx) => {
@@ -15189,8 +15352,13 @@
                             <span class="cf-sub">${sub.toLocaleString()}원</span>
                         </div>`;
 
+                    // [신규 2026-11-05] 과일 할인 쿠폰 줄 안내
+                    if (gIsFcRow(p)) {
+                        groupHtml += `
+                        <div style="margin:0 0 8px; padding:7px 10px; background:#fff8d6; border:1px solid #f2dc7a; border-radius:8px; font-size:12px; font-weight:700; color:#6b5a00; line-height:1.55; word-break:keep-all; text-align:left;"><b>과일 할인 쿠폰</b>을 써서 <b>${FC_AMT.toLocaleString()}원</b>을 빼 드렸어요.</div>`;
+                    }
                     // [신규 2026-10-28] 무료배송 쿠폰 줄은 쿠폰 안내를 붙인다
-                    if (gIsWcRow(p)) {
+                    else if (gIsWcRow(p)) {
                         groupHtml += `
                         <div style="margin:0 0 8px; padding:7px 10px; background:#fff8d6; border:1px solid #f2dc7a; border-radius:8px; font-size:12px; font-weight:700; color:#6b5a00; line-height:1.55; word-break:keep-all; text-align:left;">가입 선물 <b>과일 무료배송 쿠폰</b>을 써서 배송비 <b>${Math.abs(sub).toLocaleString()}원</b>을 빼 드렸어요.</div>`;
                     }
@@ -15962,6 +16130,12 @@
                     }
                 }
 
+                // [신규 2026-11-05] 과일 할인 쿠폰 — 확인 창에서 보여 준 그대로, 첫 과일·야채와 같은 날짜로 3,000원 빼는 줄
+                if (window.gFcUse && gFcCartFits()) {
+                    const base = allItems.find(it => !it.isExtra && (it.kind === 'fruit' || it.kind === 'veg') && !gIsSadaOrder(it));
+                    if (base) allItems.push({ name: FC_NAME, qty: 1, price: -FC_AMT, subtotal: -FC_AMT, date: base.date, matchKey: base.matchKey, isCategorized: base.isCategorized, isFV: false, isOnSite: base.isOnSite, isPushedByCutoff: false, isSada: false, isFc: true, optionText: '' });
+                }
+
                 /* [신규 2026-10-02] 포인트를 쓰면 '포인트 사용' 마이너스 줄을 하나 붙인다.
                    날짜·받는 방법은 함께 가는 상품(사다드림 뺀 첫 상품, 사다드림만 있으면 사다드림)과 같게 — 주문내역에서 같은 날 묶음에 들어간다
                    [수정 2026-10-06] 사다드림·배달비까지 포인트로 낼 수 있다 — 한도는 이번 주문 합계 (사장님 요청) */
@@ -16494,7 +16668,7 @@
                 {
                     const failed = [];
                     for (const it of saveItems) {
-                        if (gIsFeeRow(it.name) || it.isPoint) continue;   // 배달비·포인트는 재고와 무관
+                        if (gIsFeeRow(it.name) || it.isPoint || it.isFc) continue;   // 배달비·포인트·과일 할인 쿠폰은 재고와 무관
                         if (it.isExtra) continue;                      // 지난 주문은 그때 이미 깎았다
 
                         /* [수정] 이름으로만 찾으면 같은 이름이 당일용·예약용으로 둘 이상 등록된 경우
@@ -16655,6 +16829,7 @@
                    재고가 안 깎인 주문이 생겼다. 묶어 보내면 다 들어가거나 하나도 안 들어간다. */
                 const orderUpdates = {};
                 let _wcKey = '';   // [신규 2026-10-28] 무료배송 쿠폰 차감 줄의 주문 키
+                let _fcKey = '';   // [신규 2026-11-05] 과일 할인 쿠폰 줄의 주문 키
                 saveItems.filter(it => !it.isPoint).forEach(it => {
                     const formattedTimestamp = jsFormatDate(new Date(tempTimestamp));
                     const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(it.name) + (it.__keySuffix || '');
@@ -16694,6 +16869,7 @@
                     };
                     // [신규 2026-10-28] 무료배송 쿠폰 차감 줄 표시 — 다시 배달비를 맞출 때 이 줄은 따로 다룬다
                     if (it.feeWhy) { itemPayload.feeWhy = it.feeWhy; if (it.feeWhy === WC_WHY) _wcKey = orderKey; }
+                    if (it.isFc) _fcKey = orderKey;   // [신규 2026-11-05] 과일 할인 쿠폰
                     if (it.isExtra) {
                         if (it.paid !== undefined) itemPayload.paid = it.paid;
                         if (it.isStocked !== undefined) itemPayload.isStocked = it.isStocked;
@@ -16735,6 +16911,7 @@
                     await saveOrderLines();
                     _orderSaved = true;
                     if (_wcKey) { try { await gWcMarkUsed(cleanPhone, _wcKey); } catch (e2) { } }   // [신규 2026-10-28] 쿠폰을 썼다고 적는다
+                    if (_fcKey) { try { await gFcMarkUsed(cleanPhone, _fcKey); } catch (e2) { } }   // [신규 2026-11-05] 과일 할인 쿠폰을 썼다고 적는다
                     // [신규 2026-10-28] 합쳐서 무료배달이 되면 앞 주문의 배달비·쿠폰 줄을 취소하고 쿠폰을 돌려준다
                     if ((window.pendingWcCancelRows || []).length && shippingMethod === '배달주문') {
                         const _wr = window.pendingWcCancelRows; window.pendingWcCancelRows = [];
@@ -16904,7 +17081,7 @@
                 gFirebaseHasUser()
                     .then(has => { if (!has) return gFirebaseKakaoSignIn(localStorage.getItem('kakao_original_phone') || ''); })
                     .catch(() => { })
-                    .then(() => gWcLoad());   // [신규 2026-10-28] 무료배송 쿠폰 확인 — 홈을 한 번에 띄우려고 바로 묻는다 (안내창만 홈이 뜬 뒤 조금 늦게)
+                    .then(() => { gFcLoad(); return gWcLoad(); });   // [신규 2026-11-05] 과일 할인 쿠폰도 · [신규 2026-10-28] 무료배송 쿠폰 확인 — 홈을 한 번에 띄우려고 바로 묻는다 (안내창만 홈이 뜬 뒤 조금 늦게)
                 gSyncProfileFromServer();
             } else gHomeMark('wc');   // 로그인 안 한 손님 — 쿠폰은 기다릴 것이 없다
 
