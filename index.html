@@ -2869,7 +2869,7 @@
         /* ===== [신규 2026-11-06] 주문 창 통일 (사장님 요청 — "창들 통일성이 부족해 고급지게")
            · 머리: 모든 창이 제목 왼쪽 + 얇은 ✕ + 밑줄 (v3-sheet-top)
            · 글: 왼쪽 정렬. 묻는 말(주문할까요?)만 굵게
-           · 마크: 연한 바탕 + 진한 글씨 작은 네모 하나 (mk). 파랑은 쓰지 않는다 — 초록·주황·빨강·회색만
+           · 마크: 연한 바탕 + 진한 글씨 작은 네모 하나 (mk). 파랑은 픽업에만 (주문내역과 같게) — 그 밖엔 초록·주황·빨강·회색
            · 날짜 머리: '배송일' 작은 회색 + 날짜 검정 굵게 (dh) — 주문 확인·합배송 불가·남은 상품이 같은 모양 */
         .mk { display: inline-block; vertical-align: 1px; font-size: 11px; font-weight: 700; line-height: 1.5; padding: 1px 6px; border-radius: 4px; white-space: nowrap; letter-spacing: -.01em; }
         .mk + .mk { margin-left: 4px; }
@@ -2880,6 +2880,7 @@
         .mk-stop  { background: #fde7e7; color: #b42318; }
         .mk-sada  { background: #fdeedf; color: #b4540a; }
         .mk-fresh { background: #e0f2e9; color: #08704a; }
+        .mk-pick  { background: #eff6ff; color: #1d4ed8; }   /* 픽업 — 주문내역 '픽업' 딱지와 같은 파랑 */
         .nt-c { font-size: 11px !important; font-weight: 700 !important; padding: 1px 6px !important; border-radius: 4px !important; line-height: 1.5 !important; margin-top: 3px !important; }
         .nt-info .nt-c  { background: #e4e9dc !important; color: #4f5b46 !important; }
         .nt-good .nt-c  { background: #d9efcd !important; color: #2f6e12 !important; }
@@ -2893,7 +2894,7 @@
         .cf-merge-note span { background: #e6f3dd !important; color: #2f6e12 !important; border-radius: 4px !important; padding: 1px 6px !important; }
         .cf-chip { border-radius: 4px !important; padding: 2px 7px !important; }
         .cf-chip-d { background: #e6f3dd !important; color: #2f6e12 !important; }
-        .cf-chip-p { background: #eef1e9 !important; color: #4f5b46 !important; }
+        .cf-chip-p { background: #eff6ff !important; color: #1d4ed8 !important; }   /* [수정 2026-11-06] 픽업 표시는 주문내역과 같은 파랑 (사장님 요청 — 픽업 마크 통일) */
         .cf-name .mk-lead { margin-bottom: 2px; }
         /* 마크가 이름 위에 붙은 줄은 개수·금액을 이름 줄(아래)에 맞춘다 */
         .cf-row:has(.mk-lead), .sm-it:has(.mk-lead), .pg-row:has(.mk-lead) { align-items: flex-end; }
@@ -12952,7 +12953,7 @@
            '배송일' 작은 회색 + 날짜 검정 굵게 + (오늘이면) 초록 '당일배송'·'당일픽업' 마크 (사장님 요청 — 상품 카드 '당일배송'과 같은 말) */
         function gDayHead(word, label, isToday, extra) {
             const d = String(label || '').replace(/(\d+)월\s*(\d+)일\s*\(/, '$1월 $2일 (');
-            return `<span class="dh"><span class="dh-w">${word}</span><span class="dh-d">${d}</span>${isToday ? `<span class="mk mk-good">${word === '픽업일' ? '당일픽업' : '당일배송'}</span>` : ''}${extra || ''}</span>`;
+            return `<span class="dh"><span class="dh-w">${word}</span><span class="dh-d">${d}</span>${isToday ? (word === '픽업일' ? '<span class="mk mk-pick">당일픽업</span>' : '<span class="mk mk-good">당일배송</span>') : ''}${extra || ''}</span>`;
         }
         function gCartDayOf(p) {
             if (!p) return '';
