@@ -10298,6 +10298,10 @@
                  q_auto   눈에 안 띄는 선에서 화질을 낮춘다
                같은 사진이 200KB → 20KB 안팎이 된다. */
             if (str.startsWith("http://") || str.startsWith("https://")) {
+                /* [신규 2026-11-07] imgbb 사진은 깃허브 사본(moketorder/photos, 15분마다 복사)에서 먼저 받는다 (사장님 지적 —
+                   imgbb 가 'service unavailable' 그림을 내줘 섬네일이 안 보였다). 사본이 없으면(404) onerror 의 retry 로 imgbb 원본 */
+                const ib = str.match(/^https?:\/\/i\.ibb\.co\/([A-Za-z0-9]+\/[A-Za-z0-9._-]+)$/);
+                if (ib) return retry ? str : 'https://moketorder.github.io/photos/' + ib[1];
                 const m = str.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.*)$/);
                 if (!m) return str;                       // 다른 곳에 올린 사진은 손대지 않는다
                 const rest = m[2];
@@ -15187,7 +15191,7 @@
             const fsSlider = document.getElementById('fullscreen-slider-area');
             const fsCounter = document.getElementById('fs-counter');
 
-            fsSlider.innerHTML = p.images.map(id => `<div class="fullscreen-slide"><img src="${getImgUrl(id)}" referrerpolicy="no-referrer"></div>`).join('');
+            fsSlider.innerHTML = p.images.map(id => `<div class="fullscreen-slide"><img src="${getImgUrl(id)}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src=getImgUrl('${id}', 1000, true);"></div>`).join('');
 
             if (p.images.length > 1) {
                 fsCounter.innerText = `${index + 1} / ${p.images.length}`;
