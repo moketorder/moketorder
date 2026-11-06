@@ -2886,7 +2886,7 @@
         .nt-money .nt-c { background: #fde1c8 !important; color: #b4480f !important; }
         .nt-stop .nt-c  { background: #fbd5d5 !important; color: #b42318 !important; }
         .dh { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
-        .dh-w { font-size: 12px; font-weight: 600; color: #8b9682; }
+        .dh-w { font-size: 13px; font-weight: 700; color: #8b9682; }   /* 안내사항 이름표(입금·배달·취소·일정)와 같은 크기·굵기 (사장님 요청 — 통일감) */
         .dh-d { font-size: 14px; font-weight: 700; color: #16200f; font-variant-numeric: tabular-nums; }
         .dh .mk { align-self: center; margin-left: 0; }
         .cf-date { color: #16200f !important; margin-bottom: 4px !important; }
@@ -2920,6 +2920,8 @@
         .sm-it .q { flex: 0 0 auto; font-size: 13px; font-weight: 500; color: #8b9682; }
         .sm-it-d { margin-top: 2px; }
         .sm-it-d .dh-d { font-size: 12.5px; font-weight: 600; color: #4f5b46; }
+        .sm-it-d .dh-w { font-size: 12px; }
+        .pg-pay-l { font-size: 13px !important; }   /* 이름표 크기 통일 */
         .sm-day { border: 1px solid #e4e8dd; border-radius: 10px; padding: 10px 12px 4px; background: #fff; }
         .sm-day + .sm-day { margin-top: 8px; }
         .sm-day.is-off { background: #fcfcfa; }
@@ -2943,7 +2945,7 @@
         .pg-pay-r + .pg-pay-r { border-top-color: #e4e8dd !important; }
         .pg-items { border-top: none !important; padding-top: 4px !important; }   /* '주문 상품' 제목 글씨로 칸이 나뉜다 — 위 선은 뺐다 */
         /* [수정 2026-10-28] 안내사항 아래에 양 끝이 비어 있는 실선 — 창 끝까지 닿지 않고 글자 폭만큼, 요청사항과 나눈다 (사장님 요청) */
-        #confirm-notice-area { border-top: 1px solid #e2e8da !important; margin: 0 -16px 12px !important; padding: 12px 16px 0 !important; }
+        #confirm-notice-area { border-top: 1px solid #eef1e9 !important; margin: 0 -16px 12px !important; padding: 12px 16px 0 !important; }
         #confirm-notice-area::after { content: ''; display: block; height: 1px; background: #eef1e9; margin-top: 12px; }   /* 받는 사람 아래·합계 위 선과 같은 색 */
         .cf-notes { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; font-weight: 500; color: #4f5b46; line-height: 1.5; word-break: keep-all; }
         .cf-notes > div { display: flex; gap: 10px; }
@@ -12947,10 +12949,10 @@
             return '';
         }
         /* [신규 2026-11-06] 배송일·픽업일 머리 — 주문 확인·합배송 불가·남은 상품 창이 같은 모양을 쓴다
-           '배송일' 작은 회색 + 날짜 검정 굵게 + (오늘이면) 초록 '오늘' 마크 */
+           '배송일' 작은 회색 + 날짜 검정 굵게 + (오늘이면) 초록 '당일배송'·'당일픽업' 마크 (사장님 요청 — 상품 카드 '당일배송'과 같은 말) */
         function gDayHead(word, label, isToday, extra) {
             const d = String(label || '').replace(/(\d+)월\s*(\d+)일\s*\(/, '$1월 $2일 (');
-            return `<span class="dh"><span class="dh-w">${word}</span><span class="dh-d">${d}</span>${isToday ? '<span class="mk mk-good">오늘</span>' : ''}${extra || ''}</span>`;
+            return `<span class="dh"><span class="dh-w">${word}</span><span class="dh-d">${d}</span>${isToday ? `<span class="mk mk-good">${word === '픽업일' ? '당일픽업' : '당일배송'}</span>` : ''}${extra || ''}</span>`;
         }
         function gCartDayOf(p) {
             if (!p) return '';
