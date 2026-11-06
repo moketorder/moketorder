@@ -10302,6 +10302,9 @@
                    imgbb 가 'service unavailable' 그림을 내줘 섬네일이 안 보였다). 사본이 없으면(404) onerror 의 retry 로 imgbb 원본 */
                 const ib = str.match(/^https?:\/\/i\.ibb\.co\/([A-Za-z0-9]+\/[A-Za-z0-9._-]+)$/);
                 if (ib) return retry ? str : 'https://moketorder.github.io/photos/' + ib[1];
+                // [신규 2026-11-07] 깃허브에 바로 올린 새 사진 — 올린 지 1분 안쪽이라 아직 안 열렸으면 raw 주소로 받는다
+                const gh = str.match(/^https:\/\/moketorder\.github\.io\/photos\/(.+)$/);
+                if (gh) return retry ? 'https://raw.githubusercontent.com/moketorder/photos/main/' + gh[1] : str;
                 const m = str.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.*)$/);
                 if (!m) return str;                       // 다른 곳에 올린 사진은 손대지 않는다
                 const rest = m[2];
