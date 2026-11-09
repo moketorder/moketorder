@@ -4225,7 +4225,8 @@
                 const _hasVeg = _gbList.some(p => gKindOf(p) === 'veg');
                 const _tabs = [['gb-all', '전체']];
                 // [수정 2026-09-30] 과일은 주력 상품이라 상품이 없어도 탭을 늘 세운다 (없을 때는 목록에 안내가 나온다)
-                _tabs.push(['gb-fruit', _hasVeg ? '과일·야채' : '과일']);
+                _tabs.push(['gb-fruit', '과일']);
+                if (_has.has('fresh')) _tabs.push(['gb-fresh', '야채·신선']);   // [신규 2026-11-09] 야채 + 신선식품 (사장님 요청)
                 if (_has.has('sada')) _tabs.push(['gb-sada', '사다드림']);
                 if (_has.has('group')) _tabs.push(['gb-group', '일반']);
                 if (_has.has('chuseok')) _tabs.push([CHUSEOK_TAB, '추석선물']);
@@ -4351,7 +4352,7 @@
                 kind = 'fruit';
                 // [신규 2026-09-30] 공동구매 › 과일 탭 안내 — 예전 당일판매(과일) 안내를 바탕으로 쓴다
                 // [수정 2026-10-29] 탭 이름이 '과일·야채'면 안내 제목도 '과일·야채' (사장님 요청) — 탭과 같은 잣대(야채 상품이 있는지)
-                const _fvVeg = (typeof productsData !== 'undefined' ? productsData : []).filter(gGbVisible).some(p => gKindOf(p) === 'veg');
+                const _fvVeg = false;   // [수정 2026-11-09] 야채는 '야채·신선' 탭으로 옮겨 과일 탭 안내는 '과일'만
                 const _fvWord = _fvVeg ? '과일·야채' : '과일';
                 html = gTypeNoticeCard('', _fvWord, '#3d8f19', '#eef7e7', [
                     `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
@@ -12980,11 +12981,13 @@
             return (gIsLegacyTodayProduct(p) || gIsSaleToday(p)) ? gTodayYmd() : '';
         }
         // 종류 탭: chuseok · sada · fruit(과일·야채) · group(공구·신선식품·특가)
+        // [수정 2026-11-09] 과일·야채 탭에서 야채를 떼어 '야채·신선'(fresh) 탭으로 — 야채 + 신선식품 (사장님 요청)
         function gGbTabKind(p) {
             if (gIsChuseokProduct(p)) return 'chuseok';
             const k = gKindOf(p);
             if (k === 'sada') return 'sada';
-            if (k === 'fruit' || k === 'veg') return 'fruit';
+            if (k === 'fruit') return 'fruit';
+            if (k === 'veg' || k === 'fresh' || gIsFreshProduct(p)) return 'fresh';
             return 'group';
         }
         // 공동구매 목록에 보이는 상품 (노출·비공개·날짜 지남까지 본다)
@@ -13046,7 +13049,7 @@
         // 공동구매 화면 — 종류 탭은 initMainTabs 가 그리고, 여기서는 날짜 칩과 목록을 그린다
         function gRenderGroupBuy(area, isUserAction) {
             let kindKey = (currentMainTab === CHUSEOK_TAB) ? 'chuseok' : String(currentMainTab || '').replace(/^gb-/, '');
-            if (!['all', 'group', 'fruit', 'sada', 'chuseok'].includes(kindKey)) kindKey = 'all';
+            if (!['all', 'group', 'fruit', 'fresh', 'sada', 'chuseok'].includes(kindKey)) kindKey = 'all';
             const list = (productsData || []).filter(p => gGbVisible(p) && (kindKey === 'all' || gGbTabKind(p) === kindKey));
             const t = gTodayYmd();
             const dates = [...new Set(list.map(gGbDateOf))].filter(Boolean).sort();
