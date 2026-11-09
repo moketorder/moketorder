@@ -4226,7 +4226,7 @@
                 const _tabs = [['gb-all', '전체']];
                 // [수정 2026-09-30] 과일은 주력 상품이라 상품이 없어도 탭을 늘 세운다 (없을 때는 목록에 안내가 나온다)
                 _tabs.push(['gb-fruit', '과일']);
-                if (_has.has('fresh')) _tabs.push(['gb-fresh', '야채·신선']);   // [신규 2026-11-09] 야채 + 신선식품 (사장님 요청)
+                if (_has.has('fresh')) _tabs.push(['gb-fresh', '야채·신선']);   // [신규 2026-11-09] 야채 (사장님 요청)
                 if (_has.has('sada')) _tabs.push(['gb-sada', '사다드림']);
                 if (_has.has('group')) _tabs.push(['gb-group', '일반']);
                 if (_has.has('chuseok')) _tabs.push([CHUSEOK_TAB, '추석선물']);
@@ -12981,13 +12981,13 @@
             return (gIsLegacyTodayProduct(p) || gIsSaleToday(p)) ? gTodayYmd() : '';
         }
         // 종류 탭: chuseok · sada · fruit(과일·야채) · group(공구·신선식품·특가)
-        // [수정 2026-11-09] 과일·야채 탭에서 야채를 떼어 '야채·신선'(fresh) 탭으로 — 야채 + 신선식품 (사장님 요청)
+        // [수정 2026-11-09] 과일·야채 탭에서 야채를 떼어 '야채·신선'(fresh) 탭으로 (사장님 요청)
         function gGbTabKind(p) {
             if (gIsChuseokProduct(p)) return 'chuseok';
             const k = gKindOf(p);
             if (k === 'sada') return 'sada';
             if (k === 'fruit') return 'fruit';
-            if (k === 'veg' || k === 'fresh' || gIsFreshProduct(p)) return 'fresh';
+            if (k === 'veg') return 'fresh';   // 신선식품은 넣지 않는다 — 어느 상품을 넣을지는 사장님이 정한다 (2026-11-09)
             return 'group';
         }
         // 공동구매 목록에 보이는 상품 (노출·비공개·날짜 지남까지 본다)
