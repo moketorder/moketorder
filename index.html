@@ -11927,6 +11927,13 @@
                 const _ra = _rank(a, stockA), _rb = _rank(b, stockB);
                 if (_ra !== _rb) return _ra - _rb;
 
+                // [신규 2026-11-09] 상시판매 맨 위 고정 — 주문관리 📌 (전체 탭은 pinAll, 분류 탭은 pinCat). 나중에 올린 것이 더 위
+                if (String(targetKey).startsWith('onsite-')) {
+                    const _pf = targetKey === 'onsite-all' ? 'pinAll' : 'pinCat';
+                    const _pa = Number(a[_pf]) || 0, _pb = Number(b[_pf]) || 0;
+                    if (_pa !== _pb) return _pb - _pa;
+                }
+
                 // [신규] 오늘의추천·사다드림으로 표시해 둔 상품은 품절이 아닌 한 목록 맨 위로 올린다.
                 //  예전에는 이름 앞 [오늘의추천] 말머리 덕분에 아래 머릿말 규칙(getPriority)에 걸려 올라갔는데,
                 //  이제 말머리를 이름에 넣지 않으므로 값(isRecommend·isSada)을 보고 직접 올린다.
