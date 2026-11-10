@@ -12814,11 +12814,12 @@
             const pm = document.getElementById('profile-modal');
             if (pm && pm.style.display === 'flex') return;
             if (document.getElementById('wc-pop')) return;   // 무료배송 쿠폰 안내창이 떠 있으면 오늘은 그것만
+            /* [수정 2026-11-10] 창 아래 '오늘 하루 안 보기'를 누른 날만 안 띄운다 (사장님 요청). 그 밖에는 들어올 때마다 한 번 (같은 방문 안에서는 한 번만) */
             const key = 'moket_fc_pop_' + gFcPhone, t = gTodayYmd();
-            try { if (localStorage.getItem(key) === t) return; localStorage.setItem(key, t); } catch (e) { }
-            gFcShow();
+            try { if (localStorage.getItem(key) === t) return; if (sessionStorage.getItem(key) === '1') return; sessionStorage.setItem(key, '1'); } catch (e) { }
+            gFcShow(true);
         }
-        function gFcShow() {
+        function gFcShow(auto) {   // auto — 들어올 때 저절로 뜬 창이면 아래에 '오늘 하루 안 보기'
             if (!gFcActive()) return;
             // [수정 2026-11-05] 새로 온 손님(스스로 받은 쿠폰)은 환영 인사 그대로, 예전에 가입한 손님(가게가 나눠 준 쿠폰 grantedAt)은 '과일을 안 드셔 본 분께 드리는 쿠폰'이라고 알린다 (사장님 요청)
             const _fcHead = Number(gFc.grantedAt)
@@ -12835,10 +12836,16 @@
                 `<hr><div class="q">모켓의 대표상품 과일, 뭐가 다를까요?</div>` +
                 `<dl>${pts.map(p => `<div><dt>${p[0]}</dt><dd>${p[1]}</dd></div>`).join('')}</dl>` +
                 `<button type="button" class="go">오늘 과일 보러 가기</button>` +
-                `<div class="fine" style="text-align:left;">${["과일 5,000원 이상 <b>배달</b> 주문 시 자동으로 1회 적용됩니다.", "무료배달(15,000원)은 쿠폰 할인 후 금액으로 계산됩니다.", "픽업 주문에는 사용할 수 없습니다."].map(t => `<div style="padding-left:10px; text-indent:-10px;">· ${t}</div>`).join("")}</div></div></div>`;
+                `<div class="fine" style="text-align:left;">${["과일 5,000원 이상 <b>배달</b> 주문 시 자동으로 1회 적용됩니다.", "무료배달(15,000원)은 쿠폰 할인 후 금액으로 계산됩니다.", "픽업 주문에는 사용할 수 없습니다."].map(t => `<div style="padding-left:10px; text-indent:-10px;">· ${t}</div>`).join("")}</div></div>` +
+                /* [신규 2026-11-10] 창 맨 아래 — 오늘 하루 안 보기 · 닫기 (사장님 요청) */
+                `<div style="display:flex; border-top:1px solid rgba(243,241,232,.14);">` +
+                `<button type="button" class="fc-today" style="flex:1 1 0; padding:14px 0; border:none; background:none; color:rgba(243,241,232,.75); font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer;">오늘 하루 안 보기</button>` +
+                `<span style="width:1px; background:rgba(243,241,232,.14);"></span>` +
+                `<button type="button" class="fc-close" style="flex:1 1 0; padding:14px 0; border:none; background:none; color:#f3f1e8; font-size:13.5px; font-weight:800; font-family:inherit; cursor:pointer;">닫기</button></div></div>`;
             back.onclick = e => {
                 e.stopPropagation();
-                if (e.target === back || e.target.closest('.x')) gWcClose(back);
+                if (e.target.closest('.fc-today')) { try { localStorage.setItem('moket_fc_pop_' + gFcPhone, gTodayYmd()); } catch (er) { } gWcClose(back); return; }
+                if (e.target === back || e.target.closest('.x') || e.target.closest('.fc-close')) gWcClose(back);
                 else if (e.target.closest('.go')) setTimeout(gWcGoFruit, 0);
             };
             document.body.appendChild(back);
