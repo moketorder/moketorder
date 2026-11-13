@@ -3109,6 +3109,7 @@
         /* [수정 2026-10-12] 남은 시간에 따라 초록 → 주황(12시간 안) → 빨강(3시간 안) (사장님 요청 — 예전엔 1시간 안만 빨강) */
         .item-deadline.is-soon { color: #3d8f19; }   /* [수정 2026-10-12] 주황 단계는 뺐다 — 금액 주황과 겹쳐서 (B안). 3시간 안만 빨강 */
         .item-deadline.is-urgent { color: #dc2626; }
+        .item-deadline.is-next { color: #2563eb; font-weight: 800; }   /* [신규 2026-11-13] 야채 — 마감 뒤 다음날 배송 */
         .item-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 auto; }
         .item-price-row .item-price-val { white-space: nowrap; flex: 0 0 auto; }   /* '13,800원~'의 ~가 떨어지지 않게 */
         /* [ver3] 머리 줄 + 판매유형 탭만 늘 붙어 있고, 분류·날짜·검색은 함께 올라간다 */
@@ -5988,6 +5989,8 @@
             return { today: false, urgent: false, soon: false, html: `${d.getMonth() + 1}/${d.getDate()}(${W}) ${clock} 마감 · <b>${dayDiff}일 남음</b>` };
         }
         function gDeadlineHtml(p, closed) {
+            // [신규 2026-11-13] 야채는 마감 시각이 지나면(자정 전까지·쉬는 날) '다음날 배송' (사장님 요청 — 마감 대신 계속 주문을 받는다)
+            if (!closed && gIsVegAlways(p) && gVegNextDay()) return `<div class="item-deadline is-next">🚚 다음날 배송</div>`;
             const t = gExpireAt(p) || gTodayGbCloseAt(p);   // [신규 2026-09-30] 오늘 상품은 당일 마감시각까지 카운트다운
             if (!t || closed) return '';
             const x = gDeadlineText(t);
@@ -10953,6 +10956,7 @@
 
                 const s = String(p.matchKey || "").trim();
                 const isFruitVeg = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
+                if (isFruitVeg && gIsVegAlways(p)) return true;   // [신규 2026-11-13] 야채는 늘 보인다 (상시판매처럼 — 마감 뒤엔 다음 영업일 배송)
 
                 // [개선] 문자열 어디든 날짜 패턴(M/D 또는 YMD)이 있으면 추출
                 const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
@@ -11545,6 +11549,7 @@
 
                 const s = String(p.matchKey || "").trim();
                 const isFruitVeg = /과일|야채|채소|기타/.test(s) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
+                if (isFruitVeg && gIsVegAlways(p)) return true;   // [신규 2026-11-13] 야채는 늘 보인다 (상시판매처럼 — 마감 뒤엔 다음 영업일 배송)
 
                 // [개선] 문자열 어디든 날짜 패턴(M/D 또는 YMD)이 있으면 추출
                 const dm = s.replace(/[\.\/]/g, '-').match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|(\d{1,2})-(\d{1,2})/);
@@ -12952,6 +12957,7 @@
         function gIsGbProduct(p) {
             if (!p || p.name === '배달비') return false;
             if (gIsSaleToday(p)) return true;
+            if (gIsVegAlways(p)) return true;   // [신규 2026-11-13] 날짜 없는 야채(종류 veg)도 공동구매 야채 칸에
             const dt = String(gDisplayTabOf(p) || '');
             if (dt.startsWith('onsite-')) return false;
             const mk = String(p.matchKey || '').trim();
@@ -12987,10 +12993,27 @@
             for (const k in cart) { if (!(cart[k] > 0)) continue; const d = gCartDayOf(gFindCartProduct(k)); if (d) set.add(d); }
             return [...set].sort();
         }
+        /* [신규 2026-11-13] 야채는 상시판매처럼 늘 주문을 받는다 (사장님 요청).
+           날짜 없는 야채 상품 — 하루 마감·자정 숨김을 하지 않고, 마감 시각이 지나면(또는 쉬는 날) 다음 영업일 배송.
+           주문 날짜는 원래도 마감 뒤엔 다음 영업일로 들어간다 (주문 저장 isTodayOffOrAfterCutoff). 카드엔 그동안 '다음날 배송' 배지 */
+        function gIsVegAlways(p) {
+            if (!p || p.name === '배달비') return false;
+            if (gYmdFrom(p.matchKey) || gYmdFrom(p.date)) return false;
+            if (String(gDisplayTabOf(p) || '').startsWith('onsite-') || gIsSadaProduct(p)) return false;
+            return gKindOf(p) === 'veg';
+        }
+        function gVegNextDay() { const t = gTodayYmd(); return gTodayAfterClose(new Date()) || gIsOffDay(t); }   // 지금 주문하면 다음 영업일로 가나
+        function gVegShipYmd() {
+            if (!gVegNextDay()) return gTodayYmd();
+            const d = new Date(); d.setHours(12, 0, 0, 0);
+            for (let i = 0; i < 14; i++) { d.setDate(d.getDate() + 1); const y = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; if (!gIsOffDay(y)) return y; }
+            return gTodayYmd();
+        }
         function gGbDateOf(p) {
             if (!p) return '';
             const d = gYmdFrom(p.matchKey) || gYmdFrom(p.date);
             if (d) return d;
+            if (gIsVegAlways(p)) return gVegShipYmd();   // [신규 2026-11-13]
             return (gIsLegacyTodayProduct(p) || gIsSaleToday(p)) ? gTodayYmd() : '';
         }
         // 종류 탭: chuseok · sada · fruit(과일·야채) · group(공구·신선식품·특가)
@@ -13016,7 +13039,7 @@
             /* [신규 2026-09-30] 날짜 없는 예전 과일은 어제까지 켜 둔 것이면 자정부터 숨긴다.
                예전에는 날이 바뀐 뒤 주문관리를 처음 열 때에야 숨겨져, 그때까지 손님 화면에 '마감'으로 떠 있었다.
                오늘 노출을 켜거나 고친 것(updatedAt 이 오늘)은 그대로 보인다 — 주문관리 자동 숨김과 같은 잣대. */
-            if (!isAdminMode && gIsLegacyTodayProduct(p)) {
+            if (!isAdminMode && gIsLegacyTodayProduct(p) && !gIsVegAlways(p)) {   // [수정 2026-11-13] 야채는 자정에 숨기지 않는다
                 const n = new Date();
                 if ((Number(p.updatedAt) || 0) < new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()) return false;
             }
@@ -13031,6 +13054,7 @@
         // 오늘 받는 공동구매 상품인데 지금 주문할 수 없는지 (당일 마감시각 지남·아직 안 열림·휴무일)
         function gIsTodayGbClosed(p) {
             if (isAdminMode || !gIsGbProduct(p)) return false;
+            if (gIsVegAlways(p)) return false;   // [신규 2026-11-13] 야채는 늘 주문을 받는다 (마감 뒤엔 다음 영업일 배송)
             const t = gTodayYmd();
             /* [신규 2026-09-30] 날짜 없는 예전 과일은 '오늘' 노출을 켜거나 고친 것만 오늘 상품이다.
                어제 켜 둔 채 남은 것은 주문관리가 숨기기 전까지 '마감'으로 보여, 어제 과일이 다시 팔리지 않게 한다. */
