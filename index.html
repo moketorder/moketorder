@@ -10691,7 +10691,7 @@
 
                         let currentStock = baseStock;
                         const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
-                        const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited"));
+                        const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited")) || gVegUnlimitedFor(pubMatch || p);   // [신규 2026-11-13] 야채 밤 무제한
                         if (isUnlimited) {
                             currentStock = "";
                         } else if (adj !== undefined) {
@@ -10732,7 +10732,7 @@
 
                     let currentStock = baseStock;
                     const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
-                    const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited"));
+                    const isUnlimited = isSheetStockUnlimited || adj === "unlimited" || (adj !== undefined && String(adj).startsWith("unlimited")) || gVegUnlimitedFor(pub);   // [신규 2026-11-13] 야채 밤 무제한
                     if (isUnlimited) {
                         currentStock = "";
                     } else if (adj !== undefined) {
@@ -13002,6 +13002,10 @@
             if (String(gDisplayTabOf(p) || '').startsWith('onsite-') || gIsSadaProduct(p)) return false;
             return gKindOf(p) === 'veg';
         }
+        // [신규 2026-11-13] 야채는 마감 시각부터 다음날 오전 6시까지 수량 제한 없이 받는다 (사장님 요청)
+        function gVegUnlimitedFor(p) {
+            try { if (!gIsVegAlways(p)) return false; const n = new Date(); return gTodayAfterClose(n) || n.getHours() < 6; } catch (e) { return false; }
+        }
         function gVegNextDay() { const t = gTodayYmd(); return gTodayAfterClose(new Date()) || gIsOffDay(t); }   // 지금 주문하면 다음 영업일로 가나
         function gVegShipYmd() {
             if (!gVegNextDay()) return gTodayYmd();
@@ -13822,6 +13826,7 @@
 
         function gIsUnlimitedStock(pData) {
             if (!pData) return false;   // 상품을 못 찾으면 무제한으로 보지 않는다 (안전하게 재고를 센다)
+            if (gVegUnlimitedFor(pData)) return true;   // [신규 2026-11-13] 야채 — 마감 뒤 ~ 다음날 6시는 수량 제한 없음
             const v = pData.originalStock;
             return (v === "" || v === null || v === undefined || String(v).trim() === "무제한");
         }
