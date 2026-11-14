@@ -6006,7 +6006,7 @@
         }
         function gDeadlineHtml(p, closed) {
             // [신규 2026-11-13] 야채는 마감 시각이 지나면(자정 전까지·쉬는 날) '다음날 배송' (사장님 요청 — 마감 대신 계속 주문을 받는다)
-            if (!closed && gIsVegAlways(p) && gVegNextDay()) return `<div class="item-deadline is-next">🚚 다음 영업일 픽업/배송</div>`;
+            if (!closed && gIsVegAlways(p) && gVegNextDay()) return '';   // [수정 2026-11-14] 문구는 뺀다 (사장님 요청 — 야채가 신선식품에서 빠져 다른 날짜와 같이 주문한다). 주문 날짜는 그대로 다음 영업일
             const t = gExpireAt(p) || gTodayGbCloseAt(p);   // [신규 2026-09-30] 오늘 상품은 당일 마감시각까지 카운트다운
             if (!t || closed) return '';
             const x = gDeadlineText(t);
