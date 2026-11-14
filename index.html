@@ -12835,6 +12835,7 @@
             const pm = document.getElementById('profile-modal');
             if (pm && pm.style.display === 'flex') return;
             if (document.getElementById('wc-pop')) return;   // 무료배송 쿠폰 안내창이 떠 있으면 오늘은 그것만
+            if (document.getElementById('nt-pop')) { setTimeout(gFcPopupMaybe, 1500); return; }   // [신규 2026-11-14] 가게 소식 팝업이 닫힌 뒤에
             /* [수정 2026-11-10] 창 아래 '오늘 하루 안 보기'를 누른 날만 안 띄운다 (사장님 요청). 그 밖에는 들어올 때마다 한 번 (같은 방문 안에서는 한 번만) */
             const key = 'moket_fc_pop_' + gFcPhone, t = gTodayYmd();
             try { if (localStorage.getItem(key) === t) return; if (sessionStorage.getItem(key) === '1') return; sessionStorage.setItem(key, '1'); } catch (e) { }
@@ -13748,6 +13749,42 @@
             if (typeof gLoadReviewStats === 'function') jobs.push(Promise.resolve(gLoadReviewStats()).catch(() => { }));
             await Promise.all(jobs);
             if (window.gHomeOn) gRenderHome();
+            gWhenHomeReady(() => setTimeout(gNoticePopupMaybe, 1200));   // [신규 2026-11-14] 가게 소식 팝업
+        }
+        /* [신규 2026-11-14] 가게 소식 팝업 (사장님 요청) — 주문관리에서 '팝업으로 띄우기'를 켜면 들어올 때 한 번 뜬다.
+           '오늘 하루 보지 않기'를 누른 날은 안 뜬다. 과일 쿠폰 창·로그인 창이 떠 있으면 닫힐 때까지 기다렸다가 띄운다 */
+        let _gNoticeWait = 0;
+        function gNoticePopupMaybe() {
+            const n = window.__hmNotice;
+            if (!n || n.on === false || n.popup !== true) return;
+            const lines = String(n.text || '').split('\n').map(s => s.trim()).filter(Boolean);
+            if (!lines.length || document.getElementById('nt-pop')) return;
+            const t = gTodayYmd();
+            try { if (localStorage.getItem('moket_notice_pop') === t) return; if (sessionStorage.getItem('moket_notice_pop') === '1') return; } catch (e) { }
+            const pm = document.getElementById('profile-modal');
+            if (document.getElementById('wc-pop') || (pm && pm.style.display === 'flex')) {   // 다른 창이 닫히면 띄운다 (2분까지)
+                if (_gNoticeWait++ < 80) setTimeout(gNoticePopupMaybe, 1500);
+                return;
+            }
+            try { sessionStorage.setItem('moket_notice_pop', '1'); } catch (e) { }
+            const back = document.createElement('div');
+            back.id = 'nt-pop';
+            back.style.cssText = 'position:fixed; inset:0; z-index:100000; background:rgba(15,23,42,.5); display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;';
+            back.innerHTML = `<div style="width:100%; max-width:360px; background:#fff; border-radius:18px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.25); font-family:inherit;">` +
+                `<div style="padding:22px 22px 18px;"><div style="display:inline-block; padding:4px 11px; border-radius:999px; background:#eef7e7; color:#3d8f19; font-size:12.5px; font-weight:800; margin-bottom:12px;">📢 가게 소식</div>` +
+                lines.map((l, i) => `<p style="margin:${i ? '8px' : '0'} 0 0; font-size:${i ? '14.5px' : '16px'}; font-weight:${i ? 600 : 800}; color:#1f2937; line-height:1.55; word-break:keep-all; overflow-wrap:anywhere;">${gHomeEsc(l)}</p>`).join('') + `</div>` +
+                `<div style="display:flex; border-top:1px solid #eef0f2;">` +
+                `<button type="button" class="nt-today" style="flex:1 1 0; padding:15px 0; border:none; background:none; color:#64748b; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;">오늘 하루 보지 않기</button>` +
+                `<span style="width:1px; background:#eef0f2;"></span>` +
+                `<button type="button" class="nt-close" style="flex:1 1 0; padding:15px 0; border:none; background:none; color:#3d8f19; font-size:14px; font-weight:800; font-family:inherit; cursor:pointer;">닫기</button></div></div>`;
+            const close = () => { back.remove(); try { checkScrollLock(); } catch (e) { document.body.style.overflow = ''; } };
+            back.onclick = e => {
+                e.stopPropagation();
+                if (e.target.closest('.nt-today')) { try { localStorage.setItem('moket_notice_pop', gTodayYmd()); } catch (er) { } close(); return; }
+                if (e.target === back || e.target.closest('.nt-close')) close();
+            };
+            document.body.appendChild(back);
+            document.body.style.overflow = 'hidden';
         }
 
         // [신규] '오늘의추천' 상품인지 — 사다드림과 같은 방식.
