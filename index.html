@@ -12910,6 +12910,7 @@
         //   이 함수는 [신선식품] 딱지용이라 사다드림은 뺀다 — 사다드림은 [사다드림]만 보인다 (사장님 결정: 딱지는 지금처럼).
         function gIsFreshProduct(p) {
             if (!p) return false;
+            if (gKindOf(p) === 'veg') return false;   // [수정 2026-11-14] 야채는 신선식품이 아니다 — 다른 날짜 상품과 같이 주문 (사장님 요청)
             return (p.isFresh === true || p.isFresh === 'true') && !gIsSadaProduct(p);
         }
         // [신규 2026-10-03] 신선배송 — 자기 날짜에만 배달, 뒷날 상품과 한 배달로 못 묶는다 (사장님이 정한 이름).
@@ -12917,6 +12918,7 @@
         //  isFresh 없이 저장된 예전 사다드림도 신선배송으로 본다.
         function gIsFreshShip(p) {
             if (!p) return false;
+            if (gKindOf(p) === 'veg' && !gIsSadaProduct(p)) return false;   // [수정 2026-11-14] 야채는 신선배송 아님 (예전에 isFresh 로 저장된 것도)
             return p.isFresh === true || p.isFresh === 'true' || gIsSadaProduct(p);
         }
 
