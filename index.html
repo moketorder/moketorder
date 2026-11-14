@@ -14075,7 +14075,7 @@
                     // 기준이 되는 상품이 여러 개면 가장 이른 날짜가 기준이 된다
                     if (d && (!sadaDate || d < sadaDate)) sadaDate = d;
                 }
-                if (d) dated.push({ p, d, isSada: isBound, isFresh: gIsFreshProduct(p) });
+                if (d) dated.push({ p, d, key: n, isSada: isBound, isFresh: gIsFreshProduct(p) });   // [수정 2026-11-14] 장바구니 열쇠도 싣는다 — 옵션 상품은 열쇠가 '이름+옵션'이라 이름으로는 못 뺐다
             }
 
             if (!sadaDate) return null;
@@ -14175,9 +14175,10 @@
                 ? `<span class="mk mk-fresh mk-lead">신선식품</span>`
                 : (item.isSada ? `<span class="mk mk-sada mk-lead">사다드림</span>` : ``);
 
+            // [버그수정 2026-11-14] 개수·빼기는 장바구니 열쇠(item.key)로 — 옵션 상품은 이름과 열쇠가 달라 '0개'로 나오고 빼기가 안 됐다 (사장님 제보)
             const row = (item) => {
                 const nm = String(item.p.name || "");
-                return `<div class="sm-it"><div class="n">${kindTag(item)}${nm.replace(/^\[사다드림\]\s*/, '')}</div><div class="q">${cart[nm] || 0}개</div></div>`;
+                return `<div class="sm-it"><div class="n">${kindTag(item)}${nm.replace(/^\[사다드림\]\s*/, '')}${gOptionLinesHtml(gCartOptionText(item.key))}</div><div class="q">${cart[item.key] || 0}개</div></div>`;
             };
 
             // 기준 날짜 + 더 늦은 날짜들을 한데 모아 날짜순으로 묶는다
@@ -14191,7 +14192,7 @@
                 const items = byDate[d];
                 const tag = isBase ? `<span class="mk mk-good">기준</span>` : `<span class="mk mk-stop">함께 불가</span>`;
                 // 이 날짜에 담긴 상품 이름들을 버튼 하나에 실어 보낸다
-                const names = encodeURIComponent(JSON.stringify(items.map(o => String(o.p.name || ""))));
+                const names = encodeURIComponent(JSON.stringify(items.map(o => String(o.key || o.p.name || "")))).replace(/'/g, '%27');   // 작은따옴표가 onclick 글을 끊지 않게
                 return `<div class="sm-day${isBase ? '' : ' is-off'}">` +
                     `<div class="sm-day-h">${gDayHead('배송일', gFormatDateKey(d, items[0].p), false, tag)}` +
                     `<button type="button" class="sm-del" onclick="removeConflictDate('${names}')">빼기</button></div>` +
