@@ -3577,7 +3577,7 @@
         <div id="free-delivery-notice"
             style="display:none; justify-content:center; align-items:center; gap:7px; padding-bottom:8px; font-weight:700; color:#3d8f19;">
             <!-- 좁은 화면(320px)에서 칩과 함께 한 줄에 들어가도록 글자 크기를 폭에 맞춰 줄인다 -->
-            <span style="font-size:clamp(13px, 4.2vw, 16px); white-space:nowrap;">15,000원 이상 주문시 무료배달</span>
+            <span id="free-ship-banner-txt" style="font-size:clamp(13px, 4.2vw, 16px); white-space:nowrap;">15,000원 이상 주문시 무료배달</span>
             <!-- 누를 수 있다는 게 보이도록, 아래 '총 N개' 알약과 같은 형태(주황 채움 + 그림자)로 맞춘다 -->
             <!-- [ver3] 주황 알약 단추에 그림글자까지 들어가 무료배달 안내보다 눈에 띄었다. 작은 글씨 링크로 낮춘다 -->
             <button type="button" onclick="showCombinedDeliveryGuide()"
@@ -4333,7 +4333,7 @@
                 //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
                 html = gTypeNoticeCard('', '사다드림', '#3d8f19', '#eef7e7', [
                     `모켓이 대신 사다 드리는 상품이에요`,
-                    `무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>`,
+                    `무료배달 기준 금액(<b style="color:var(--nego-orange);">${gFreeMinTxt()}</b>)에 <b style="color:#16200f;">포함되지 않아요</b>`,
                     // [수정] '(배달·픽업 모두)'는 괄호째 붙어 있어야 읽히므로 중간에 줄이 바뀌지 않게 묶어 둔다
                     `주문마감 전까지 <b style="color:#3d8f19;">입금이 확인</b>되어야 주문이 확정돼요<span style="white-space:nowrap;">(배달·픽업 모두)</span>`,
                     `사다드림은 <b style="color:#3d8f19;">카드 결제가 안 돼요</b>`
@@ -4457,6 +4457,22 @@
             } catch (e) {
                 console.error("배달비 로드 실패:", e);
             }
+            // [신규 2026-11-14] 무료배달 기준 금액도 주문관리에서 정한다 (사장님 요청) — 못 읽으면 15,000원
+            try {
+                const r2 = await fetch(FIREBASE_DB_URL + "delivery_free_min.json?t=" + Date.now());
+                const v = r2.ok ? await r2.json() : null;
+                if (v !== null && !isNaN(v) && Number(v) > 0) FREE_DELIVERY_MIN = parseInt(v);
+            } catch (e) { }
+            gPaintFreeMin();
+        }
+        // [신규 2026-11-14] 무료배달 기준 금액 (delivery_free_min, 없으면 15,000원)
+        var FREE_DELIVERY_MIN = 15000;
+        function gFreeMinTxt() { return Number(FREE_DELIVERY_MIN).toLocaleString() + '원'; }
+        function gPaintFreeMin() {
+            const b = document.getElementById('free-ship-banner-txt');
+            if (b) b.textContent = `${gFreeMinTxt()} 이상 주문시 무료배달`;
+            const s = document.getElementById('ship-opt-delivery-sub');
+            if (s) s.textContent = `${gFreeMinTxt()} 이상 무료 · 미만 ${Number(deliveryFee || 3000).toLocaleString()}원`;
         }
 
         async function fetchDeliveryStatus() {
@@ -5129,7 +5145,7 @@
                 if (hasExistingSadaFee) {
                     // 같은 배달 건에 이미 배달비가 부과되어 있으면 중복 부과하지 않음
                     window.isSadaDeliveryFeeAdded = false;
-                } else if (existingSadaDateShipBase >= 15000) {
+                } else if (existingSadaDateShipBase >= FREE_DELIVERY_MIN) {
                     // [신규] 그날 배달이 이미 무료 기준을 넘겨 잡혀 있으면 같은 차로 나가므로 배달비 없음
                     window.isSadaDeliveryFeeAdded = false;
                 } else if (!window.isSadaDeliveryFeeAdded) {
@@ -5145,7 +5161,7 @@
             let needReserveFeePrompt = false;
             const combinedShipBase = existingReserveTotal + reserveTotal;
             if (hasReserveInCart) {
-                if (combinedShipBase >= 15000) {
+                if (combinedShipBase >= FREE_DELIVERY_MIN) {
                     // 합쳐서 무료 기준을 넘겼으니 이번엔 배달비를 받지 않는다.
                     window.isReserveDeliveryFeeAdded = false;
                 } else if (hasExistingReserveFee) {
@@ -5170,12 +5186,12 @@
             /* [신규 2026-10-28] 그날 무료배송 쿠폰으로 배달비를 뺀 주문이 있는데, 이번 주문을 합쳐 무료배달 기준을 넘으면
                쿠폰이 필요 없어진다 — 그 배달비 줄과 쿠폰 줄을 함께 취소하고 쿠폰을 돌려준다 (7일 안에 다시 쓴다) */
             window.pendingWcCancelRows = [];
-            if (combinedShipBase >= 15000) {
+            if (combinedShipBase >= FREE_DELIVERY_MIN) {
                 const _wcRow = pendingReserveItems.find(it => gIsWcRow(it) && !isOrderCancelled(it));
                 const _wcFee = _wcRow && pendingReserveItems.find(it => String(it.item || '').trim() === '배달비' && !isOrderCancelled(it));
                 if (_wcRow && _wcFee) window.pendingWcCancelRows = [_wcFee, _wcRow];
             }
-            if (combinedShipBase >= 15000 && hasExistingReserveFee
+            if (combinedShipBase >= FREE_DELIVERY_MIN && hasExistingReserveFee
                 && !window.isReserveDeliveryFeeAdded && !window.isSadaDeliveryFeeAdded) {
                 const feeRow = reserveFeeScan.feeRow;
                 const amt = parseInt((feeRow && (feeRow.total || feeRow.price)) || deliveryFee) || 0;
@@ -5222,7 +5238,7 @@
                         feeModal(
                             `배달비 안내`,
                             feeRow('사다드림 주문금액', sadaTotal) + feeRow(window.__fcFeeCut ? '공동구매 주문금액 (과일 쿠폰 할인 후)' : '공동구매 주문금액', reserveTotal),
-                            feeNote('사다드림 상품 금액은 무료배달 기준(15,000원)에 포함되지 않아요.'),
+                            feeNote(`사다드림 상품 금액은 무료배달 기준(${gFreeMinTxt()})에 포함되지 않아요.`),
                             gNote('money', '배달비', `사다드림과 공동구매는 배달일이 달라 배달비가 따로 붙어요. <b>${deliveryFee.toLocaleString()}원 × 2 = ${(deliveryFee * 2).toLocaleString()}원</b>`)
                         ),
                         'confirm',
@@ -5245,7 +5261,7 @@
                             `배달비 안내`,
                             feeRow('사다드림 주문금액', sadaTotal),
                             '',
-                            gNote('money', '배달비', `사다드림 상품은 무료배달 기준(15,000원)에 들어가지 않아서 배달비 <b>${deliveryFee.toLocaleString()}원</b>이 붙어요.`)
+                            gNote('money', '배달비', `사다드림 상품은 무료배달 기준(${gFreeMinTxt()})에 들어가지 않아서 배달비 <b>${deliveryFee.toLocaleString()}원</b>이 붙어요.`)
                         ),
                         'confirm',
                         () => {
@@ -5269,10 +5285,10 @@
                     showSystemModal(
                         feeModal(
                             `배달비 안내`,
-                            (window.__fcFeeCut ? feeRow('주문금액', reserveTotal + window.__fcFeeCut) + feeRow('과일 할인 쿠폰', -window.__fcFeeCut) + feeRow('쿠폰 할인 후 금액', reserveTotal) : feeRow('주문금액', reserveTotal)) + feeRow('무료배달 기준', 15000),   /* [신규 2026-11-05] 쿠폰을 뺀 금액으로 따진다 */
-                            cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준(15,000원)에 포함되지 않아요.') : ``,
-                            gNote('money', '배달비', `15,000원이 안 돼서 배달비 <b>${deliveryFee.toLocaleString()}원</b>이 붙어요.`) +
-                            feeNudge(15000 - reserveTotal) +
+                            (window.__fcFeeCut ? feeRow('주문금액', reserveTotal + window.__fcFeeCut) + feeRow('과일 할인 쿠폰', -window.__fcFeeCut) + feeRow('쿠폰 할인 후 금액', reserveTotal) : feeRow('주문금액', reserveTotal)) + feeRow('무료배달 기준', FREE_DELIVERY_MIN),   /* [신규 2026-11-05] 쿠폰을 뺀 금액으로 따진다 */
+                            cartHasSada ? feeNote(`사다드림 상품 금액은 무료배달 기준(${gFreeMinTxt()})에 포함되지 않아요.`) : ``,
+                            gNote('money', '배달비', `${gFreeMinTxt()}이 안 돼서 배달비 <b>${deliveryFee.toLocaleString()}원</b>이 붙어요.`) +
+                            feeNudge(FREE_DELIVERY_MIN - reserveTotal) +
                             gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?')
                         ),
                         'confirm',
@@ -5521,9 +5537,9 @@
                 // 픽업 주문까지 함께 보낼 때의 배달비 (그 금액까지 무료배달 기준에 더한다)
                 const pickupBase = shipBase(pickupGoods);
                 const mergedBase = nowBase + pickupBase;
-                const mReserve = (hasReserveInCart || pickupBase > 0) && mergedBase < 15000 && !hasExistingReserveFee;
+                const mReserve = (hasReserveInCart || pickupBase > 0) && mergedBase < FREE_DELIVERY_MIN && !hasExistingReserveFee;
                 let mRefund = 0;
-                if (mergedBase >= 15000 && hasExistingReserveFee && !needSadaFeePrompt) {
+                if (mergedBase >= FREE_DELIVERY_MIN && hasExistingReserveFee && !needSadaFeePrompt) {
                     const fr = reserveFeeScan.feeRow;
                     mRefund = Math.max(0, parseInt((fr && (fr.total || fr.price)) || deliveryFee) || 0);
                 }
@@ -5532,11 +5548,11 @@
                     let tag, extra = '';
                     if (n) {
                         tag = `<small class="fee">+ 배달비 ${won(deliveryFee * n)}</small>`;
-                        if (needReserve && base < 15000) extra += gNote('good', '무료배달', `같은 날짜 상품을 <b>${won(15000 - base)}</b>만 더 담으면 배달비가 무료예요.`);
-                        if (needSada) extra += `<div class="cb-note">사다드림 상품 금액은 무료배달 기준(15,000원)에 포함되지 않아요.</div>`;
+                        if (needReserve && base < FREE_DELIVERY_MIN) extra += gNote('good', '무료배달', `같은 날짜 상품을 <b>${won(FREE_DELIVERY_MIN - base)}</b>만 더 담으면 배달비가 무료예요.`);
+                        if (needSada) extra += `<div class="cb-note">사다드림 상품 금액은 무료배달 기준(${gFreeMinTxt()})에 포함되지 않아요.</div>`;
                         extra += gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?');
                     } else if (refund > 0) { tag = `<small>무료배달</small>`; extra = gNote('money', '배달비', `합배송으로 앞 주문 배달비 <b>${won(refund)}</b>은 취소해 드려요. 이미 입금하셨다면 돌려드려요.`); }
-                    else if (base >= 15000) tag = `<small>무료배달</small>`;
+                    else if (base >= FREE_DELIVERY_MIN) tag = `<small>무료배달</small>`;
                     else tag = `<small class="inc">배달비는 앞 주문에 포함</small>`;   // 그날 배달비를 이미 냈다
                     return { tag, extra };
                 };
@@ -6296,13 +6312,13 @@
             const fee = (typeof deliveryFee !== 'undefined' ? deliveryFee : 3000);
             const daysStr = (typeof isSundayAsWeekday !== "undefined" && isSundayAsWeekday) ? "월~일" : ((typeof isSaturdayAsWeekday !== "undefined" && isSaturdayAsWeekday) ? "월~토" : "월~금");
             return `<div class="v3-grp"><h4>배달비</h4>` +
-                `<p class="kv"><span class="k">배달</span><span><b>${Number(fee).toLocaleString()}원</b> · 같은 날 받는 상품이 <b>15,000원 이상</b>이면 무료</span></p>` +
+                `<p class="kv"><span class="k">배달</span><span><b>${Number(fee).toLocaleString()}원</b> · 같은 날 받는 상품이 <b>${gFreeMinTxt()} 이상</b>이면 무료</span></p>` +
                 `<p class="kv"><span class="k">매장 픽업</span><span>배달비 없음</span></p></div>` +
                 `<div class="v3-grp"><h4>받는 날</h4>` +
                 `<p>상품마다 받는 날이 정해져 있습니다. 여러 날짜를 같이 담으면 <b>가장 늦은 날에 한 번</b> 배달합니다.</p>` +
                 `<p>받는 날은 상품 목록과 주문내역에서 볼 수 있습니다.</p></div>` +
                 `<div class="v3-grp"><h4>합배송</h4>` +
-                `<p>따로 주문해도 받는 날이 같으면 함께 나갑니다. 합쳐서 <b>15,000원</b>이 넘으면 먼저 낸 배달비를 돌려드립니다.</p>` +
+                `<p>따로 주문해도 받는 날이 같으면 함께 나갑니다. 합쳐서 <b>${gFreeMinTxt()}</b>이 넘으면 먼저 낸 배달비를 돌려드립니다.</p>` +
                 `<p>매장 픽업은 상품이 들어온 날마다 따로 찾아가시면 됩니다.</p></div>` +
                 (forFold ? '' : `<div class="v3-grp"><h4>판매 방식</h4>` +
                 `<p class="kv"><span class="k">공동구매</span><span>상품마다 받는 날이 정해져 있습니다. 오늘 상품은 ${daysStr} <b>${gTodayCloseWords()}</b>까지 주문하면 그날 받습니다</span></p>` +
@@ -9830,7 +9846,7 @@
                 const amountOf = (o) => Math.abs(parseInt(o.total || 0));
                 const currentFee = feeItems.reduce((a, o) => a + amountOf(o), 0)
                                  - allRefunds.reduce((a, o) => a + amountOf(o), 0);
-                const neededFee = (activeTotal >= 15000) ? 0 : (window.deliveryFee || 3000);
+                const neededFee = (activeTotal >= FREE_DELIVERY_MIN) ? 0 : (window.deliveryFee || 3000);
                 /* [신규 2026-10-28] 쿠폰은 그날 과일이 남아 있고 배달비가 붙어 있어야 쓸모가 있다.
                    과일을 모두 취소했거나 배달비가 필요 없어지면 쿠폰 줄도 취소한다 (쿠폰은 gWcCheckRestore 가 돌려준다) */
                 const hasFruit = productItems.some(o => {
@@ -9888,7 +9904,7 @@
                 + `</div>`;
 
             if (addedFee > 0) {
-                msg += gNote('money', '배달비', `남은 주문이 15,000원보다 적어져 그날 마지막 주문에 배달비 <b>${won(addedFee)}</b>이 붙었어요.`);
+                msg += gNote('money', '배달비', `남은 주문이 ${gFreeMinTxt()}보다 적어져 그날 마지막 주문에 배달비 <b>${won(addedFee)}</b>이 붙었어요.`);
             } else if (refundedFee > 0) {
                 msg += gNote('money', '배달비', `붙어 있던 배달비 <b>${won(refundedFee)}</b>도 함께 취소했어요. 이미 입금하셨다면 돌려드려요.`);
             } else {
@@ -9978,13 +9994,13 @@
                     return !isCanceled && !isGoingToBeCanceled && o.item !== '배달비' && !gIsPointRow(o.item);
                 }).length;
                 
-                if (remainingActiveCount > 0 && remainingTotal < 15000) {
+                if (remainingActiveCount > 0 && remainingTotal < FREE_DELIVERY_MIN) {
                     willTriggerDeliveryFee = true;
                 }
             }
             
             const confirmMsg = willTriggerDeliveryFee 
-                ? `정말로 이 주문을 취소하시겠습니까?<br><br><span style="color:#d32f2f; font-weight:800;">⚠️ 부분 취소로 인해 무료배송 기준(15,000원) 미만이 되어 배달비 ${deliveryFeeToCharge.toLocaleString()}원이 자동으로 부과됩니다.</span>`
+                ? `정말로 이 주문을 취소하시겠습니까?<br><br><span style="color:#d32f2f; font-weight:800;">⚠️ 부분 취소로 인해 무료배송 기준(${gFreeMinTxt()}) 미만이 되어 배달비 ${deliveryFeeToCharge.toLocaleString()}원이 자동으로 부과됩니다.</span>`
                 : "정말로 이 주문을 취소하시겠습니까?";
 
             showSystemModal(confirmMsg, 'confirm', async () => {
@@ -12841,7 +12857,7 @@
                 `<hr><div class="q">모켓의 대표상품 과일, 뭐가 다를까요?</div>` +
                 `<dl>${pts.map(p => `<div><dt>${p[0]}</dt><dd>${p[1]}</dd></div>`).join('')}</dl>` +
                 `<button type="button" class="go">오늘 과일 보러 가기</button>` +
-                `<div class="fine" style="text-align:left;">${["과일 5,000원 이상 <b>배달</b> 주문 시 자동으로 1회 적용됩니다.", "무료배달(15,000원)은 쿠폰 할인 후 금액으로 계산됩니다.", "픽업 주문에는 사용할 수 없습니다."].map(t => `<div style="padding-left:10px; text-indent:-10px;">· ${t}</div>`).join("")}</div></div>` +
+                `<div class="fine" style="text-align:left;">${["과일 5,000원 이상 <b>배달</b> 주문 시 자동으로 1회 적용됩니다.", `무료배달(${gFreeMinTxt()})은 쿠폰 할인 후 금액으로 계산됩니다.`, "픽업 주문에는 사용할 수 없습니다."].map(t => `<div style="padding-left:10px; text-indent:-10px;">· ${t}</div>`).join("")}</div></div>` +
                 /* [신규 2026-11-10] 창 맨 아래 — 오늘 하루 안 보기 · 닫기 (사장님 요청) */
                 `<div style="display:flex; border-top:1px solid rgba(243,241,232,.14);">` +
                 `<button type="button" class="fc-today" style="flex:1 1 0; padding:14px 0; border:none; background:none; color:rgba(243,241,232,.75); font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer;">오늘 하루 안 보기</button>` +
@@ -15591,7 +15607,7 @@
                     // [신규] 차감 줄만 보면 왜 빠지는지 알 수 없어서, 바로 밑에 이유를 적어 준다.
                     else if (p.name === FEE_REFUND_NAME) {
                         groupHtml += `
-                        <div style="margin:0 0 8px; padding:7px 10px; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; font-size:12px; font-weight:700; color:#2e7d32; line-height:1.55; word-break:keep-all; text-align:left;">이전 주문과 <b>합배송</b>되어 무료배달 기준(15,000원)을 넘었어요. 앞서 붙은 배달비 <b>${Math.abs(sub).toLocaleString()}원</b>은 이번 입금 금액에서 빼 드렸어요.</div>`;
+                        <div style="margin:0 0 8px; padding:7px 10px; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; font-size:12px; font-weight:700; color:#2e7d32; line-height:1.55; word-break:keep-all; text-align:left;">이전 주문과 <b>합배송</b>되어 무료배달 기준(${gFreeMinTxt()})을 넘었어요. 앞서 붙은 배달비 <b>${Math.abs(sub).toLocaleString()}원</b>은 이번 입금 금액에서 빼 드렸어요.</div>`;
                     }
                 });
                 groupHtml += `</div></div>`;
@@ -15676,7 +15692,7 @@
                 return;
             }
             const _shipSub = document.getElementById('ship-opt-delivery-sub');   // [ver3] 배달비는 설정값으로
-            if (_shipSub) _shipSub.textContent = `15,000원 이상 무료 · 미만 ${Number(deliveryFee || 3000).toLocaleString()}원`;
+            if (_shipSub) _shipSub.textContent = `${gFreeMinTxt()} 이상 무료 · 미만 ${Number(deliveryFee || 3000).toLocaleString()}원`;
             document.getElementById('shipping-overlay').style.display = 'flex';
             checkScrollLock();
         }
