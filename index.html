@@ -12337,7 +12337,7 @@
         function gOrigPriceLabel(p) {
             if (!gIsSale(p)) return '';
             if (gListPrice(p)) return (gListPrice(p) + gCalcAgencyFee(p, parseInt(p.price) || 0)).toLocaleString() + '원';   // [신규 2026-10-11] 정상가를 따로 적었으면 그 값을 긋는다
-            const base = parseInt(p && p.price) || 0;
+            const base = gEffBase(p);
             const before = !gHasChoiceOptions(p) ? base : (base > 0 ? base : gMinOptionAdd(p));
             if (before <= 0) return '';
             return (before + gCalcAgencyFee(p, before)).toLocaleString() + '원';   // [수정 2026-10-29] 정상가도 대행료 포함 — 아래 금액과 같은 잣대
@@ -12449,6 +12449,13 @@
 
         // [신규] 고를 수 있는 옵션(선택옵션)이 실제로 있는 상품인지.
         //  금액제한·1인당제한만 켜진 상품은 고를 항목이 없으므로 여기서는 옵션 상품으로 보지 않는다.
+        /* [신규 2026-11-16] 상품의 기본가 — 고를 옵션에 가격이 하나라도 적혀 있으면 공구가·상시가가 적혀 있어도 0으로 본다 (사장님 요청).
+           그때는 옵션 가격이 곧 그 상품 값이다 (예전엔 기본가 + 옵션가로 더해졌다) */
+        function gEffBase(p) {
+            if (!p) return 0;
+            if (gHasChoiceOptions(p) && p.options.some(g => (g.items || []).some(it => (parseInt(it && it.price) || 0) > 0))) return 0;
+            return parseInt(p.price) || 0;
+        }
         function gHasChoiceOptions(p) {
             if (!p || !gBool(p.useOptions, true)) return false;
             if (!gBool(p.useChoiceOptions) || !Array.isArray(p.options)) return false;
@@ -12481,7 +12488,7 @@
         //  손님이 아는 그 값보다 비싸게 적혀 나왔다. 이제 기본가격이 있으면 그 값을 그대로 쓰고,
         //  기본가격이 0원일 때만 옵션 중 가장 싼 값을 쓴다.
         function gCardPriceLabel(p) {
-            const base = parseInt(p && p.price) || 0;
+            const base = gEffBase(p);   // [수정 2026-11-16] 가격 있는 옵션이면 기본가는 0 → 옵션 가장 싼 값~
             // [수정] 할인 상품은 깎인 금액을 보여 준다. 할인 전 금액은 gOrigPriceLabel로 그 위에 따로 적는다.
             /* [수정 2026-10-29] 사다드림 대행료를 더한 금액으로 보여 준다 (사장님 요청 — 카드엔 2만원인데 장바구니에선 2만4천원이라 헷갈렸다).
                대행료는 개당·할인 전 금액으로 구간을 정한다(gCalcAgencyFee). 고를 옵션이 있으면 가장 싼 금액 + 그 대행료로 '~' */
@@ -14314,7 +14321,7 @@
         //  옵션이 없는 상품은 기존과 동일하게 기본가만 쓴다.
         // 할인 전 금액. 대행료 구간을 고를 때는 이 값을 쓴다.
         function gCartUnitPriceRaw(p, name) {
-            const base = parseInt((p && p.price) || 0) || 0;
+            const base = gEffBase(p);   // [수정 2026-11-16] 가격 있는 옵션이면 기본가는 0
             const opt = parseInt((cartOptions[name] && cartOptions[name].optionTotal) || 0) || 0;
             return base + opt;
         }
@@ -14564,7 +14571,7 @@
                 });
             });
 
-            const base = parseInt(p.price) || 0;
+            const base = gEffBase(p);   // [수정 2026-11-16]
             const unit = base + optionTotal;
             // [버그수정] 옵션 상품은 장바구니 키에 옵션 서명이 붙어 상품명으로만 찾으면 0으로 잡힌다.
             //  조합이 달라도 같은 상품이면 1인당 제한에 함께 세어야 한다.
@@ -14655,7 +14662,7 @@
 
                     // 수량이 2개 이상이면 합계 금액도 같이 보여준다
                     // [수정 2026-11-06] 상품 기본값이 0원이면 옵션 값이 곧 전체 값이라 '+'를 붙이지 않는다 (사장님 요청 — '+15,900원'이 더 내는 돈처럼 보였다)
-                    const _plus = (parseInt((productsData.find(pd => pd.name === gCartName(st.name)) || {}).price) || 0) > 0 ? '+' : '';
+                    const _plus = gEffBase(productsData.find(pd => pd.name === gCartName(st.name))) > 0 ? '+' : '';   // [수정 2026-11-16]
                     const priceText = price
                         ? (q > 1 ? `${_plus}${(price * q).toLocaleString()}원` : `${_plus}${price.toLocaleString()}원`)
                         : (_plus ? '+0원' : '0원');
