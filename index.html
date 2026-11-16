@@ -10770,6 +10770,9 @@
                     });
                 });
 
+                // [신규 2026-11-16] 옵션마다 재고를 적은 상품은 상품 재고 대신 옵션 재고를 따른다 (사장님 요청 — 상품 재고를 따로 안 적어도 되게)
+                freshData.forEach(fp => { const s = gOptFollowStock(fp); if (s !== null) fp.stock = s; });
+
                 console.log("[Data Sync] 최종 유효 데이터:", freshData);
 
                 console.log("[Data Sync] 필터링 후 유효 데이터:", freshData);
@@ -13879,6 +13882,20 @@
             return Math.max(0, base + adj);
         }
 
+        /* [신규 2026-11-16] 옵션 재고를 따르는 상품의 남은 수량 (사장님 요청).
+           고를 옵션 묶음 중 모든 항목에 재고를 적은 묶음이 있으면 → 그 묶음의 남은 수량 합 (묶음이 여럿이면 가장 적은 것).
+           그런 묶음이 없으면 null (예전처럼 상품 재고). 상품 재고 칸은 보지 않는다 — 옵션이 다 팔려야 품절 */
+        function gOptFollowStock(p) {
+            if (!p || !gHasChoiceOptions(p)) return null;
+            let best = null;
+            p.options.forEach(g => {
+                const items = (g && Array.isArray(g.items)) ? g.items.filter(Boolean) : [];
+                if (!items.length || items.some(it => gOptBaseStock(it) === null)) return;
+                const sum = items.reduce((a, it) => a + (gOptRemain(p, g.name, it) || 0), 0);
+                best = best === null ? sum : Math.min(best, sum);
+            });
+            return best;
+        }
         function gOptStockUrl(optKey) {
             return `${FIREBASE_DB_URL}option_stock/${encodeURIComponent(optKey)}.json`;
         }
@@ -17003,6 +17020,7 @@
                         }
 
                         if (gIsUnlimitedStock(pData)) continue;
+                        if (gOptFollowStock(pData) !== null) continue;   // [신규 2026-11-16] 옵션 재고를 따르는 상품 — 옵션 재고(따로 잡음)만 본다, 상품 재고 칸은 안 본다
 
                         let base = parseInt((pData && pData.originalStock) || 0) || 0;
                         const adjKey = fGetAdjKey(it.matchKey || it.date, it.name, it.sid || (pData && pData.sid));
