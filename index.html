@@ -12173,9 +12173,7 @@
                     `<div class="thumb-notice">상세보기 <span>›</span></div>` +
                     // [신규] 할인 상품은 사진 위쪽에 '15% 할인!' 띠를 두른다 (아래 '예시이미지입니다.'와 짝)
                     // [수정 2026-10-02] 문구를 적어 두었으면 띠에 그 문구만, 없으면 '2,000원 할인!' (사장님 요청)
-                    (gIsSale(p) ? ((gSaleBadgeOn(p) && gSaleBadgeText(p))
-                        ? `<div class="thumb-sale txt">${gSaleBadgeText(p).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</div>`
-                        : `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>`) : '') +
+                    gThumbBandHtml(p, s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))) +   // [수정 2026-11-18] 섬네일 문구는 할인과 따로
                     // [수정 2026-10-02] 두 칸 카드 — 신선·냉장·당일배송 딱지는 사진 아래쪽에 겹쳐 둔다
                     `<div class="thumb-badges">` + gStorageBadge(p) + gTagBadges(p) + `</div>` +
                     `</div>` +
@@ -12303,7 +12301,9 @@
         }
         function gIsSale(p) { return gDiscountRateOf(p) > 0 || gDiscAmountOf(p) > 0; }
         function gIsSaleToday(p) { return gIsSale(p) && !(p.saleToToday === false || p.saleToToday === 'false'); }
-        function gSaleBadgeOn(p) { return gIsSale(p) && !(p.saleBadge === false || p.saleBadge === 'false'); }
+        // [수정 2026-11-18] 섬네일 문구는 할인과 따로 켠다 — 켜져 있으면(saleBadge true) 할인 없어도 띠에 문구. 예전 상품(값 없음)은 할인 중일 때만
+        function gSaleBadgeOn(p) { if (!p) return false; if (p.saleBadge === true || p.saleBadge === 'true') return true; if (p.saleBadge === false || p.saleBadge === 'false') return false; return gIsSale(p); }
+        function gThumbBandHtml(p, esc) { const t = gSaleBadgeOn(p) && gSaleBadgeText(p); return t ? `<div class="thumb-sale txt">${esc(t)}</div>` : (gIsSale(p) ? `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>` : ''); }
         // [신규 2026-10-02] 할인 섬네일 문구 — 주문관리 상세옵션에서 직접 쓴다. 비우면 문구 없음 (사장님 요청: 기본은 공란)
         function gSaleBadgeText(p) { return String((p && p.saleBadgeText) || '').trim(); }
         function gDiscLabelOf(p) { return gDiscAmountOf(p) > 0 ? `${gDiscAmountOf(p).toLocaleString()}원 할인` : `${gDiscountRateOf(p)}% 할인`; }
@@ -13363,9 +13363,7 @@
             const closed = gIsClosedProduct(p), stock = gHomeStockOf(p), sold = closed || stock <= 0;
             const img = (Array.isArray(p.images) && p.images[0]) || '';
             const open = `onclick="gHomeOpen('${escapeArg(p.name)}')"`;
-            const sale = gIsSale(p)
-                ? ((gSaleBadgeOn(p) && gSaleBadgeText(p)) ? `<div class="thumb-sale txt">${gHomeEsc(gSaleBadgeText(p))}</div>` : `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>`)
-                : '';
+            const sale = gThumbBandHtml(p, gHomeEsc);   // [수정 2026-11-18] 섬네일 문구는 할인과 따로
             const label = closed ? '마감' : (sold ? '품절' : (q > 0 ? `담김 <b>${q}</b>개` : (gHasChoiceOptions(p) ? '옵션 선택' : '담기')));
             return `<div class="product-card hm-card${sold ? ' soldout' : ''}${rank ? ' ranked' : ''}">` +
                 `<div class="hm-thumb" ${open}>` +
