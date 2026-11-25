@@ -17471,8 +17471,9 @@
             const t0 = Date.now();
             const clearUrl = () => { try { const u = new URL(location.href); u.searchParams.delete('p'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); } catch (e) { } };
             const tick = () => {
-                const ready = typeof productsData !== 'undefined' && productsData && productsData.length && document.querySelector('.product-card');
-                if (!ready) { if (Date.now() - t0 < 20000) setTimeout(tick, 300); return; }
+                // 로그인 화면·안내 창이 떠 있으면(화면이 잠겨 있으면) 닫힐 때까지 기다린다 — 그 뒤에 자리로 간다
+                const ready = typeof productsData !== 'undefined' && productsData && productsData.length && document.querySelector('.product-card') && getComputedStyle(document.body).overflow !== 'hidden';
+                if (!ready) { if (Date.now() - t0 < 600000) setTimeout(tick, 400); return; }
                 const p = productsData.find(x => x && String(x.sid || '') === sid);
                 clearUrl();
                 const type = p ? gHomeTypeOf(p) : '';
