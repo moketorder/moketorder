@@ -17469,15 +17469,19 @@
            첫 그리기가 끝날 때까지(상품을 받고 홈이 뜰 때까지) 기다렸다가 옮긴다. 한 번 쓰면 주소에서 ?p= 를 지워 새로고침해도 다시 안 움직인다. */
         function gDeepLinkGo(sid) {
             sid = String(sid || '').trim(); if (!sid) return;
-            const t0 = Date.now();
+            const t0 = Date.now(); let tReady = 0;
             const clearUrl = () => { try { const u = new URL(location.href); u.searchParams.delete('p'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); } catch (e) { } };
             const tick = () => {
                 // 로그인 화면·안내 창이 떠 있으면(화면이 잠겨 있으면) 닫힐 때까지 기다린다 — 그 뒤에 자리로 간다
                 const ready = typeof productsData !== 'undefined' && productsData && productsData.length && document.querySelector('.product-card') && getComputedStyle(document.body).overflow !== 'hidden';
                 if (!ready) { if (Date.now() - t0 < 600000) setTimeout(tick, 400); return; }
                 const p = productsData.find(x => x && String(x.sid || '') === sid);
-                clearUrl();
                 const type = p ? gHomeTypeOf(p) : '';
+                /* [수정 2026-11-26] 처음엔 폰에 저장해 둔 옛 상품 목록으로 먼저 그려서, 새로 올린 상품이 없다고 나왔다 (사장님 지적 — 밀푀유 식빵).
+                   못 찾으면 서버에서 새 목록이 올 때까지 15초 더 기다려 다시 본다 */
+                if (!tReady) tReady = Date.now();
+                if (!type && Date.now() - tReady < 15000) { setTimeout(tick, 500); return; }
+                clearUrl();
                 if (!type) { try { showToast('지금은 판매하지 않는 상품이에요'); } catch (e) { } return; }
                 window.gHomeStart = false;
                 if (window.gHomeOn || currentDeliveryType !== type || currentMainTab !== (type === 'onsite' ? ONSITE_ALL.key : 'gb-all') || (type === 'reserve' && window.gGbPickedDate !== 'all')) {
