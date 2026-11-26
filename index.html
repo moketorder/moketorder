@@ -17484,10 +17484,15 @@
                 clearUrl();
                 if (!type) { try { showToast('지금은 판매하지 않는 상품이에요'); } catch (e) { } return; }
                 window.gHomeStart = false;
-                if (window.gHomeOn || currentDeliveryType !== type || currentMainTab !== (type === 'onsite' ? ONSITE_ALL.key : 'gb-all') || (type === 'reserve' && window.gGbPickedDate !== 'all')) {
+                /* [수정 2026-11-26] '전체'가 아니라 그 상품의 하위 분류 탭으로 (사장님 요청) — 상시판매는 분류탭(국·찌개 등), 공동구매는 과일·야채·사다드림·일반·추석선물 */
+                const _gk = type === 'reserve' ? gGbTabKind(p) : '';
+                const sub = type === 'onsite' ? (gOnsiteTabCatOf(p) || ONSITE_ALL.key) : (_gk === 'chuseok' ? CHUSEOK_TAB : 'gb-' + _gk);
+                if (window.gHomeOn || currentDeliveryType !== type) {
                     if (currentDeliveryType === type && !window.gHomeOn) currentDeliveryType = '';   // 같은 유형이면 switchDeliveryType 이 맨 위로만 올리므로 새로 그리게
                     switchDeliveryType(type);
                 }
+                if (type === 'reserve') window.gGbPickedDate = 'all';
+                if (document.querySelector('.main-tab-btn[data-tab="' + sub + '"]')) switchMainTab(sub);   // 그 탭이 없으면(드문 경우) 전체에 둔다
                 const find = () => [...document.querySelectorAll('.product-card')].find(c => !c.classList.contains('hm-card') && [...c.querySelectorAll('.qty-num')].some(q => q.dataset.name === p.name));
                 let tries = 0;
                 const go = (again) => {
