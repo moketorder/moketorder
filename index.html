@@ -17044,10 +17044,9 @@
                         for (const rv of reserved) { try { await gReleaseStockCAS(rv.adjKey, rv.qty); } catch (e) {} }
                         for (const rv of reservedOpt) { try { await gReleaseOptionCAS(rv.optKey, rv.qty); } catch (e) {} }
 
-                        // 배달비 주입 플래그도 되돌린다 (주문을 만들지 않았으므로)
-                        window.isDeliveryFeeAddedUnder15000 = false;
-                        window.isSadaDeliveryFeeAdded = false;
-                        window.isReserveDeliveryFeeAdded = false;
+                        /* [수정 2026-11-27] 배달비 표시는 그대로 둔다 (사장님 지적 — 롱6103 사다드림 배달 주문에 배달비가 빠짐).
+                           예전엔 여기서 꺼서, 손님이 '주문확정 (재시도)'를 누르면 배달비 없이 주문이 들어갔다.
+                           장바구니를 고치러 나가면 다시 '배달주문'을 누를 때 처음부터 새로 계산한다 */
                         _undoOrderStart();   // [신규 2026-10-03] 장바구니를 되살려 수량을 줄이거나 뺄 수 있게
 
                         isHistoryProcessing = false;
@@ -17116,9 +17115,7 @@
                     if (!pw.ok) {
                         for (const rv of reserved) { try { await gReleaseStockCAS(rv.adjKey, rv.qty); } catch (e) {} }
                         for (const rv of reservedOpt) { try { await gReleaseOptionCAS(rv.optKey, rv.qty); } catch (e) {} }
-                        window.isDeliveryFeeAddedUnder15000 = false;
-                        window.isSadaDeliveryFeeAdded = false;
-                        window.isReserveDeliveryFeeAdded = false;
+                        // [수정 2026-11-27] 배달비 표시는 그대로 둔다 — 재시도해도 배달비가 빠지지 않게 (위 재고 부족과 같다)
                         window.gPointUse = 0;
                         // 미리 넣어 둔 주문내역도 걷어 내고 장바구니도 되살린다 (주문을 만들지 않았으므로)
                         _undoOrderStart();
